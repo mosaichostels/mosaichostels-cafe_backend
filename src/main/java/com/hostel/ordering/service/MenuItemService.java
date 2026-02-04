@@ -1,92 +1,60 @@
 package com.hostel.ordering.service;
 
-import com.google.api.core.ApiFuture;
-import com.google.cloud.firestore.*;
 import com.hostel.ordering.model.MenuItem;
+import com.hostel.ordering.repository.MenuItemRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ExecutionException;
+import java.util.Optional;
 
 @Service
 public class MenuItemService {
 
-    private static final String COLLECTION_NAME = "menuItems";
-
     @Autowired
-    private Firestore firestore;
+    private MenuItemRepository menuItemRepository;
 
-    public MenuItem createMenuItem(MenuItem menuItem) throws ExecutionException, InterruptedException {
+    public MenuItem createMenuItem(MenuItem menuItem) {
         menuItem.setCreatedAt(System.currentTimeMillis());
         menuItem.setUpdatedAt(System.currentTimeMillis());
 
-        DocumentReference docRef = firestore.collection(COLLECTION_NAME).document();
-        menuItem.setId(docRef.getId());
-
-        ApiFuture<WriteResult> result = docRef.set(menuItem);
-        result.get();
-
-        return menuItem;
+        return menuItemRepository.save(menuItem);
     }
 
-    public MenuItem getMenuItem(String id) throws ExecutionException, InterruptedException {
-        DocumentReference docRef = firestore.collection(COLLECTION_NAME).document(id);
-        ApiFuture<DocumentSnapshot> future = docRef.get();
-        DocumentSnapshot document = future.get();
+    public MenuItem getMenuItem(String id) {
+        Optional<MenuItem> menuItem = menuItemRepository.findById(id);
+        return menuItem.orElse(null);
+    }
 
-        if (document.exists()) {
-            return document.toObject(MenuItem.class);
+    public List<MenuItem> getAllMenuItems() {
+        return menuItemRepository.findAll();
+    }
+
+    public List<MenuItem> getAvailableMenuItems() {
+        return menuItemRepository.findByAvailableTrueOrderByNameAsc();
+    }
+
+    public MenuItem updateMenuItem(String id, MenuItem menuItem) {
+        Optional<MenuItem> optionalMenuItem = menuItemRepository.findById(id);
+        
+        if (optionalMenuItem.isPresent()) {
+            MenuItem existingMenuItem = optionalMenuItem.get();
+            
+            if (menuItem.getName() != null) existingMenuItem.setName(menuItem.getName());
+            if (menuItem.getDescription() != null) existingMenuItem.setDescription(menuItem.getDescription());
+            if (menuItem.getPrice() != null) existingMenuItem.setPrice(menuItem.getPrice());
+            if (menuItem.getCategory() != null) existingMenuItem.setCategory(menuItem.getCategory());
+            if (menuItem.getAvailable() != null) existingMenuItem.setAvailable(menuItem.getAvailable());
+            
+            existingMenuItem.setUpdatedAt(System.currentTimeMillis());
+            
+            return menuItemRepository.save(existingMenuItem);
         }
+        
         return null;
     }
 
-    public List<MenuItem> getAllMenuItems() throws ExecutionException, InterruptedException {
-        ApiFuture<QuerySnapshot> future = firestore.collection(COLLECTION_NAME).get();
-        List<QueryDocumentSnapshot> documents = future.get().getDocuments();
-
-        List<MenuItem> menuItems = new ArrayList<>();
-        for (QueryDocumentSnapshot document : documents) {
-            menuItems.add(document.toObject(MenuItem.class));
-        }
-        return menuItems;
-    }
-
-    public List<MenuItem> getAvailableMenuItems() throws ExecutionException, InterruptedException {
-        ApiFuture<QuerySnapshot> future = firestore.collection(COLLECTION_NAME)
-                .whereEqualTo("available", true)
-                .get();
-        List<QueryDocumentSnapshot> documents = future.get().getDocuments();
-
-        List<MenuItem> menuItems = new ArrayList<>();
-        for (QueryDocumentSnapshot document : documents) {
-            menuItems.add(document.toObject(MenuItem.class));
-        }
-        return menuItems;
-    }
-
-    public MenuItem updateMenuItem(String id, MenuItem menuItem) throws ExecutionException, InterruptedException {
-        DocumentReference docRef = firestore.collection(COLLECTION_NAME).document(id);
-
-        Map<String, Object> updates = new HashMap<>();
-        if (menuItem.getName() != null) updates.put("name", menuItem.getName());
-        if (menuItem.getDescription() != null) updates.put("description", menuItem.getDescription());
-        if (menuItem.getPrice() != null) updates.put("price", menuItem.getPrice());
-        if (menuItem.getCategory() != null) updates.put("category", menuItem.getCategory());
-        if (menuItem.getAvailable() != null) updates.put("available", menuItem.getAvailable());
-        updates.put("updatedAt", System.currentTimeMillis());
-
-        ApiFuture<WriteResult> result = docRef.update(updates);
-        result.get();
-
-        return getMenuItem(id);
-    }
-
-    public void deleteMenuItem(String id) throws ExecutionException, InterruptedException {
-        ApiFuture<WriteResult> result = firestore.collection(COLLECTION_NAME).document(id).delete();
-        result.get();
+    public void deleteMenuItem(String id) {
+        menuItemRepository.deleteById(id);
     }
 }

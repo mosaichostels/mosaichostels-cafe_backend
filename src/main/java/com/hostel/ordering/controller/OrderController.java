@@ -91,28 +91,4 @@ public class OrderController {
                     .body("Error deleting order: " + e.getMessage());
         }
     }
-
-    @PostMapping("/register-token")
-    public ResponseEntity<?> registerFCMToken(@RequestBody Map<String, String> payload) {
-        try {
-            String token = payload.get("token");
-            orderService.registerFCMToken(token);
-            return ResponseEntity.ok("Token registered successfully");
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error registering token: " + e.getMessage());
-        }
-    }
-
-    @PostMapping("/unregister-token")
-    public ResponseEntity<?> unregisterFCMToken(@RequestBody Map<String, String> payload) {
-        try {
-            String token = payload.get("token");
-            orderService.unregisterFCMToken(token);
-            return ResponseEntity.ok("Token unregistered successfully");
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error unregistering token: " + e.getMessage());
-        }
-    }
 }
