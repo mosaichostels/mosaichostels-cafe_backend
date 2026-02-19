@@ -10,4 +10,5 @@ import java.util.List;
 public interface MenuItemRepository extends MongoRepository<MenuItem, String> {
     List<MenuItem> findByCategoryOrderByNameAsc(String category);
     List<MenuItem> findByAvailableTrueOrderByNameAsc();
+    List<MenuItem> findByNameContainingIgnoreCaseOrderByNameAsc(String name);
 }

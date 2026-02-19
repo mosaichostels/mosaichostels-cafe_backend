@@ -64,6 +64,17 @@ public class MenuItemController {
         }
     }
 
+    @GetMapping("/search")
+    public ResponseEntity<?> searchMenuItems(@RequestParam String name) {
+        try {
+            List<MenuItem> menuItems = menuItemService.searchMenuItemsByName(name);
+            return ResponseEntity.ok(menuItems);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error searching menu items: " + e.getMessage());
+        }
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<?> updateMenuItem(@PathVariable String id, @RequestBody MenuItem menuItem) {
         try {

@@ -34,6 +34,10 @@ public class MenuItemService {
         return menuItemRepository.findByAvailableTrueOrderByNameAsc();
     }
 
+    public List<MenuItem> searchMenuItemsByName(String name) {
+        return menuItemRepository.findByNameContainingIgnoreCaseOrderByNameAsc(name);
+    }
+
     public MenuItem updateMenuItem(String id, MenuItem menuItem) {
         Optional<MenuItem> optionalMenuItem = menuItemRepository.findById(id);
         

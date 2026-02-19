@@ -1,0 +1,17 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  application:
+    name: mosaichostels-cafe
+  data:
+    mongodb:
+      uri: ${MONGODB_URI}
+
+logging:
+  level:
+    root: INFO
+    com.mosaichostels: DEBUG
+
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:*}
