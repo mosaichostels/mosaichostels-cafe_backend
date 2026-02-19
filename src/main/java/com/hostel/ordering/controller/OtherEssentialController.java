@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/other-essentials")
+@RequestMapping("/other-essentials")
 public class OtherEssentialController {
 
     @Autowired
