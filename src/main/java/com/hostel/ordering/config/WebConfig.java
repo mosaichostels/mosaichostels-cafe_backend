@@ -13,14 +13,21 @@ public class WebConfig implements WebMvcConfigurer {
         String corsOrigins = System.getenv()
                 .getOrDefault("CORS_ALLOWED_ORIGINS", "");
 
-        String[] allowedOrigins = corsOrigins.isEmpty()
-                ? new String[] {}
-                : corsOrigins.split(",");
-
-        registry.addMapping("/**")
-                .allowedOrigins(allowedOrigins)
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                .allowedHeaders("*")
-                .allowCredentials(false);
+        if (corsOrigins.equals("*")) {
+            registry.addMapping("/**")
+                    .allowedOriginPatterns("*")
+                    .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                    .allowedHeaders("*")
+                    .allowCredentials(false);
+        } else {
+            String[] allowedOrigins = corsOrigins.isEmpty()
+                    ? new String[]{"*"}
+                    : corsOrigins.split(",");
+            registry.addMapping("/**")
+                    .allowedOrigins(allowedOrigins)
+                    .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                    .allowedHeaders("*")
+                    .allowCredentials(false);
+        }
     }
 }
