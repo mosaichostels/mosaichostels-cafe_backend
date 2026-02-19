@@ -2,16 +2,16 @@ server:
   port: ${PORT:8080}
 
 spring:
-  application:
-    name: mosaichostels-cafe
   data:
     mongodb:
       uri: ${MONGODB_URI}
+      auto-index-creation: true
 
 logging:
   level:
     root: INFO
-    com.mosaichostels: DEBUG
+    com.hostel.ordering: DEBUG
+    org.springframework.data.mongodb: DEBUG
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:*}
