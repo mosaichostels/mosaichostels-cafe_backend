@@ -4,7 +4,7 @@ server:
 spring:
   data:
     mongodb:
-      uri: ${MONGODB_URI:mongodb://localhost:27017/mosaicdb}
+      uri: ${MONGODB_URI:mongodb+srv://mosaichostelvaranasi:mosaic2025@cluster0.sxnlz6z.mongodb.net/mosaiccafe}
       auto-index-creation: true
 
 logging:
@@ -14,4 +14,4 @@ logging:
     org.springframework.data.mongodb: DEBUG
 
 cors:
-  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:5500}
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://192.168.1.50:3000,http://127.0.0.1:3000}

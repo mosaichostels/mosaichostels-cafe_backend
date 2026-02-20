@@ -34,8 +34,7 @@ public class OtherEssentialController {
             if (otherEssential != null) {
                 return ResponseEntity.ok(otherEssential);
             }
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Other essential not found");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Other essential not found");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error fetching other essential: " + e.getMessage());
@@ -64,6 +63,19 @@ public class OtherEssentialController {
         }
     }
 
+    @GetMapping("/search")
+    public ResponseEntity<?> searchOtherEssentials(
+            @RequestParam String q,
+            @RequestParam(required = false, defaultValue = "false") boolean availableOnly) {
+        try {
+            List<OtherEssential> results = otherEssentialService.searchOtherEssentials(q, availableOnly);
+            return ResponseEntity.ok(results);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error searching other essentials: " + e.getMessage());
+        }
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<?> updateOtherEssential(@PathVariable String id, @RequestBody OtherEssential otherEssential) {
         try {
@@ -71,8 +83,7 @@ public class OtherEssentialController {
             if (updated != null) {
                 return ResponseEntity.ok(updated);
             }
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Other essential not found");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Other essential not found");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error updating other essential: " + e.getMessage());

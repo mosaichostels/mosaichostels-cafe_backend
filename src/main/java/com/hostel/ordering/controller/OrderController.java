@@ -35,8 +35,7 @@ public class OrderController {
             if (order != null) {
                 return ResponseEntity.ok(order);
             }
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Order not found");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Order not found");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error fetching order: " + e.getMessage());
@@ -44,9 +43,15 @@ public class OrderController {
     }
 
     @GetMapping
-    public ResponseEntity<?> getAllOrders() {
+    public ResponseEntity<?> getAllOrders(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String dormitory,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long dateFrom,
+            @RequestParam(required = false) Long dateTo,
+            @RequestParam(required = false, defaultValue = "createdAt_desc") String sort) {
         try {
-            List<Order> orders = orderService.getAllOrders();
+            List<Order> orders = orderService.getFilteredOrders(status, dormitory, search, dateFrom, dateTo, sort);
             return ResponseEntity.ok(orders);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -73,8 +78,7 @@ public class OrderController {
             if (updated != null) {
                 return ResponseEntity.ok(updated);
             }
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Order not found");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Order not found");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error updating order status: " + e.getMessage());

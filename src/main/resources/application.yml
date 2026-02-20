@@ -2,4 +2,4 @@ spring:
   application:
     name: mosaichostels-cafe
   profiles:
-    active: ${SPRING_PROFILES_ACTIVE:prod}
+    active: ${SPRING_PROFILES_ACTIVE:dev}

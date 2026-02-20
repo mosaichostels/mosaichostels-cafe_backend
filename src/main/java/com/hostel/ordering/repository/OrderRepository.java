@@ -10,4 +10,12 @@ import java.util.List;
 public interface OrderRepository extends MongoRepository<Order, String> {
     List<Order> findByStatusOrderByCreatedAtDesc(String status);
     List<Order> findAllByOrderByCreatedAtDesc();
+    List<Order> findByStatusAndDormitoryOrderByCreatedAtDesc(String status, String dormitory);
+    List<Order> findByDormitoryOrderByCreatedAtDesc(String dormitory);
+    List<Order> findByBookingNameContainingIgnoreCaseOrderByCreatedAtDesc(String bookingName);
+    List<Order> findByStatusAndBookingNameContainingIgnoreCaseOrderByCreatedAtDesc(String status, String bookingName);
+    List<Order> findByPhoneNumberContainingOrderByCreatedAtDesc(String phoneNumber);
+    List<Order> findByStatusAndPhoneNumberContainingOrderByCreatedAtDesc(String status, String phoneNumber);
+    List<Order> findByCreatedAtBetweenOrderByCreatedAtDesc(Long from, Long to);
+    List<Order> findByStatusAndCreatedAtBetweenOrderByCreatedAtDesc(String status, Long from, Long to);
 }
