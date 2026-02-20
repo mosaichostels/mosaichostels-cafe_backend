@@ -119,4 +119,13 @@ public class OrderService {
     public void deleteOrder(String id) {
         orderRepository.deleteById(id);
     }
+
+    public void deleteAllOrders() {
+        orderRepository.deleteAll();
+    }
+
+    public void deleteFilteredOrders(String status, String dormitory, String search, Long dateFrom, Long dateTo) {
+        List<Order> orders = getFilteredOrders(status, dormitory, search, dateFrom, dateTo, null);
+        orderRepository.deleteAll(orders);
+    }
 }

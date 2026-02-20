@@ -95,4 +95,26 @@ public class OrderController {
                     .body("Error deleting order: " + e.getMessage());
         }
     }
+
+    @DeleteMapping
+    public ResponseEntity<?> deleteOrders(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String dormitory,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long dateFrom,
+            @RequestParam(required = false) Long dateTo,
+            @RequestParam(required = false, defaultValue = "false") boolean all) {
+        try {
+            if (all) {
+                orderService.deleteAllOrders();
+                return ResponseEntity.ok("All orders deleted successfully");
+            } else {
+                orderService.deleteFilteredOrders(status, dormitory, search, dateFrom, dateTo);
+                return ResponseEntity.ok("Filtered orders deleted successfully");
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error deleting orders: " + e.getMessage());
+        }
+    }
 }
