@@ -47,10 +47,12 @@ public class OtherEssentialService {
             OtherEssential existingOtherEssential = optionalOtherEssential.get();
 
             if (otherEssential.getName() != null) existingOtherEssential.setName(otherEssential.getName());
-            if (otherEssential.getDescription() != null) existingOtherEssential.setDescription(otherEssential.getDescription());
+            if (otherEssential.getDescription() != null)
+                existingOtherEssential.setDescription(otherEssential.getDescription());
             if (otherEssential.getPrice() != null) existingOtherEssential.setPrice(otherEssential.getPrice());
             if (otherEssential.getCategory() != null) existingOtherEssential.setCategory(otherEssential.getCategory());
-            if (otherEssential.getAvailable() != null) existingOtherEssential.setAvailable(otherEssential.getAvailable());
+            if (otherEssential.getAvailable() != null)
+                existingOtherEssential.setAvailable(otherEssential.getAvailable());
 
             existingOtherEssential.setUpdatedAt(System.currentTimeMillis());
 

@@ -8,7 +8,8 @@ public class OrderItem {
     private Double price;
     private Double subtotal;
 
-    public OrderItem() {}
+    public OrderItem() {
+    }
 
     public String getMenuItemId() {
         return menuItemId;

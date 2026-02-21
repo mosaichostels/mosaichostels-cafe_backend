@@ -16,7 +16,8 @@ public class OtherEssential {
     private Long createdAt;
     private Long updatedAt;
 
-    public OtherEssential() {}
+    public OtherEssential() {
+    }
 
     public String getId() {
         return id;
