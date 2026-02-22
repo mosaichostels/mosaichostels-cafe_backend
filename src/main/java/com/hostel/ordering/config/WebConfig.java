@@ -21,7 +21,7 @@ public class WebConfig implements WebMvcConfigurer {
                     .allowCredentials(false);
         } else {
             String[] allowedOrigins = corsOrigins.isEmpty()
-                    ? new String[]{"*"}
+                    ? new String[] { "*" }
                     : corsOrigins.split(",");
             registry.addMapping("/**")
                     .allowedOrigins(allowedOrigins)

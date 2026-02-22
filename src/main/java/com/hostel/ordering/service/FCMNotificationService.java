@@ -11,7 +11,6 @@ public class FCMNotificationService {
 
     private static final Logger logger = LoggerFactory.getLogger(FCMNotificationService.class);
     private static final String ORDERS_TOPIC = "new_orders";
-    private static final String ANDROID_CHANNEL_ID = "orders_channel";
 
     public void sendNewOrderNotification(Order order) {
         try {
@@ -23,19 +22,15 @@ public class FCMNotificationService {
                     order.getTotalAmount()
             );
 
-            AndroidNotification androidNotification = AndroidNotification.builder()
-                    .setTitle(title)
-                    .setBody(body)
-                    .setChannelId(ANDROID_CHANNEL_ID) // 🔴 VERY IMPORTANT
-                    .setSound("default")
-                    .setPriority(AndroidNotification.Priority.HIGH)
-                    .build();
-
+            // HIGH priority wakes up the device (works on all OEMs)
             AndroidConfig androidConfig = AndroidConfig.builder()
                     .setPriority(AndroidConfig.Priority.HIGH)
-                    .setNotification(androidNotification)
+                    .setTtl(3600 * 1000L)
                     .build();
 
+            // Data-only message — no "notification" block.
+            // This ensures onMessageReceived() fires even when app is killed
+            // on Samsung, Xiaomi (MIUI), Motorola, Nothing, etc.
             Message message = Message.builder()
                     .setTopic(ORDERS_TOPIC)
                     .setAndroidConfig(androidConfig)
@@ -43,6 +38,8 @@ public class FCMNotificationService {
                     .putData("orderId", order.getId())
                     .putData("customerName", order.getBookingName())
                     .putData("totalAmount", String.valueOf(order.getTotalAmount()))
+                    .putData("title", title)   // Android app reads this to build the notification
+                    .putData("body", body)     // Android app reads this to build the notification
                     .build();
 
             String response = FirebaseMessaging.getInstance().send(message);
