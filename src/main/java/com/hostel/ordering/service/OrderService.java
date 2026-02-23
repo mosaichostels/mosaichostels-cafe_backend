@@ -43,7 +43,8 @@ public class OrderService {
         return orderRepository.findByStatusOrderByCreatedAtDesc(status);
     }
 
-    public List<Order> getFilteredOrders(String status, String dormitory, String search, Long dateFrom, Long dateTo, String sort) {
+    public List<Order> getFilteredOrders(String status, String dormitory, String search, Long dateFrom, Long dateTo,
+            String sort) {
         List<Order> orders;
 
         boolean hasSearch = search != null && !search.trim().isEmpty();
@@ -59,14 +60,16 @@ public class OrderService {
             if (isNumericSearch) {
                 // Phone number search
                 if (status != null && !status.isEmpty()) {
-                    orders = orderRepository.findByStatusAndPhoneNumberContainingOrderByCreatedAtDesc(status, search.trim());
+                    orders = orderRepository.findByStatusAndPhoneNumberContainingOrderByCreatedAtDesc(status,
+                            search.trim());
                 } else {
                     orders = orderRepository.findByPhoneNumberContainingOrderByCreatedAtDesc(search.trim());
                 }
             } else {
                 // Name search
                 if (status != null && !status.isEmpty()) {
-                    orders = orderRepository.findByStatusAndBookingNameContainingIgnoreCaseOrderByCreatedAtDesc(status, search.trim());
+                    orders = orderRepository.findByStatusAndBookingNameContainingIgnoreCaseOrderByCreatedAtDesc(status,
+                            search.trim());
                 } else {
                     orders = orderRepository.findByBookingNameContainingIgnoreCaseOrderByCreatedAtDesc(search.trim());
                 }
@@ -87,13 +90,16 @@ public class OrderService {
         if (sort != null) {
             switch (sort) {
                 case "total_asc":
-                    orders = orders.stream().sorted((a, b) -> Double.compare(a.getTotalAmount(), b.getTotalAmount())).collect(Collectors.toList());
+                    orders = orders.stream().sorted((a, b) -> Double.compare(a.getTotalAmount(), b.getTotalAmount()))
+                            .collect(Collectors.toList());
                     break;
                 case "total_desc":
-                    orders = orders.stream().sorted((a, b) -> Double.compare(b.getTotalAmount(), a.getTotalAmount())).collect(Collectors.toList());
+                    orders = orders.stream().sorted((a, b) -> Double.compare(b.getTotalAmount(), a.getTotalAmount()))
+                            .collect(Collectors.toList());
                     break;
                 case "createdAt_asc":
-                    orders = orders.stream().sorted((a, b) -> Long.compare(a.getCreatedAt(), b.getCreatedAt())).collect(Collectors.toList());
+                    orders = orders.stream().sorted((a, b) -> Long.compare(a.getCreatedAt(), b.getCreatedAt()))
+                            .collect(Collectors.toList());
                     break;
                 default: // createdAt_desc - already sorted by repo
                     break;

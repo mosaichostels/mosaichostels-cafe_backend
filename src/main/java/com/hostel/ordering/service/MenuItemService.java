@@ -34,7 +34,8 @@ public class MenuItemService {
         List<MenuItem> items;
 
         if (category != null && !category.isEmpty() && subCategory != null && !subCategory.isEmpty()) {
-            items = menuItemRepository.findByAvailableTrueAndCategoryAndSubCategoryOrderByNameAsc(category, subCategory);
+            items = menuItemRepository.findByAvailableTrueAndCategoryAndSubCategoryOrderByNameAsc(category,
+                    subCategory);
         } else if (category != null && !category.isEmpty()) {
             items = menuItemRepository.findByAvailableTrueAndCategoryOrderByNameAsc(category);
         } else if (subCategory != null && !subCategory.isEmpty()) {
@@ -47,13 +48,16 @@ public class MenuItemService {
         if (sort != null) {
             switch (sort) {
                 case "price_asc":
-                    items = items.stream().sorted((a, b) -> Double.compare(a.getPrice(), b.getPrice())).collect(Collectors.toList());
+                    items = items.stream().sorted((a, b) -> Double.compare(a.getPrice(), b.getPrice()))
+                            .collect(Collectors.toList());
                     break;
                 case "price_desc":
-                    items = items.stream().sorted((a, b) -> Double.compare(b.getPrice(), a.getPrice())).collect(Collectors.toList());
+                    items = items.stream().sorted((a, b) -> Double.compare(b.getPrice(), a.getPrice()))
+                            .collect(Collectors.toList());
                     break;
                 case "newest":
-                    items = items.stream().sorted((a, b) -> Long.compare(b.getCreatedAt(), a.getCreatedAt())).collect(Collectors.toList());
+                    items = items.stream().sorted((a, b) -> Long.compare(b.getCreatedAt(), a.getCreatedAt()))
+                            .collect(Collectors.toList());
                     break;
                 default: // name_asc - already sorted
                     break;
@@ -91,12 +95,18 @@ public class MenuItemService {
         if (optionalMenuItem.isPresent()) {
             MenuItem existingMenuItem = optionalMenuItem.get();
 
-            if (menuItem.getName() != null) existingMenuItem.setName(menuItem.getName());
-            if (menuItem.getDescription() != null) existingMenuItem.setDescription(menuItem.getDescription());
-            if (menuItem.getPrice() != null) existingMenuItem.setPrice(menuItem.getPrice());
-            if (menuItem.getCategory() != null) existingMenuItem.setCategory(menuItem.getCategory());
-            if (menuItem.getSubCategory() != null) existingMenuItem.setSubCategory(menuItem.getSubCategory());
-            if (menuItem.getAvailable() != null) existingMenuItem.setAvailable(menuItem.getAvailable());
+            if (menuItem.getName() != null)
+                existingMenuItem.setName(menuItem.getName());
+            if (menuItem.getDescription() != null)
+                existingMenuItem.setDescription(menuItem.getDescription());
+            if (menuItem.getPrice() != null)
+                existingMenuItem.setPrice(menuItem.getPrice());
+            if (menuItem.getCategory() != null)
+                existingMenuItem.setCategory(menuItem.getCategory());
+            if (menuItem.getSubCategory() != null)
+                existingMenuItem.setSubCategory(menuItem.getSubCategory());
+            if (menuItem.getAvailable() != null)
+                existingMenuItem.setAvailable(menuItem.getAvailable());
 
             existingMenuItem.setUpdatedAt(System.currentTimeMillis());
 

@@ -30,5 +30,6 @@ public interface MenuItemRepository extends MongoRepository<MenuItem, String> {
 
     List<MenuItem> findByNameContainingIgnoreCaseAndAvailableTrueOrderByNameAsc(String name);
 
-    List<MenuItem> findByDescriptionContainingIgnoreCaseOrNameContainingIgnoreCaseOrderByNameAsc(String desc, String name);
+    List<MenuItem> findByDescriptionContainingIgnoreCaseOrNameContainingIgnoreCaseOrderByNameAsc(String desc,
+            String name);
 }

@@ -19,8 +19,7 @@ public class FCMNotificationService {
                     "Order #%s from %s — ₹%.2f",
                     order.getId().substring(0, 8),
                     order.getBookingName(),
-                    order.getTotalAmount()
-            );
+                    order.getTotalAmount());
 
             // HIGH priority wakes up the device (works on all OEMs)
             AndroidConfig androidConfig = AndroidConfig.builder()
@@ -38,8 +37,8 @@ public class FCMNotificationService {
                     .putData("orderId", order.getId())
                     .putData("customerName", order.getBookingName())
                     .putData("totalAmount", String.valueOf(order.getTotalAmount()))
-                    .putData("title", title)   // Android app reads this to build the notification
-                    .putData("body", body)     // Android app reads this to build the notification
+                    .putData("title", title) // Android app reads this to build the notification
+                    .putData("body", body) // Android app reads this to build the notification
                     .build();
 
             String response = FirebaseMessaging.getInstance().send(message);

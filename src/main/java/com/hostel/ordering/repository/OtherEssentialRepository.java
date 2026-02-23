@@ -14,7 +14,8 @@ public interface OtherEssentialRepository extends MongoRepository<OtherEssential
 
     List<OtherEssential> findByNameContainingIgnoreCaseAndAvailableTrueOrderByNameAsc(String name);
 
-    List<OtherEssential> findByDescriptionContainingIgnoreCaseOrNameContainingIgnoreCaseOrderByNameAsc(String desc, String name);
+    List<OtherEssential> findByDescriptionContainingIgnoreCaseOrNameContainingIgnoreCaseOrderByNameAsc(String desc,
+            String name);
 
     List<OtherEssential> findByCategoryOrderByNameAsc(String category);
 
