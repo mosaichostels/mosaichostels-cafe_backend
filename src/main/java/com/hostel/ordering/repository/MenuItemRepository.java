@@ -10,8 +10,6 @@ import java.util.List;
 public interface MenuItemRepository extends MongoRepository<MenuItem, String> {
     List<MenuItem> findByCategoryOrderByNameAsc(String category);
 
-    List<MenuItem> findByCategoryAndSubCategoryOrderByNameAsc(String category, String subCategory);
-
     List<MenuItem> findByAvailableTrueOrderByNameAsc();
 
     List<MenuItem> findByAvailableTrueOrderByCreatedAtDesc();
@@ -21,10 +19,6 @@ public interface MenuItemRepository extends MongoRepository<MenuItem, String> {
     List<MenuItem> findByAvailableTrueOrderByPriceDesc();
 
     List<MenuItem> findByAvailableTrueAndCategoryOrderByNameAsc(String category);
-
-    List<MenuItem> findByAvailableTrueAndSubCategoryOrderByNameAsc(String subCategory);
-
-    List<MenuItem> findByAvailableTrueAndCategoryAndSubCategoryOrderByNameAsc(String category, String subCategory);
 
     List<MenuItem> findByNameContainingIgnoreCaseOrderByNameAsc(String name);
 

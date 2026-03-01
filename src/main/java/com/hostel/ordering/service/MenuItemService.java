@@ -30,16 +30,11 @@ public class MenuItemService {
         return menuItemRepository.findAll();
     }
 
-    public List<MenuItem> getAvailableMenuItems(String category, String subCategory, String sort) {
+    public List<MenuItem> getAvailableMenuItems(String category, String sort) {
         List<MenuItem> items;
 
-        if (category != null && !category.isEmpty() && subCategory != null && !subCategory.isEmpty()) {
-            items = menuItemRepository.findByAvailableTrueAndCategoryAndSubCategoryOrderByNameAsc(category,
-                    subCategory);
-        } else if (category != null && !category.isEmpty()) {
+        if (category != null && !category.isEmpty()) {
             items = menuItemRepository.findByAvailableTrueAndCategoryOrderByNameAsc(category);
-        } else if (subCategory != null && !subCategory.isEmpty()) {
-            items = menuItemRepository.findByAvailableTrueAndSubCategoryOrderByNameAsc(subCategory);
         } else {
             items = menuItemRepository.findByAvailableTrueOrderByNameAsc();
         }
@@ -74,21 +69,6 @@ public class MenuItemService {
         return menuItemRepository.findByNameContainingIgnoreCaseOrderByNameAsc(query);
     }
 
-    public List<String> getSubCategories(String category) {
-        List<MenuItem> items;
-        if (category != null && !category.isEmpty()) {
-            items = menuItemRepository.findByCategoryOrderByNameAsc(category);
-        } else {
-            items = menuItemRepository.findAll();
-        }
-        return items.stream()
-                .map(MenuItem::getSubCategory)
-                .filter(s -> s != null && !s.isEmpty())
-                .distinct()
-                .sorted()
-                .collect(Collectors.toList());
-    }
-
     public MenuItem updateMenuItem(String id, MenuItem menuItem) {
         Optional<MenuItem> optionalMenuItem = menuItemRepository.findById(id);
 
@@ -103,8 +83,6 @@ public class MenuItemService {
                 existingMenuItem.setPrice(menuItem.getPrice());
             if (menuItem.getCategory() != null)
                 existingMenuItem.setCategory(menuItem.getCategory());
-            if (menuItem.getSubCategory() != null)
-                existingMenuItem.setSubCategory(menuItem.getSubCategory());
             if (menuItem.getAvailable() != null)
                 existingMenuItem.setAvailable(menuItem.getAvailable());
 

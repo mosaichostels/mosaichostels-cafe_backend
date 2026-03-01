@@ -55,10 +55,9 @@ public class MenuItemController {
     @GetMapping("/available")
     public ResponseEntity<?> getAvailableMenuItems(
             @RequestParam(required = false) String category,
-            @RequestParam(required = false) String subCategory,
             @RequestParam(required = false, defaultValue = "name_asc") String sort) {
         try {
-            List<MenuItem> menuItems = menuItemService.getAvailableMenuItems(category, subCategory, sort);
+            List<MenuItem> menuItems = menuItemService.getAvailableMenuItems(category, sort);
             return ResponseEntity.ok(menuItems);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -76,17 +75,6 @@ public class MenuItemController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error searching menu items: " + e.getMessage());
-        }
-    }
-
-    @GetMapping("/subcategories")
-    public ResponseEntity<?> getSubCategories(@RequestParam(required = false) String category) {
-        try {
-            List<String> subCategories = menuItemService.getSubCategories(category);
-            return ResponseEntity.ok(subCategories);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error fetching subcategories: " + e.getMessage());
         }
     }
 

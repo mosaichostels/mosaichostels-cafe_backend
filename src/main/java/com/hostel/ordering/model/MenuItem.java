@@ -12,7 +12,6 @@ public class MenuItem {
     private String description;
     private Double price;
     private String category;
-    private String subCategory;
     private Boolean available;
     private Long createdAt;
     private Long updatedAt;
@@ -58,14 +57,6 @@ public class MenuItem {
 
     public void setCategory(String category) {
         this.category = category;
-    }
-
-    public String getSubCategory() {
-        return subCategory;
-    }
-
-    public void setSubCategory(String subCategory) {
-        this.subCategory = subCategory;
     }
 
     public Boolean getAvailable() {
