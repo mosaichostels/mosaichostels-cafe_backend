@@ -3,7 +3,6 @@ package com.hostel.ordering.service;
 import com.hostel.ordering.model.Order;
 import com.hostel.ordering.model.PagedResponse;
 import com.hostel.ordering.repository.OrderRepository;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -18,7 +17,7 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final FCMNotificationService fcmNotificationService;
 
-    public OrderService(OrderRepository orderRepository, @Lazy FCMNotificationService fcmNotificationService) {
+    public OrderService(OrderRepository orderRepository, FCMNotificationService fcmNotificationService) {
         this.orderRepository = orderRepository;
         this.fcmNotificationService = fcmNotificationService;
     }

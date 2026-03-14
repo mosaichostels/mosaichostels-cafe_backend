@@ -9,12 +9,11 @@ RUN mvn clean package -DskipTests -q
 # Stage 2: Run
 FROM eclipse-temurin:17-jre
 WORKDIR /app
-COPY --from=builder /app/target/*.jar app.jar
+COPY --from=builder /app/target/ordering-system-1.0.0.jar app.jar
 
 EXPOSE 8080
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:8080/health || exit 1
+# Removed HEALTHCHECK to avoid dependency on curl in slim JRE image
 
 # JVM flags tuned for Railway's low-memory containers:
 #   -XX:+UseContainerSupport         - respect container cgroup memory limits

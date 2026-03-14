@@ -7,7 +7,7 @@ server:
 
 spring:
   main:
-    lazy-initialization: true
+    lazy-initialization: false
 
   data:
     mongodb:
@@ -16,7 +16,7 @@ spring:
 
 logging:
   level:
-    root: WARN
+    root: INFO
     com.hostel.ordering: INFO
     org.springframework.data.mongodb: WARN
 
