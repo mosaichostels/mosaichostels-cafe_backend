@@ -1,14 +1,17 @@
 package com.hostel.ordering.service;
 
 import com.hostel.ordering.model.Order;
+import com.hostel.ordering.model.PagedResponse;
 import com.hostel.ordering.repository.OrderRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Service
 public class OrderService {
@@ -25,7 +28,6 @@ public class OrderService {
         order.setUpdatedAt(System.currentTimeMillis());
         order.setStatus("ORDERED");
         Order saved = orderRepository.save(order);
-        // Send push notification to Android app
         fcmNotificationService.sendNewOrderNotification(saved);
         return saved;
     }
@@ -35,90 +37,183 @@ public class OrderService {
         return order.orElse(null);
     }
 
-    public List<Order> getAllOrders() {
-        return orderRepository.findAllByOrderByCreatedAtDesc();
+    /**
+     * Returns a paginated response when page/size are provided (web admin).
+     * Falls back to full list when pagination params are null (Android app).
+     */
+    public Object getFilteredOrders(String status, String dormitory, String search,
+                                     Long dateFrom, Long dateTo, String sort,
+                                     Integer page, Integer size) {
+
+        boolean paginate = page != null && size != null;
+
+        if (paginate) {
+            return getFilteredOrdersPaged(status, dormitory, search, dateFrom, dateTo, sort, page, size);
+        } else {
+            return getFilteredOrdersList(status, dormitory, search, dateFrom, dateTo, sort);
+        }
     }
 
-    public List<Order> getOrdersByStatus(String status) {
-        return orderRepository.findByStatusOrderByCreatedAtDesc(status);
+    // ── Paginated path (web admin) ────────────────────────────────────────────
+
+    private PagedResponse<Order> getFilteredOrdersPaged(String status, String dormitory,
+            String search, Long dateFrom, Long dateTo, String sort, int page, int size) {
+
+        // Sort-by-total needs in-memory sort; force DB sort for createdAt variants
+        boolean needsInMemorySort = sort != null &&
+                (sort.equals("total_asc") || sort.equals("total_desc"));
+
+        Pageable pageable = PageRequest.of(page, needsInMemorySort ? Integer.MAX_VALUE : size);
+        Page<Order> resultPage = queryPaged(status, dormitory, search, dateFrom, dateTo, pageable);
+
+        List<Order> orders = resultPage.getContent();
+
+        if (needsInMemorySort) {
+            if (sort.equals("total_asc")) {
+                orders = orders.stream()
+                        .sorted((a, b) -> Double.compare(a.getTotalAmount(), b.getTotalAmount()))
+                        .toList();
+            } else {
+                orders = orders.stream()
+                        .sorted((a, b) -> Double.compare(b.getTotalAmount(), a.getTotalAmount()))
+                        .toList();
+            }
+            // Manually slice the page after in-memory sort
+            int fromIdx = page * size;
+            int toIdx = Math.min(fromIdx + size, orders.size());
+            long total = orders.size();
+            orders = fromIdx >= orders.size() ? List.of() : orders.subList(fromIdx, toIdx);
+            return new PagedResponse<>(orders, page, size, total);
+        }
+
+        // createdAt_asc needs reverse — fetch DESC then flip (avoids extra repo method)
+        if ("createdAt_asc".equals(sort)) {
+            orders = orders.stream()
+                    .sorted((a, b) -> Long.compare(a.getCreatedAt(), b.getCreatedAt()))
+                    .toList();
+        }
+
+        return new PagedResponse<>(orders, page, size, resultPage.getTotalElements());
     }
 
-    public List<Order> getFilteredOrders(String status, String dormitory, String search, Long dateFrom, Long dateTo,
-            String sort) {
-        List<Order> orders;
-
+    private Page<Order> queryPaged(String status, String dormitory, String search,
+                                    Long dateFrom, Long dateTo, Pageable pageable) {
         boolean hasSearch = search != null && !search.trim().isEmpty();
         boolean isNumericSearch = hasSearch && search.trim().matches("\\d+");
 
         if (dateFrom != null && dateTo != null) {
             if (status != null && !status.isEmpty()) {
-                orders = orderRepository.findByStatusAndCreatedAtBetweenOrderByCreatedAtDesc(status, dateFrom, dateTo);
-            } else {
-                orders = orderRepository.findByCreatedAtBetweenOrderByCreatedAtDesc(dateFrom, dateTo);
+                return orderRepository.findByStatusAndCreatedAtBetweenOrderByCreatedAtDesc(status, dateFrom, dateTo, pageable);
             }
-        } else if (hasSearch) {
-            if (isNumericSearch) {
-                // Phone number search
-                if (status != null && !status.isEmpty()) {
-                    orders = orderRepository.findByStatusAndPhoneNumberContainingOrderByCreatedAtDesc(status,
-                            search.trim());
-                } else {
-                    orders = orderRepository.findByPhoneNumberContainingOrderByCreatedAtDesc(search.trim());
-                }
-            } else {
-                // Name search
-                if (status != null && !status.isEmpty()) {
-                    orders = orderRepository.findByStatusAndBookingNameContainingIgnoreCaseOrderByCreatedAtDesc(status,
-                            search.trim());
-                } else {
-                    orders = orderRepository.findByBookingNameContainingIgnoreCaseOrderByCreatedAtDesc(search.trim());
-                }
-            }
-        } else if (dormitory != null && !dormitory.isEmpty()) {
-            if (status != null && !status.isEmpty()) {
-                orders = orderRepository.findByStatusAndDormitoryOrderByCreatedAtDesc(status, dormitory);
-            } else {
-                orders = orderRepository.findByDormitoryOrderByCreatedAtDesc(dormitory);
-            }
-        } else if (status != null && !status.isEmpty()) {
-            orders = orderRepository.findByStatusOrderByCreatedAtDesc(status);
-        } else {
-            orders = orderRepository.findAllByOrderByCreatedAtDesc();
+            return orderRepository.findByCreatedAtBetweenOrderByCreatedAtDesc(dateFrom, dateTo, pageable);
         }
 
-        // Apply sorting
+        if (hasSearch) {
+            if (isNumericSearch) {
+                if (status != null && !status.isEmpty()) {
+                    return orderRepository.findByStatusAndPhoneNumberContainingOrderByCreatedAtDesc(status, search.trim(), pageable);
+                }
+                return orderRepository.findByPhoneNumberContainingOrderByCreatedAtDesc(search.trim(), pageable);
+            } else {
+                if (status != null && !status.isEmpty()) {
+                    return orderRepository.findByStatusAndBookingNameContainingIgnoreCaseOrderByCreatedAtDesc(status, search.trim(), pageable);
+                }
+                return orderRepository.findByBookingNameContainingIgnoreCaseOrderByCreatedAtDesc(search.trim(), pageable);
+            }
+        }
+
+        if (dormitory != null && !dormitory.isEmpty()) {
+            if (status != null && !status.isEmpty()) {
+                return orderRepository.findByStatusAndDormitoryOrderByCreatedAtDesc(status, dormitory, pageable);
+            }
+            return orderRepository.findByDormitoryOrderByCreatedAtDesc(dormitory, pageable);
+        }
+
+        if (status != null && !status.isEmpty()) {
+            return orderRepository.findByStatusOrderByCreatedAtDesc(status, pageable);
+        }
+
+        return orderRepository.findAllByOrderByCreatedAtDesc(pageable);
+    }
+
+    // ── Non-paginated path (Android app / bulk delete) ────────────────────────
+
+    private List<Order> getFilteredOrdersList(String status, String dormitory, String search,
+                                               Long dateFrom, Long dateTo, String sort) {
+        List<Order> orders = queryList(status, dormitory, search, dateFrom, dateTo);
+
         if (sort != null) {
             switch (sort) {
                 case "total_asc":
-                    orders = orders.stream().sorted((a, b) -> Double.compare(a.getTotalAmount(), b.getTotalAmount()))
-                            .collect(Collectors.toList());
+                    orders = orders.stream()
+                            .sorted((a, b) -> Double.compare(a.getTotalAmount(), b.getTotalAmount()))
+                            .toList();
                     break;
                 case "total_desc":
-                    orders = orders.stream().sorted((a, b) -> Double.compare(b.getTotalAmount(), a.getTotalAmount()))
-                            .collect(Collectors.toList());
+                    orders = orders.stream()
+                            .sorted((a, b) -> Double.compare(b.getTotalAmount(), a.getTotalAmount()))
+                            .toList();
                     break;
                 case "createdAt_asc":
-                    orders = orders.stream().sorted((a, b) -> Long.compare(a.getCreatedAt(), b.getCreatedAt()))
-                            .collect(Collectors.toList());
+                    orders = orders.stream()
+                            .sorted((a, b) -> Long.compare(a.getCreatedAt(), b.getCreatedAt()))
+                            .toList();
                     break;
-                default: // createdAt_desc - already sorted by repo
+                default:
                     break;
             }
         }
-
         return orders;
+    }
+
+    private List<Order> queryList(String status, String dormitory, String search,
+                                   Long dateFrom, Long dateTo) {
+        boolean hasSearch = search != null && !search.trim().isEmpty();
+        boolean isNumericSearch = hasSearch && search.trim().matches("\\d+");
+
+        if (dateFrom != null && dateTo != null) {
+            if (status != null && !status.isEmpty()) {
+                return orderRepository.findByStatusAndCreatedAtBetweenOrderByCreatedAtDesc(status, dateFrom, dateTo);
+            }
+            return orderRepository.findByCreatedAtBetweenOrderByCreatedAtDesc(dateFrom, dateTo);
+        }
+
+        if (hasSearch) {
+            if (isNumericSearch) {
+                if (status != null && !status.isEmpty()) {
+                    return orderRepository.findByStatusAndPhoneNumberContainingOrderByCreatedAtDesc(status, search.trim());
+                }
+                return orderRepository.findByPhoneNumberContainingOrderByCreatedAtDesc(search.trim());
+            } else {
+                if (status != null && !status.isEmpty()) {
+                    return orderRepository.findByStatusAndBookingNameContainingIgnoreCaseOrderByCreatedAtDesc(status, search.trim());
+                }
+                return orderRepository.findByBookingNameContainingIgnoreCaseOrderByCreatedAtDesc(search.trim());
+            }
+        }
+
+        if (dormitory != null && !dormitory.isEmpty()) {
+            if (status != null && !status.isEmpty()) {
+                return orderRepository.findByStatusAndDormitoryOrderByCreatedAtDesc(status, dormitory);
+            }
+            return orderRepository.findByDormitoryOrderByCreatedAtDesc(dormitory);
+        }
+
+        if (status != null && !status.isEmpty()) {
+            return orderRepository.findByStatusOrderByCreatedAtDesc(status);
+        }
+
+        return orderRepository.findAllByOrderByCreatedAtDesc();
     }
 
     public Order updateOrderStatus(String id, String status) {
         Optional<Order> optionalOrder = orderRepository.findById(id);
-
         if (optionalOrder.isPresent()) {
             Order order = optionalOrder.get();
             order.setStatus(status);
             order.setUpdatedAt(System.currentTimeMillis());
             return orderRepository.save(order);
         }
-
         return null;
     }
 
@@ -131,7 +226,7 @@ public class OrderService {
     }
 
     public void deleteFilteredOrders(String status, String dormitory, String search, Long dateFrom, Long dateTo) {
-        List<Order> orders = getFilteredOrders(status, dormitory, search, dateFrom, dateTo, null);
+        List<Order> orders = getFilteredOrdersList(status, dormitory, search, dateFrom, dateTo, null);
         orderRepository.deleteAll(orders);
     }
 }

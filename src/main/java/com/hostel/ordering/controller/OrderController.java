@@ -7,7 +7,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -42,6 +41,17 @@ public class OrderController {
         }
     }
 
+    /**
+     * GET /orders
+     *
+     * Supports optional pagination via ?page=0&size=20 (used by web admin).
+     * When page/size are omitted the full list is returned (Android app behaviour).
+     *
+     * When paginated, the response body is a PagedResponse<Order>:
+     *   { content, page, size, totalElements, totalPages, last }
+     *
+     * When not paginated, the response body is a plain List<Order>.
+     */
     @GetMapping
     public ResponseEntity<?> getAllOrders(
             @RequestParam(required = false) String status,
@@ -49,24 +59,16 @@ public class OrderController {
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Long dateFrom,
             @RequestParam(required = false) Long dateTo,
-            @RequestParam(required = false, defaultValue = "createdAt_desc") String sort) {
+            @RequestParam(required = false, defaultValue = "createdAt_desc") String sort,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
         try {
-            List<Order> orders = orderService.getFilteredOrders(status, dormitory, search, dateFrom, dateTo, sort);
-            return ResponseEntity.ok(orders);
+            Object result = orderService.getFilteredOrders(
+                    status, dormitory, search, dateFrom, dateTo, sort, page, size);
+            return ResponseEntity.ok(result);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error fetching orders: " + e.getMessage());
-        }
-    }
-
-    @GetMapping("/status/{status}")
-    public ResponseEntity<?> getOrdersByStatus(@PathVariable String status) {
-        try {
-            List<Order> orders = orderService.getOrdersByStatus(status);
-            return ResponseEntity.ok(orders);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error fetching orders by status: " + e.getMessage());
         }
     }
 
