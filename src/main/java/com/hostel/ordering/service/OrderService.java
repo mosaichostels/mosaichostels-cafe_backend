@@ -71,16 +71,17 @@ public class OrderService {
                     ? orderRepository.findByStatusAndCreatedAtBetween(status, dateFrom, dateTo, pageable)
                     : orderRepository.findByCreatedAtBetween(dateFrom, dateTo, pageable);
         }
-        if (hasSearch) {
-            boolean isNumeric = search.trim().matches("\\d+");
+        if (hasSearch && search != null) {
+            String trimmedSearch = search.trim();
+            boolean isNumeric = trimmedSearch.matches("\\d+");
             if (isNumeric) {
                 return hasStatus
-                        ? orderRepository.findByStatusAndPhoneNumberContaining(status, search.trim(), pageable)
-                        : orderRepository.findByPhoneNumberContaining(search.trim(), pageable);
+                        ? orderRepository.findByStatusAndPhoneNumberContaining(status, trimmedSearch, pageable)
+                        : orderRepository.findByPhoneNumberContaining(trimmedSearch, pageable);
             } else {
                 return hasStatus
-                        ? orderRepository.findByStatusAndBookingNameContainingIgnoreCase(status, search.trim(), pageable)
-                        : orderRepository.findByBookingNameContainingIgnoreCase(search.trim(), pageable);
+                        ? orderRepository.findByStatusAndBookingNameContainingIgnoreCase(status, trimmedSearch, pageable)
+                        : orderRepository.findByBookingNameContainingIgnoreCase(trimmedSearch, pageable);
             }
         }
         if (dormitory != null && !dormitory.isEmpty()) {
@@ -104,16 +105,17 @@ public class OrderService {
                     ? orderRepository.findByStatusAndCreatedAtBetweenOrderByCreatedAtDesc(status, dateFrom, dateTo)
                     : orderRepository.findByCreatedAtBetweenOrderByCreatedAtDesc(dateFrom, dateTo);
         }
-        if (hasSearch) {
-            boolean isNumeric = search.trim().matches("\\d+");
+        if (hasSearch && search != null) {
+            String trimmedSearch = search.trim();
+            boolean isNumeric = trimmedSearch.matches("\\d+");
             if (isNumeric) {
                 return hasStatus
-                        ? orderRepository.findByStatusAndPhoneNumberContainingOrderByCreatedAtDesc(status, search.trim())
-                        : orderRepository.findByPhoneNumberContainingOrderByCreatedAtDesc(search.trim());
+                        ? orderRepository.findByStatusAndPhoneNumberContainingOrderByCreatedAtDesc(status, trimmedSearch)
+                        : orderRepository.findByPhoneNumberContainingOrderByCreatedAtDesc(trimmedSearch);
             } else {
                 return hasStatus
-                        ? orderRepository.findByStatusAndBookingNameContainingIgnoreCaseOrderByCreatedAtDesc(status, search.trim())
-                        : orderRepository.findByBookingNameContainingIgnoreCaseOrderByCreatedAtDesc(search.trim());
+                        ? orderRepository.findByStatusAndBookingNameContainingIgnoreCaseOrderByCreatedAtDesc(status, trimmedSearch)
+                        : orderRepository.findByBookingNameContainingIgnoreCaseOrderByCreatedAtDesc(trimmedSearch);
             }
         }
         if (dormitory != null && !dormitory.isEmpty()) {

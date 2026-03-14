@@ -1,11 +1,16 @@
 package com.hostel.ordering.model;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.util.List;
 
-/**
- * Generic paginated response wrapper.
- * Returned when the caller passes page/limit params; otherwise the plain list is returned.
- */
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class PagedResponse<T> {
     private List<T> content;
     private int page;
@@ -24,12 +29,4 @@ public class PagedResponse<T> {
         this.hasNext = page < this.totalPages - 1;
         this.hasPrevious = page > 0;
     }
-
-    public List<T> getContent() { return content; }
-    public int getPage() { return page; }
-    public int getLimit() { return limit; }
-    public long getTotalElements() { return totalElements; }
-    public int getTotalPages() { return totalPages; }
-    public boolean isHasNext() { return hasNext; }
-    public boolean isHasPrevious() { return hasPrevious; }
 }
