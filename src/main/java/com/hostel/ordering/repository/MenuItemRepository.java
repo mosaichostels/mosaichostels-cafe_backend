@@ -8,7 +8,6 @@ import java.util.List;
 
 @Repository
 public interface MenuItemRepository extends MongoRepository<MenuItem, String> {
-    List<MenuItem> findByCategoryOrderByNameAsc(String category);
 
     List<MenuItem> findByAvailableTrueOrderByNameAsc();
 
@@ -23,7 +22,4 @@ public interface MenuItemRepository extends MongoRepository<MenuItem, String> {
     List<MenuItem> findByNameContainingIgnoreCaseOrderByNameAsc(String name);
 
     List<MenuItem> findByNameContainingIgnoreCaseAndAvailableTrueOrderByNameAsc(String name);
-
-    List<MenuItem> findByDescriptionContainingIgnoreCaseOrNameContainingIgnoreCaseOrderByNameAsc(String desc,
-            String name);
 }

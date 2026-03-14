@@ -2,17 +2,16 @@ package com.hostel.ordering.service;
 
 import com.hostel.ordering.model.OtherEssential;
 import com.hostel.ordering.repository.OtherEssentialRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 public class OtherEssentialService {
 
-    @Autowired
-    private OtherEssentialRepository otherEssentialRepository;
+    private final OtherEssentialRepository otherEssentialRepository;
 
     public OtherEssential createOtherEssential(OtherEssential otherEssential) {
         otherEssential.setCreatedAt(System.currentTimeMillis());
@@ -21,8 +20,7 @@ public class OtherEssentialService {
     }
 
     public OtherEssential getOtherEssential(String id) {
-        Optional<OtherEssential> otherEssential = otherEssentialRepository.findById(id);
-        return otherEssential.orElse(null);
+        return otherEssentialRepository.findById(id).orElse(null);
     }
 
     public List<OtherEssential> getAllOtherEssentials() {
@@ -41,11 +39,7 @@ public class OtherEssentialService {
     }
 
     public OtherEssential updateOtherEssential(String id, OtherEssential otherEssential) {
-        Optional<OtherEssential> optionalOtherEssential = otherEssentialRepository.findById(id);
-
-        if (optionalOtherEssential.isPresent()) {
-            OtherEssential existingOtherEssential = optionalOtherEssential.get();
-
+        return otherEssentialRepository.findById(id).map(existingOtherEssential -> {
             if (otherEssential.getName() != null)
                 existingOtherEssential.setName(otherEssential.getName());
             if (otherEssential.getDescription() != null)
@@ -60,9 +54,7 @@ public class OtherEssentialService {
             existingOtherEssential.setUpdatedAt(System.currentTimeMillis());
 
             return otherEssentialRepository.save(existingOtherEssential);
-        }
-
-        return null;
+        }).orElse(null);
     }
 
     public void deleteOtherEssential(String id) {

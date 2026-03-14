@@ -2,14 +2,13 @@ package com.hostel.ordering.service;
 
 import com.google.firebase.messaging.*;
 import com.hostel.ordering.model.Order;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 @Service
+@Slf4j
 public class FCMNotificationService {
 
-    private static final Logger logger = LoggerFactory.getLogger(FCMNotificationService.class);
     private static final String ORDERS_TOPIC = "new_orders";
 
     public void sendNewOrderNotification(Order order) {
@@ -21,15 +20,11 @@ public class FCMNotificationService {
                     order.getBookingName(),
                     order.getTotalAmount());
 
-            // HIGH priority wakes up the device (works on all OEMs)
             AndroidConfig androidConfig = AndroidConfig.builder()
                     .setPriority(AndroidConfig.Priority.HIGH)
                     .setTtl(3600 * 1000L)
                     .build();
 
-            // Data-only message — no "notification" block.
-            // This ensures onMessageReceived() fires even when app is killed
-            // on Samsung, Xiaomi (MIUI), Motorola, Nothing, etc.
             Message message = Message.builder()
                     .setTopic(ORDERS_TOPIC)
                     .setAndroidConfig(androidConfig)
@@ -37,15 +32,15 @@ public class FCMNotificationService {
                     .putData("orderId", order.getId())
                     .putData("customerName", order.getBookingName())
                     .putData("totalAmount", String.valueOf(order.getTotalAmount()))
-                    .putData("title", title) // Android app reads this to build the notification
-                    .putData("body", body) // Android app reads this to build the notification
+                    .putData("title", title)
+                    .putData("body", body)
                     .build();
 
             String response = FirebaseMessaging.getInstance().send(message);
-            logger.info("✅ FCM notification sent: {}", response);
+            log.info("✅ FCM notification sent: {}", response);
 
         } catch (Exception e) {
-            logger.error("❌ Failed to send FCM notification", e);
+            log.error("❌ Failed to send FCM notification", e);
         }
     }
 }
