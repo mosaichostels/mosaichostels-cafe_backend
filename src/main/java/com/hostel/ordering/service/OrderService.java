@@ -3,8 +3,6 @@ package com.hostel.ordering.service;
 import com.hostel.ordering.model.Order;
 import com.hostel.ordering.model.PagedResponse;
 import com.hostel.ordering.repository.OrderRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -13,10 +11,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
-@Slf4j
 public class OrderService {
 
     private final OrderRepository orderRepository;

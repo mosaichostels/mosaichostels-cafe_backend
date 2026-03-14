@@ -21,14 +21,14 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 #   -XX:MaxRAMPercentage=65.0        - cap heap at 65% of container RAM (leaves room for metaspace + threads)
 #   -XX:InitialRAMPercentage=30.0    - start with a smaller heap so startup doesn't OOM
 #   -XX:+UseSerialGC                 - Serial GC uses far less overhead than G1 on small containers
-#   -XX:CICompilerCount=1            - only 1 JIT compiler thread (default is 2+, wastes RSS)
+#   -XX:CICompilerCount=2            - minimum 2 JIT compiler threads required for tiered compilation
 #   -Xss256k                         - smaller thread stack (default 512k) — saves ~256k per thread
 ENTRYPOINT ["java", \
   "-XX:+UseContainerSupport", \
   "-XX:MaxRAMPercentage=65.0", \
   "-XX:InitialRAMPercentage=30.0", \
   "-XX:+UseSerialGC", \
-  "-XX:CICompilerCount=1", \
+  "-XX:CICompilerCount=2", \
   "-Xss256k", \
   "-Djava.security.egd=file:/dev/./urandom", \
   "-Dspring.profiles.active=prod", \
