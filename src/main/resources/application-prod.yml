@@ -2,12 +2,12 @@ server:
   port: ${PORT:8080}
   tomcat:
     threads:
-      max: 50
-      min-spare: 5
+      max: 20
+      min-spare: 2
 
 spring:
   main:
-    lazy-initialization: false
+    lazy-initialization: true
 
   data:
     mongodb:
@@ -16,15 +16,21 @@ spring:
 
 logging:
   level:
-    root: INFO
+    root: WARN
     com.hostel.ordering: INFO
-    org.springframework.data.mongodb: INFO
+    org.springframework.data.mongodb: WARN
+    # suppress verbose Firebase/Google HTTP client logs
+    com.google: WARN
+    io.grpc: WARN
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,loggers
+        include: health
+  endpoint:
+    health:
+      show-details: never
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:*}

@@ -6,6 +6,7 @@ import com.google.firebase.FirebaseOptions;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -15,10 +16,19 @@ import java.nio.charset.StandardCharsets;
 @Slf4j
 public class FirebaseConfig {
 
+    /**
+     * @Lazy — Firebase initialization is deferred until FCMNotificationService first uses it.
+     * This prevents Firebase's heavy SDK initialization from happening at startup,
+     * which was contributing to the OOM crash loop on Railway.
+     *
+     * The bean returns null gracefully if credentials are absent — the FCMNotificationService
+     * already handles null and logs a warning instead of throwing.
+     */
     @Bean
+    @Lazy
     public FirebaseApp firebaseApp() {
-        log.info("🔥 Starting Firebase initialization...");
-        
+        log.info("🔥 Initializing Firebase (lazy)...");
+
         try {
             if (!FirebaseApp.getApps().isEmpty()) {
                 log.info("ℹ️ Firebase already initialized, returning existing instance.");
@@ -27,10 +37,9 @@ public class FirebaseConfig {
 
             InputStream stream = loadCredentials();
             if (stream == null) {
-                log.error("❌ CRITICAL: No Firebase credentials found! Expected FIREBASE_SERVICE_ACCOUNT_JSON env var or firebase-service-account.json file.");
-                // We don't throw here to let the app start (maybe some features work without Firebase),
-                // but usually the app will fail later.
-                return null; 
+                log.warn("⚠️ No Firebase credentials found (FIREBASE_SERVICE_ACCOUNT_JSON not set). " +
+                         "Push notifications will be disabled. App will continue normally.");
+                return null;
             }
 
             FirebaseOptions options = FirebaseOptions.builder()
@@ -40,8 +49,9 @@ public class FirebaseConfig {
             FirebaseApp app = FirebaseApp.initializeApp(options);
             log.info("✅ Firebase initialized successfully: {}", app.getName());
             return app;
+
         } catch (Exception e) {
-            log.error("❌ CRITICAL: Firebase initialization failed!", e);
+            log.error("❌ Firebase initialization failed — push notifications disabled.", e);
             return null;
         }
     }
@@ -49,11 +59,11 @@ public class FirebaseConfig {
     private InputStream loadCredentials() {
         String json = System.getenv("FIREBASE_SERVICE_ACCOUNT_JSON");
         if (json != null && !json.isBlank()) {
-            log.info("✅ Found FIREBASE_SERVICE_ACCOUNT_JSON environment variable.");
+            log.info("✅ Using FIREBASE_SERVICE_ACCOUNT_JSON environment variable.");
             return new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8));
         }
 
-        log.info("🔍 Checking for firebase-service-account.json in classpath...");
+        log.info("🔍 Checking classpath for firebase-service-account.json...");
         InputStream file = getClass().getClassLoader()
                 .getResourceAsStream("firebase-service-account.json");
         if (file != null) {
