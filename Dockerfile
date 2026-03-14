@@ -25,11 +25,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 #   -Xss256k                         - smaller thread stack (default 512k) — saves ~256k per thread
 ENTRYPOINT ["java", \
   "-XX:+UseContainerSupport", \
-  "-XX:MaxRAMPercentage=65.0", \
-  "-XX:InitialRAMPercentage=30.0", \
-  "-XX:+UseSerialGC", \
-  "-XX:CICompilerCount=2", \
-  "-Xss256k", \
+  "-XX:MaxRAMPercentage=75.0", \
+  "-XX:InitialRAMPercentage=20.0", \
   "-Djava.security.egd=file:/dev/./urandom", \
   "-Dspring.profiles.active=prod", \
   "-jar", "app.jar"]

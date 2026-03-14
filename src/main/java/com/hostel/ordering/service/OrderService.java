@@ -50,9 +50,7 @@ public class OrderService {
             Integer page, Integer limit) {
 
         Sort mongoSort = buildSort(sort);
-        boolean paginated = (page != null && limit != null);
-
-        if (paginated) {
+        if (page != null && limit != null) {
             Pageable pageable = PageRequest.of(page, limit, mongoSort);
             Page<Order> result = queryPaged(status, dormitory, search, dateFrom, dateTo, pageable);
             return new PagedResponse<>(result.getContent(), page, limit, result.getTotalElements());
