@@ -8,7 +8,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.4.1</version>
+        <version>3.5.10</version>
         <relativePath/>
     </parent>
 
@@ -34,41 +34,19 @@
             <artifactId>spring-boot-starter-data-mongodb</artifactId>
         </dependency>
 
-        <!-- Validation -->
+        <!-- DevTools: runtime/optional — excluded from production fat-jar -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-validation</artifactId>
-        </dependency>
-
-        <!-- Actuator for health checks -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-actuator</artifactId>
-        </dependency>
-
-        <!--
-            Replaced firebase-admin 9.4.1 with a single lightweight OAuth2 library.
-
-            firebase-admin pulls in: grpc-netty-shaded, netty-*, guava, protobuf, opencensus,
-            google-cloud-firestore, and 40+ transitive JARs totalling ~70MB on disk.
-            At runtime that inflates metaspace to ~400-500MB — more than Railway's container RAM.
-            The kernel OOM-kills the JVM silently mid-startup (no stack trace, just restart loop).
-
-            We only need FCM push notifications → use FCM HTTP v1 REST API directly.
-            All we need for that is an OAuth2 access token, which google-auth-library provides
-            as a single 2MB JAR with zero gRPC/Netty dependencies.
-        -->
-        <dependency>
-            <groupId>com.google.auth</groupId>
-            <artifactId>google-auth-library-oauth2-http</artifactId>
-            <version>1.23.0</version>
-        </dependency>
-
-        <!-- Lombok -->
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
+            <artifactId>spring-boot-devtools</artifactId>
+            <scope>runtime</scope>
             <optional>true</optional>
+        </dependency>
+
+        <!-- Firebase Admin SDK for FCM push notifications -->
+        <dependency>
+            <groupId>com.google.firebase</groupId>
+            <artifactId>firebase-admin</artifactId>
+            <version>9.1.1</version>
         </dependency>
 
         <!-- Spring Boot Test -->
@@ -83,6 +61,9 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludeDevtools>true</excludeDevtools>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

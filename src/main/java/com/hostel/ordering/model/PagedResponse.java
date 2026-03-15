@@ -1,32 +1,29 @@
 package com.hostel.ordering.model;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
 import java.util.List;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
 public class PagedResponse<T> {
     private List<T> content;
     private int page;
-    private int limit;
+    private int size;
     private long totalElements;
     private int totalPages;
-    private boolean hasNext;
-    private boolean hasPrevious;
+    private boolean last;
 
-    public PagedResponse(List<T> content, int page, int limit, long totalElements) {
+    public PagedResponse(List<T> content, int page, int size, long totalElements) {
         this.content = content;
         this.page = page;
-        this.limit = limit;
+        this.size = size;
         this.totalElements = totalElements;
-        this.totalPages = limit > 0 ? (int) Math.ceil((double) totalElements / limit) : 1;
-        this.hasNext = page < this.totalPages - 1;
-        this.hasPrevious = page > 0;
+        this.totalPages = (int) Math.ceil((double) totalElements / size);
+        this.last = page >= this.totalPages - 1;
     }
+
+    // Getters
+    public List<T> getContent() { return content; }
+    public int getPage() { return page; }
+    public int getSize() { return size; }
+    public long getTotalElements() { return totalElements; }
+    public int getTotalPages() { return totalPages; }
+    public boolean isLast() { return last; }
 }

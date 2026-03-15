@@ -11,12 +11,6 @@ public interface MenuItemRepository extends MongoRepository<MenuItem, String> {
 
     List<MenuItem> findByAvailableTrueOrderByNameAsc();
 
-    List<MenuItem> findByAvailableTrueOrderByCreatedAtDesc();
-
-    List<MenuItem> findByAvailableTrueOrderByPriceAsc();
-
-    List<MenuItem> findByAvailableTrueOrderByPriceDesc();
-
     List<MenuItem> findByAvailableTrueAndCategoryOrderByNameAsc(String category);
 
     List<MenuItem> findByNameContainingIgnoreCaseOrderByNameAsc(String name);

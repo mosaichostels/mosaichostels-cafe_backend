@@ -11,19 +11,19 @@ import java.util.List;
 @Repository
 public interface OrderRepository extends MongoRepository<Order, String> {
 
-    // ── Paginated queries (used by web admin panel) ───────────────────────────
-    Page<Order> findByStatus(String status, Pageable pageable);
-    Page<Order> findAll(Pageable pageable);
-    Page<Order> findByStatusAndDormitory(String status, String dormitory, Pageable pageable);
-    Page<Order> findByDormitory(String dormitory, Pageable pageable);
-    Page<Order> findByBookingNameContainingIgnoreCase(String bookingName, Pageable pageable);
-    Page<Order> findByStatusAndBookingNameContainingIgnoreCase(String status, String bookingName, Pageable pageable);
-    Page<Order> findByPhoneNumberContaining(String phoneNumber, Pageable pageable);
-    Page<Order> findByStatusAndPhoneNumberContaining(String status, String phoneNumber, Pageable pageable);
-    Page<Order> findByCreatedAtBetween(Long from, Long to, Pageable pageable);
-    Page<Order> findByStatusAndCreatedAtBetween(String status, Long from, Long to, Pageable pageable);
+    // ── Paginated (used by web admin with pagination params) ──────────────────
+    Page<Order> findByStatusOrderByCreatedAtDesc(String status, Pageable pageable);
+    Page<Order> findAllByOrderByCreatedAtDesc(Pageable pageable);
+    Page<Order> findByStatusAndDormitoryOrderByCreatedAtDesc(String status, String dormitory, Pageable pageable);
+    Page<Order> findByDormitoryOrderByCreatedAtDesc(String dormitory, Pageable pageable);
+    Page<Order> findByBookingNameContainingIgnoreCaseOrderByCreatedAtDesc(String bookingName, Pageable pageable);
+    Page<Order> findByStatusAndBookingNameContainingIgnoreCaseOrderByCreatedAtDesc(String status, String bookingName, Pageable pageable);
+    Page<Order> findByPhoneNumberContainingOrderByCreatedAtDesc(String phoneNumber, Pageable pageable);
+    Page<Order> findByStatusAndPhoneNumberContainingOrderByCreatedAtDesc(String status, String phoneNumber, Pageable pageable);
+    Page<Order> findByCreatedAtBetweenOrderByCreatedAtDesc(Long from, Long to, Pageable pageable);
+    Page<Order> findByStatusAndCreatedAtBetweenOrderByCreatedAtDesc(String status, Long from, Long to, Pageable pageable);
 
-    // ── Unpaginated queries (used by Android app and delete operations) ───────
+    // ── Non-paginated (used by Android app or bulk delete operations) ─────────
     List<Order> findByStatusOrderByCreatedAtDesc(String status);
     List<Order> findAllByOrderByCreatedAtDesc();
     List<Order> findByStatusAndDormitoryOrderByCreatedAtDesc(String status, String dormitory);
