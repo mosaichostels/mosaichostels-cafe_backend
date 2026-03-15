@@ -2,18 +2,18 @@ package com.hostel.ordering.service;
 
 import com.hostel.ordering.model.MenuItem;
 import com.hostel.ordering.repository.MenuItemRepository;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class MenuItemService {
 
-    private final MenuItemRepository menuItemRepository;
+    @Autowired
+    private MenuItemRepository menuItemRepository;
 
     public MenuItem createMenuItem(MenuItem menuItem) {
         menuItem.setCreatedAt(System.currentTimeMillis());
@@ -22,7 +22,8 @@ public class MenuItemService {
     }
 
     public MenuItem getMenuItem(String id) {
-        return menuItemRepository.findById(id).orElse(null);
+        Optional<MenuItem> menuItem = menuItemRepository.findById(id);
+        return menuItem.orElse(null);
     }
 
     public List<MenuItem> getAllMenuItems() {
@@ -38,16 +39,24 @@ public class MenuItemService {
             items = menuItemRepository.findByAvailableTrueOrderByNameAsc();
         }
 
+        // Apply sort
         if (sort != null) {
-            items = switch (sort) {
-                case "price_asc" -> items.stream().sorted(Comparator.comparing(MenuItem::getPrice))
-                        .collect(Collectors.toList());
-                case "price_desc" -> items.stream().sorted(Comparator.comparing(MenuItem::getPrice).reversed())
-                        .collect(Collectors.toList());
-                case "newest" -> items.stream().sorted(Comparator.comparing(MenuItem::getCreatedAt).reversed())
-                        .collect(Collectors.toList());
-                default -> items;
-            };
+            switch (sort) {
+                case "price_asc":
+                    items = items.stream().sorted((a, b) -> Double.compare(a.getPrice(), b.getPrice()))
+                            .collect(Collectors.toList());
+                    break;
+                case "price_desc":
+                    items = items.stream().sorted((a, b) -> Double.compare(b.getPrice(), a.getPrice()))
+                            .collect(Collectors.toList());
+                    break;
+                case "newest":
+                    items = items.stream().sorted((a, b) -> Long.compare(b.getCreatedAt(), a.getCreatedAt()))
+                            .collect(Collectors.toList());
+                    break;
+                default: // name_asc - already sorted
+                    break;
+            }
         }
 
         return items;
@@ -61,7 +70,11 @@ public class MenuItemService {
     }
 
     public MenuItem updateMenuItem(String id, MenuItem menuItem) {
-        return menuItemRepository.findById(id).map(existingMenuItem -> {
+        Optional<MenuItem> optionalMenuItem = menuItemRepository.findById(id);
+
+        if (optionalMenuItem.isPresent()) {
+            MenuItem existingMenuItem = optionalMenuItem.get();
+
             if (menuItem.getName() != null)
                 existingMenuItem.setName(menuItem.getName());
             if (menuItem.getDescription() != null)
@@ -76,7 +89,9 @@ public class MenuItemService {
             existingMenuItem.setUpdatedAt(System.currentTimeMillis());
 
             return menuItemRepository.save(existingMenuItem);
-        }).orElse(null);
+        }
+
+        return null;
     }
 
     public void deleteMenuItem(String id) {
