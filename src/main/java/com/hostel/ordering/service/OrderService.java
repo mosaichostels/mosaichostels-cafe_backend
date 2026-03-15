@@ -45,10 +45,9 @@ public class OrderService {
                                      Long dateFrom, Long dateTo, String sort,
                                      Integer page, Integer size) {
 
-        boolean paginate = page != null && size != null;
 
-        if (paginate) {
-            return getFilteredOrdersPaged(status, dormitory, search, dateFrom, dateTo, sort, page, size);
+        if (page != null && size != null) {
+            return getFilteredOrdersPaged(status, dormitory, search, dateFrom, dateTo, sort, page.intValue(), size.intValue());
         } else {
             return getFilteredOrdersList(status, dormitory, search, dateFrom, dateTo, sort);
         }
@@ -60,8 +59,8 @@ public class OrderService {
             String search, Long dateFrom, Long dateTo, String sort, int page, int size) {
 
         // Sort-by-total needs in-memory sort; force DB sort for createdAt variants
-        boolean needsInMemorySort = sort != null &&
-                (sort.equals("total_asc") || sort.equals("total_desc"));
+        boolean needsInMemorySort = (sort != null) &&
+                ("total_asc".equals(sort) || "total_desc".equals(sort));
 
         Pageable pageable = PageRequest.of(page, needsInMemorySort ? Integer.MAX_VALUE : size);
         Page<Order> resultPage = queryPaged(status, dormitory, search, dateFrom, dateTo, pageable);
@@ -69,7 +68,8 @@ public class OrderService {
         List<Order> orders = resultPage.getContent();
 
         if (needsInMemorySort) {
-            if (sort.equals("total_asc")) {
+            final String finalSort = sort; // local for safety if needed
+            if ("total_asc".equals(finalSort)) {
                 orders = orders.stream()
                         .sorted((a, b) -> Double.compare(a.getTotalAmount(), b.getTotalAmount()))
                         .toList();
@@ -98,8 +98,9 @@ public class OrderService {
 
     private Page<Order> queryPaged(String status, String dormitory, String search,
                                     Long dateFrom, Long dateTo, Pageable pageable) {
-        boolean hasSearch = search != null && !search.trim().isEmpty();
-        boolean isNumericSearch = hasSearch && search.trim().matches("\\d+");
+        String trimmedSearch = (search != null) ? search.trim() : "";
+        boolean hasSearch = !trimmedSearch.isEmpty();
+        boolean isNumericSearch = hasSearch && trimmedSearch.matches("\\d+");
 
         if (dateFrom != null && dateTo != null) {
             if (status != null && !status.isEmpty()) {
@@ -111,14 +112,14 @@ public class OrderService {
         if (hasSearch) {
             if (isNumericSearch) {
                 if (status != null && !status.isEmpty()) {
-                    return orderRepository.findByStatusAndPhoneNumberContainingOrderByCreatedAtDesc(status, search.trim(), pageable);
+                    return orderRepository.findByStatusAndPhoneNumberContainingOrderByCreatedAtDesc(status, trimmedSearch, pageable);
                 }
-                return orderRepository.findByPhoneNumberContainingOrderByCreatedAtDesc(search.trim(), pageable);
+                return orderRepository.findByPhoneNumberContainingOrderByCreatedAtDesc(trimmedSearch, pageable);
             } else {
                 if (status != null && !status.isEmpty()) {
-                    return orderRepository.findByStatusAndBookingNameContainingIgnoreCaseOrderByCreatedAtDesc(status, search.trim(), pageable);
+                    return orderRepository.findByStatusAndBookingNameContainingIgnoreCaseOrderByCreatedAtDesc(status, trimmedSearch, pageable);
                 }
-                return orderRepository.findByBookingNameContainingIgnoreCaseOrderByCreatedAtDesc(search.trim(), pageable);
+                return orderRepository.findByBookingNameContainingIgnoreCaseOrderByCreatedAtDesc(trimmedSearch, pageable);
             }
         }
 
@@ -168,8 +169,9 @@ public class OrderService {
 
     private List<Order> queryList(String status, String dormitory, String search,
                                    Long dateFrom, Long dateTo) {
-        boolean hasSearch = search != null && !search.trim().isEmpty();
-        boolean isNumericSearch = hasSearch && search.trim().matches("\\d+");
+        String trimmedSearch = (search != null) ? search.trim() : "";
+        boolean hasSearch = !trimmedSearch.isEmpty();
+        boolean isNumericSearch = hasSearch && trimmedSearch.matches("\\d+");
 
         if (dateFrom != null && dateTo != null) {
             if (status != null && !status.isEmpty()) {
@@ -181,14 +183,14 @@ public class OrderService {
         if (hasSearch) {
             if (isNumericSearch) {
                 if (status != null && !status.isEmpty()) {
-                    return orderRepository.findByStatusAndPhoneNumberContainingOrderByCreatedAtDesc(status, search.trim());
+                    return orderRepository.findByStatusAndPhoneNumberContainingOrderByCreatedAtDesc(status, trimmedSearch);
                 }
-                return orderRepository.findByPhoneNumberContainingOrderByCreatedAtDesc(search.trim());
+                return orderRepository.findByPhoneNumberContainingOrderByCreatedAtDesc(trimmedSearch);
             } else {
                 if (status != null && !status.isEmpty()) {
-                    return orderRepository.findByStatusAndBookingNameContainingIgnoreCaseOrderByCreatedAtDesc(status, search.trim());
+                    return orderRepository.findByStatusAndBookingNameContainingIgnoreCaseOrderByCreatedAtDesc(status, trimmedSearch);
                 }
-                return orderRepository.findByBookingNameContainingIgnoreCaseOrderByCreatedAtDesc(search.trim());
+                return orderRepository.findByBookingNameContainingIgnoreCaseOrderByCreatedAtDesc(trimmedSearch);
             }
         }
 
