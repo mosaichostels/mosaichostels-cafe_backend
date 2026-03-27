@@ -2,7 +2,6 @@ package com.hostel.ordering.controller;
 
 import com.hostel.ordering.model.MenuItem;
 import com.hostel.ordering.service.MenuItemService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -13,53 +12,46 @@ import java.util.List;
 @RequestMapping("/menu-items")
 public class MenuItemController {
 
-    @Autowired
-    private MenuItemService menuItemService;
+    private final MenuItemService menuItemService;
+
+    public MenuItemController(MenuItemService menuItemService) {
+        this.menuItemService = menuItemService;
+    }
 
     @PostMapping
     public ResponseEntity<MenuItem> createMenuItem(@RequestBody MenuItem menuItem) {
-        MenuItem created = menuItemService.createMenuItem(menuItem);
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+        return ResponseEntity.status(HttpStatus.CREATED).body(menuItemService.createMenuItem(menuItem));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<MenuItem> getMenuItem(@PathVariable String id) {
         MenuItem menuItem = menuItemService.getMenuItem(id);
-        if (menuItem != null) {
-            return ResponseEntity.ok(menuItem);
-        }
-        return ResponseEntity.notFound().build();
+        return menuItem != null ? ResponseEntity.ok(menuItem) : ResponseEntity.notFound().build();
     }
 
     @GetMapping
     public ResponseEntity<List<MenuItem>> getAllMenuItems() {
-        List<MenuItem> menuItems = menuItemService.getAllMenuItems();
-        return ResponseEntity.ok(menuItems);
+        return ResponseEntity.ok(menuItemService.getAllMenuItems());
     }
 
     @GetMapping("/available")
     public ResponseEntity<List<MenuItem>> getAvailableMenuItems(
             @RequestParam(required = false) String category,
             @RequestParam(required = false, defaultValue = "name_asc") String sort) {
-        List<MenuItem> menuItems = menuItemService.getAvailableMenuItems(category, sort);
-        return ResponseEntity.ok(menuItems);
+        return ResponseEntity.ok(menuItemService.getAvailableMenuItems(category, sort));
     }
 
     @GetMapping("/search")
     public ResponseEntity<List<MenuItem>> searchMenuItems(
             @RequestParam String q,
             @RequestParam(required = false, defaultValue = "false") boolean availableOnly) {
-        List<MenuItem> menuItems = menuItemService.searchMenuItems(q, availableOnly);
-        return ResponseEntity.ok(menuItems);
+        return ResponseEntity.ok(menuItemService.searchMenuItems(q, availableOnly));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<MenuItem> updateMenuItem(@PathVariable String id, @RequestBody MenuItem menuItem) {
         MenuItem updated = menuItemService.updateMenuItem(id, menuItem);
-        if (updated != null) {
-            return ResponseEntity.ok(updated);
-        }
-        return ResponseEntity.notFound().build();
+        return updated != null ? ResponseEntity.ok(updated) : ResponseEntity.notFound().build();
     }
 
     @DeleteMapping("/{id}")

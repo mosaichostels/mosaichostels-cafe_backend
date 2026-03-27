@@ -2,7 +2,6 @@ package com.hostel.ordering.controller;
 
 import com.hostel.ordering.model.OtherEssential;
 import com.hostel.ordering.service.OtherEssentialService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -13,51 +12,45 @@ import java.util.List;
 @RequestMapping("/other-essentials")
 public class OtherEssentialController {
 
-    @Autowired
-    private OtherEssentialService otherEssentialService;
+    private final OtherEssentialService otherEssentialService;
+
+    public OtherEssentialController(OtherEssentialService otherEssentialService) {
+        this.otherEssentialService = otherEssentialService;
+    }
 
     @PostMapping
     public ResponseEntity<OtherEssential> createOtherEssential(@RequestBody OtherEssential otherEssential) {
-        OtherEssential created = otherEssentialService.createOtherEssential(otherEssential);
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+        return ResponseEntity.status(HttpStatus.CREATED).body(otherEssentialService.createOtherEssential(otherEssential));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<OtherEssential> getOtherEssential(@PathVariable String id) {
-        OtherEssential otherEssential = otherEssentialService.getOtherEssential(id);
-        if (otherEssential != null) {
-            return ResponseEntity.ok(otherEssential);
-        }
-        return ResponseEntity.notFound().build();
+        OtherEssential item = otherEssentialService.getOtherEssential(id);
+        return item != null ? ResponseEntity.ok(item) : ResponseEntity.notFound().build();
     }
 
     @GetMapping
     public ResponseEntity<List<OtherEssential>> getAllOtherEssentials() {
-        List<OtherEssential> otherEssentials = otherEssentialService.getAllOtherEssentials();
-        return ResponseEntity.ok(otherEssentials);
+        return ResponseEntity.ok(otherEssentialService.getAllOtherEssentials());
     }
 
     @GetMapping("/available")
     public ResponseEntity<List<OtherEssential>> getAvailableOtherEssentials() {
-        List<OtherEssential> otherEssentials = otherEssentialService.getAvailableOtherEssentials();
-        return ResponseEntity.ok(otherEssentials);
+        return ResponseEntity.ok(otherEssentialService.getAvailableOtherEssentials());
     }
 
     @GetMapping("/search")
     public ResponseEntity<List<OtherEssential>> searchOtherEssentials(
             @RequestParam String q,
             @RequestParam(required = false, defaultValue = "false") boolean availableOnly) {
-        List<OtherEssential> results = otherEssentialService.searchOtherEssentials(q, availableOnly);
-        return ResponseEntity.ok(results);
+        return ResponseEntity.ok(otherEssentialService.searchOtherEssentials(q, availableOnly));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<OtherEssential> updateOtherEssential(@PathVariable String id, @RequestBody OtherEssential otherEssential) {
+    public ResponseEntity<OtherEssential> updateOtherEssential(@PathVariable String id,
+                                                               @RequestBody OtherEssential otherEssential) {
         OtherEssential updated = otherEssentialService.updateOtherEssential(id, otherEssential);
-        if (updated != null) {
-            return ResponseEntity.ok(updated);
-        }
-        return ResponseEntity.notFound().build();
+        return updated != null ? ResponseEntity.ok(updated) : ResponseEntity.notFound().build();
     }
 
     @DeleteMapping("/{id}")

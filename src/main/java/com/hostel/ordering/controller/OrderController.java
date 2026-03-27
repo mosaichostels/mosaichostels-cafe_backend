@@ -2,7 +2,6 @@ package com.hostel.ordering.controller;
 
 import com.hostel.ordering.model.Order;
 import com.hostel.ordering.service.OrderService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -13,22 +12,21 @@ import java.util.Map;
 @RequestMapping("/orders")
 public class OrderController {
 
-    @Autowired
-    private OrderService orderService;
+    private final OrderService orderService;
+
+    public OrderController(OrderService orderService) {
+        this.orderService = orderService;
+    }
 
     @PostMapping
     public ResponseEntity<Order> createOrder(@RequestBody Order order) {
-        Order created = orderService.createOrder(order);
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+        return ResponseEntity.status(HttpStatus.CREATED).body(orderService.createOrder(order));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<Order> getOrder(@PathVariable String id) {
         Order order = orderService.getOrder(id);
-        if (order != null) {
-            return ResponseEntity.ok(order);
-        }
-        return ResponseEntity.notFound().build();
+        return order != null ? ResponseEntity.ok(order) : ResponseEntity.notFound().build();
     }
 
     @GetMapping
@@ -41,19 +39,15 @@ public class OrderController {
             @RequestParam(required = false, defaultValue = "createdAt_desc") String sort,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size) {
-        Object result = orderService.getFilteredOrders(
-                status, dormitory, search, dateFrom, dateTo, sort, page, size);
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(orderService.getFilteredOrders(
+                status, dormitory, search, dateFrom, dateTo, sort, page, size));
     }
 
     @PutMapping("/{id}/status")
-    public ResponseEntity<Order> updateOrderStatus(@PathVariable String id, @RequestBody Map<String, String> payload) {
-        String status = payload.get("status");
-        Order updated = orderService.updateOrderStatus(id, status);
-        if (updated != null) {
-            return ResponseEntity.ok(updated);
-        }
-        return ResponseEntity.notFound().build();
+    public ResponseEntity<Order> updateOrderStatus(@PathVariable String id,
+                                                    @RequestBody Map<String, String> payload) {
+        Order updated = orderService.updateOrderStatus(id, payload.get("status"));
+        return updated != null ? ResponseEntity.ok(updated) : ResponseEntity.notFound().build();
     }
 
     @DeleteMapping("/{id}")
@@ -73,9 +67,8 @@ public class OrderController {
         if (all) {
             orderService.deleteAllOrders();
             return ResponseEntity.ok("All orders deleted successfully");
-        } else {
-            orderService.deleteFilteredOrders(status, dormitory, search, dateFrom, dateTo);
-            return ResponseEntity.ok("Filtered orders deleted successfully");
         }
+        orderService.deleteFilteredOrders(status, dormitory, search, dateFrom, dateTo);
+        return ResponseEntity.ok("Filtered orders deleted successfully");
     }
 }

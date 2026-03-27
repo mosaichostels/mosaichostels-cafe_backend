@@ -2,17 +2,18 @@ package com.hostel.ordering.service;
 
 import com.hostel.ordering.model.OtherEssential;
 import com.hostel.ordering.repository.OtherEssentialRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class OtherEssentialService {
 
-    @Autowired
-    private OtherEssentialRepository otherEssentialRepository;
+    private final OtherEssentialRepository otherEssentialRepository;
+
+    public OtherEssentialService(OtherEssentialRepository otherEssentialRepository) {
+        this.otherEssentialRepository = otherEssentialRepository;
+    }
 
     public OtherEssential createOtherEssential(OtherEssential otherEssential) {
         otherEssential.setCreatedAt(System.currentTimeMillis());
@@ -21,8 +22,7 @@ public class OtherEssentialService {
     }
 
     public OtherEssential getOtherEssential(String id) {
-        Optional<OtherEssential> otherEssential = otherEssentialRepository.findById(id);
-        return otherEssential.orElse(null);
+        return otherEssentialRepository.findById(id).orElse(null);
     }
 
     public List<OtherEssential> getAllOtherEssentials() {
@@ -41,28 +41,17 @@ public class OtherEssentialService {
     }
 
     public OtherEssential updateOtherEssential(String id, OtherEssential otherEssential) {
-        Optional<OtherEssential> optionalOtherEssential = otherEssentialRepository.findById(id);
-
-        if (optionalOtherEssential.isPresent()) {
-            OtherEssential existingOtherEssential = optionalOtherEssential.get();
-
-            if (otherEssential.getName() != null)
-                existingOtherEssential.setName(otherEssential.getName());
-            if (otherEssential.getDescription() != null)
-                existingOtherEssential.setDescription(otherEssential.getDescription());
-            if (otherEssential.getPrice() != null)
-                existingOtherEssential.setPrice(otherEssential.getPrice());
-            if (otherEssential.getCategory() != null)
-                existingOtherEssential.setCategory(otherEssential.getCategory());
-            if (otherEssential.getAvailable() != null)
-                existingOtherEssential.setAvailable(otherEssential.getAvailable());
-
-            existingOtherEssential.setUpdatedAt(System.currentTimeMillis());
-
-            return otherEssentialRepository.save(existingOtherEssential);
-        }
-
-        return null;
+        return otherEssentialRepository.findById(id)
+                .map(existing -> {
+                    if (otherEssential.getName() != null) existing.setName(otherEssential.getName());
+                    if (otherEssential.getDescription() != null) existing.setDescription(otherEssential.getDescription());
+                    if (otherEssential.getPrice() != null) existing.setPrice(otherEssential.getPrice());
+                    if (otherEssential.getCategory() != null) existing.setCategory(otherEssential.getCategory());
+                    if (otherEssential.getAvailable() != null) existing.setAvailable(otherEssential.getAvailable());
+                    existing.setUpdatedAt(System.currentTimeMillis());
+                    return otherEssentialRepository.save(existing);
+                })
+                .orElse(null);
     }
 
     public void deleteOtherEssential(String id) {
