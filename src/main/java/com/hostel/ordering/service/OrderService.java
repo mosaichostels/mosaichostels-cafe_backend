@@ -26,7 +26,9 @@ public class OrderService {
     public Order createOrder(Order order) {
         order.setCreatedAt(System.currentTimeMillis());
         order.setUpdatedAt(System.currentTimeMillis());
-        order.setStatus("ORDERED");
+        if (order.getStatus() == null || order.getStatus().isEmpty()) {
+            order.setStatus("ORDERED");
+        }
         Order saved = orderRepository.save(order);
         fcmNotificationService.sendNewOrderNotification(saved);
         return saved;
