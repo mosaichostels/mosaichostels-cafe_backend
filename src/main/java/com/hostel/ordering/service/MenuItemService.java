@@ -35,16 +35,18 @@ public class MenuItemService {
                 ? menuItemRepository.findByAvailableTrueAndCategoryOrderByNameAsc(category)
                 : menuItemRepository.findByAvailableTrueOrderByNameAsc();
 
-        if (sort != null) {
-            Comparator<MenuItem> comparator = switch (sort) {
-                case "price_asc" -> Comparator.comparingDouble(MenuItem::getPrice);
-                case "price_desc" -> Comparator.comparingDouble(MenuItem::getPrice).reversed();
-                case "newest" -> Comparator.comparingLong(MenuItem::getCreatedAt).reversed();
-                default -> null;
-            };
-            if (comparator != null) {
-                return items.stream().sorted(comparator).toList();
-            }
+        String finalSort = (sort == null || sort.isBlank()) ? "price_asc" : sort;
+        
+        Comparator<MenuItem> comparator = switch (finalSort) {
+            case "price_asc" -> Comparator.comparingDouble(MenuItem::getPrice);
+            case "price_desc" -> Comparator.comparingDouble(MenuItem::getPrice).reversed();
+            case "newest" -> Comparator.comparingLong(MenuItem::getCreatedAt).reversed();
+            case "name_asc" -> Comparator.comparing(MenuItem::getName);
+            default -> null;
+        };
+
+        if (comparator != null) {
+            return items.stream().sorted(comparator).toList();
         }
 
         return items;

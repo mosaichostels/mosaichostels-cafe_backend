@@ -4,6 +4,7 @@ import com.google.firebase.messaging.*;
 import com.hostel.ordering.model.Order;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -12,6 +13,7 @@ public class FCMNotificationService {
     private static final Logger logger = LoggerFactory.getLogger(FCMNotificationService.class);
     private static final String ORDERS_TOPIC = "new_orders";
 
+    @Async
     public void sendNewOrderNotification(Order order) {
         try {
             String title = "🛎 New Order Received!";

@@ -55,12 +55,7 @@ public class OrderRepositoryImpl implements OrderRepositoryCustom {
         }
 
         if (criteria.search() != null && !criteria.search().isBlank()) {
-            String trimmed = criteria.search().trim();
-            if (trimmed.matches("\\d+")) {
-                criteriaList.add(Criteria.where("phoneNumber").regex(trimmed));
-            } else {
-                criteriaList.add(Criteria.where("bookingName").regex(trimmed, "i"));
-            }
+            criteriaList.add(Criteria.where("bookingName").regex(criteria.search().trim(), "i"));
         }
 
         Query query = new Query();

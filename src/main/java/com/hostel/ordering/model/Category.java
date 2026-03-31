@@ -6,20 +6,13 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import java.util.List;
-
-@Document(collection = "orders")
+@Document(collection = "categories")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Order {
+public class Category {
     @Id
     private String id;
-    private String bookingName;
-    private String dormitory;
-    private List<OrderItem> items;
-    private Double totalAmount;
-    private String status;
-    private Long createdAt;
-    private Long updatedAt;
+    private String name;
+    private int showOrder;
 }
