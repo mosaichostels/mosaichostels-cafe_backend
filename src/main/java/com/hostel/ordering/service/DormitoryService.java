@@ -5,6 +5,7 @@ import com.hostel.ordering.repository.DormitoryRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class DormitoryService {
@@ -21,6 +22,14 @@ public class DormitoryService {
 
     public Dormitory addDormitory(Dormitory dormitory) {
         return repository.save(dormitory);
+    }
+
+    public Dormitory addIfNotExists(Dormitory dormitory) {
+        Optional<Dormitory> existing = repository.findByName(dormitory.getName());
+        if (existing.isEmpty()) {
+            return repository.save(dormitory);
+        }
+        return existing.get();
     }
 
     public void deleteDormitory(String id) {

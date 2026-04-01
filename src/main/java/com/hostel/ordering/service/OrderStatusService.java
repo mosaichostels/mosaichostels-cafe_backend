@@ -5,6 +5,7 @@ import com.hostel.ordering.repository.OrderStatusRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class OrderStatusService {
@@ -21,6 +22,14 @@ public class OrderStatusService {
 
     public OrderStatusConfig addStatus(OrderStatusConfig status) {
         return repository.save(status);
+    }
+
+    public OrderStatusConfig addIfNotExists(OrderStatusConfig status) {
+        Optional<OrderStatusConfig> existing = repository.findByValue(status.getValue());
+        if (existing.isEmpty()) {
+            return repository.save(status);
+        }
+        return existing.get();
     }
 
     public void deleteStatus(String id) {

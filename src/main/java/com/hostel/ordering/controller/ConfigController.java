@@ -1,5 +1,6 @@
 package com.hostel.ordering.controller;
 
+import com.hostel.ordering.model.Category;
 import com.hostel.ordering.model.Dormitory;
 import com.hostel.ordering.model.OrderStatusConfig;
 import com.hostel.ordering.service.CategoryService;
@@ -52,7 +53,7 @@ public class ConfigController {
     // Category Management
     @PostMapping("/categories")
     public Category addCategory(@RequestBody Category category) {
-        return categoryService.addCategory(category);
+        return categoryService.createCategory(category);
     }
 
     @DeleteMapping("/categories/{id}")
