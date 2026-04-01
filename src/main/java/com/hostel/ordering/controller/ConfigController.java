@@ -56,6 +56,11 @@ public class ConfigController {
         return categoryService.createCategory(category);
     }
 
+    @PutMapping("/categories/{id}")
+    public Category updateCategory(@PathVariable String id, @RequestBody Category category) {
+        return categoryService.updateCategory(id, category);
+    }
+
     @DeleteMapping("/categories/{id}")
     public void deleteCategory(@PathVariable String id) {
         categoryService.deleteCategory(id);
@@ -65,6 +70,11 @@ public class ConfigController {
     @PostMapping("/dormitories")
     public Dormitory addDormitory(@RequestBody Dormitory dormitory) {
         return dormitoryService.addDormitory(dormitory);
+    }
+
+    @PutMapping("/dormitories/{id}")
+    public Dormitory updateDormitory(@PathVariable String id, @RequestBody Dormitory dormitory) {
+        return dormitoryService.updateDormitory(id, dormitory);
     }
 
     @DeleteMapping("/dormitories/{id}")

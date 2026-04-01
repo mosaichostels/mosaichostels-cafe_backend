@@ -32,6 +32,16 @@ public class CategoryService {
         return existing.get();
     }
 
+    public Category updateCategory(String id, Category category) {
+        return categoryRepository.findById(id)
+                .map(existing -> {
+                    if (category.getName() != null) existing.setName(category.getName());
+                    if (category.getShowOrder() != 0) existing.setShowOrder(category.getShowOrder());
+                    return categoryRepository.save(existing);
+                })
+                .orElse(null);
+    }
+
     public void deleteCategory(String id) {
         categoryRepository.deleteById(id);
     }

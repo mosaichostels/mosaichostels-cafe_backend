@@ -32,6 +32,15 @@ public class DormitoryService {
         return existing.get();
     }
 
+    public Dormitory updateDormitory(String id, Dormitory dormitory) {
+        return repository.findById(id)
+                .map(existing -> {
+                    if (dormitory.getName() != null) existing.setName(dormitory.getName());
+                    return repository.save(existing);
+                })
+                .orElse(null);
+    }
+
     public void deleteDormitory(String id) {
         repository.deleteById(id);
     }
