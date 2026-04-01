@@ -6,7 +6,7 @@ spring:
   data:
     mongodb:
       uri: ${MONGODB_URI}
-  # Reduce Tomcat thread pool to save memory on Railway
+  # Reduce Tomcat thread pool to save memory on free hosting
   web:
     resources:
       add-mappings: false
@@ -14,8 +14,8 @@ server:
   port: ${PORT:8080}
   tomcat:
     threads:
-      max: 20
-      min-spare: 5
+      max: 10
+      min-spare: 2
     connection-timeout: 20000
 # Disable unused actuator endpoints / banner
 spring.main.banner-mode: off
