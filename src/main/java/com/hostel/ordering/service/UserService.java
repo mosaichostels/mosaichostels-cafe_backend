@@ -22,6 +22,10 @@ public class UserService {
         return userRepository.findAll();
     }
 
+    public User getUserById(String id) {
+        return userRepository.findById(id).orElse(null);
+    }
+
     public User createUser(String username, String password, Set<String> roles) {
         String cleanUsername = username.trim();
         if (userRepository.findByUsername(cleanUsername).isPresent()) {

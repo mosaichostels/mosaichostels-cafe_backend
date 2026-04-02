@@ -44,7 +44,14 @@ public class UserController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteUser(@PathVariable String id) {
+        User user = userService.getUserById(id); // I should add this method or use userRepository
+        String username = (user != null) ? user.getUsername() : id;
+        
         userService.deleteUser(id);
+        
+        // Log the action
+        auditService.logAction("DELETED_USER", "Deleted user account: " + username);
+        
         return ResponseEntity.ok(Map.of("message", "User deleted successfully"));
     }
 
