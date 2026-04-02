@@ -28,7 +28,12 @@ public class UserDetailsServiceImpl implements UserDetailsService {
                 user.getUsername(),
                 user.getPassword(),
                 user.getRoles().stream()
-                        .map(SimpleGrantedAuthority::new)
+                        .map(role -> {
+                            if (!role.startsWith("ROLE_")) {
+                                return new SimpleGrantedAuthority("ROLE_" + role);
+                            }
+                            return new SimpleGrantedAuthority(role);
+                        })
                         .collect(Collectors.toList()));
     }
 }

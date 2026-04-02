@@ -23,11 +23,12 @@ public class UserService {
     }
 
     public User createUser(String username, String password, Set<String> roles) {
-        if (userRepository.existsByUsername(username)) {
+        String cleanUsername = username.trim();
+        if (userRepository.findByUsername(cleanUsername).isPresent()) {
             throw new IllegalArgumentException("Username is already taken!");
         }
 
-        User user = new User(username, encoder.encode(password), roles);
+        User user = new User(cleanUsername, encoder.encode(password), roles);
         return userRepository.save(user);
     }
 
@@ -39,12 +40,14 @@ public class UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("User not found!"));
 
+        String cleanUsername = newUsername.trim();
+
         // If username is changing, check if new one is taken
-        if (!user.getUsername().equals(newUsername) && userRepository.existsByUsername(newUsername)) {
+        if (!user.getUsername().equals(cleanUsername) && userRepository.existsByUsername(cleanUsername)) {
             throw new IllegalArgumentException("Username is already taken!");
         }
 
-        user.setUsername(newUsername);
+        user.setUsername(cleanUsername);
         user.setRoles(roles);
 
         if (newPassword != null && !newPassword.trim().isEmpty()) {
