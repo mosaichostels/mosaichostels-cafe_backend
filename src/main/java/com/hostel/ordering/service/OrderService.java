@@ -5,22 +5,27 @@ import com.hostel.ordering.model.PagedResponse;
 import com.hostel.ordering.repository.OrderRepository;
 import com.hostel.ordering.repository.OrderRepositoryCustom.SearchCriteria;
 import com.hostel.ordering.repository.OrderRepositoryCustom.SearchResult;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
 import java.util.List;
 
+@Slf4j
 @Service
 public class OrderService {
 
     private final OrderRepository orderRepository;
     private final FCMNotificationService fcmNotificationService;
+    private final AuditService auditService;
 
     public OrderService(OrderRepository orderRepository,
-                        FCMNotificationService fcmNotificationService) {
+                        FCMNotificationService fcmNotificationService,
+                        AuditService auditService) {
         this.orderRepository = orderRepository;
         this.fcmNotificationService = fcmNotificationService;
+        this.auditService = auditService;
     }
 
     public Order createOrder(Order order) {
@@ -30,7 +35,9 @@ public class OrderService {
             order.setStatus("ORDERED");
         }
         Order saved = orderRepository.save(order);
+        log.info("New order created: {} by {} in {}", saved.getId(), saved.getBookingName(), saved.getDormitory());
         fcmNotificationService.sendNewOrderNotification(saved);
+        auditService.logAction("ORDER_CREATED", "Order ID: " + saved.getId() + " for " + saved.getBookingName());
         return saved;
     }
 
@@ -109,19 +116,27 @@ public class OrderService {
     public Order updateOrderStatus(String id, String status) {
         return orderRepository.findById(id)
                 .map(order -> {
+                    String oldStatus = order.getStatus();
                     order.setStatus(status);
                     order.setUpdatedAt(System.currentTimeMillis());
-                    return orderRepository.save(order);
+                    Order updated = orderRepository.save(order);
+                    log.info("Order {} status updated: {} -> {}", id, oldStatus, status);
+                    auditService.logAction("ORDER_STATUS_UPDATED", "Order " + id + ": " + oldStatus + " -> " + status);
+                    return updated;
                 })
                 .orElse(null);
     }
 
     public void deleteOrder(String id) {
         orderRepository.deleteById(id);
+        log.info("Order deleted: {}", id);
+        auditService.logAction("ORDER_DELETED", "Order ID: " + id);
     }
 
     public void deleteAllOrders() {
         orderRepository.deleteAll();
+        log.warn("All orders deleted!");
+        auditService.logAction("ORDERS_BULK_DELETED", "All orders cleared");
     }
 
     public void deleteFilteredOrders(String status, String dormitory, String search, Long dateFrom, Long dateTo) {

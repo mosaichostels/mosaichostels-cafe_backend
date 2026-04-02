@@ -2,18 +2,21 @@ package com.hostel.ordering.service;
 
 import com.hostel.ordering.model.Category;
 import com.hostel.ordering.repository.CategoryRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Optional;
 
+@Slf4j
 @Service
 public class CategoryService {
 
     private final CategoryRepository categoryRepository;
+    private final AuditService auditService;
 
-    public CategoryService(CategoryRepository categoryRepository) {
+    public CategoryService(CategoryRepository categoryRepository, AuditService auditService) {
         this.categoryRepository = categoryRepository;
+        this.auditService = auditService;
     }
 
     public List<Category> getAllCategories() {
@@ -21,32 +24,31 @@ public class CategoryService {
     }
 
     public Category createCategory(Category category) {
-        return categoryRepository.save(category);
+        Category saved = categoryRepository.save(category);
+        log.info("Category created: {}", saved.getName());
+        auditService.logAction("CATEGORY_CREATED", "Name: " + saved.getName());
+        return saved;
     }
 
-    public Category createIfNotExists(Category category) {
-        Optional<Category> existing = categoryRepository.findByName(category.getName());
-        if (existing.isEmpty()) {
-            return categoryRepository.save(category);
-        }
-        return existing.get();
-    }
 
     public Category updateCategory(String id, Category category) {
         return categoryRepository.findById(id)
                 .map(existing -> {
+                    String oldName = existing.getName();
                     if (category.getName() != null) existing.setName(category.getName());
                     if (category.getShowOrder() != 0) existing.setShowOrder(category.getShowOrder());
-                    return categoryRepository.save(existing);
+                    Category updated = categoryRepository.save(existing);
+                    log.info("Category updated: {} -> {}", oldName, updated.getName());
+                    auditService.logAction("CATEGORY_UPDATED", "ID: " + id + ", " + oldName + " -> " + updated.getName());
+                    return updated;
                 })
                 .orElse(null);
     }
 
     public void deleteCategory(String id) {
         categoryRepository.deleteById(id);
+        log.warn("Category deleted: {}", id);
+        auditService.logAction("CATEGORY_DELETED", "ID: " + id);
     }
 
-    public long count() {
-        return categoryRepository.count();
-    }
 }

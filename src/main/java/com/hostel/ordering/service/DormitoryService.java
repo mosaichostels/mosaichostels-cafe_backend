@@ -2,18 +2,21 @@ package com.hostel.ordering.service;
 
 import com.hostel.ordering.model.Dormitory;
 import com.hostel.ordering.repository.DormitoryRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Optional;
 
+@Slf4j
 @Service
 public class DormitoryService {
 
     private final DormitoryRepository repository;
+    private final AuditService auditService;
 
-    public DormitoryService(DormitoryRepository repository) {
+    public DormitoryService(DormitoryRepository repository, AuditService auditService) {
         this.repository = repository;
+        this.auditService = auditService;
     }
 
     public List<Dormitory> getAllDormitories() {
@@ -21,31 +24,30 @@ public class DormitoryService {
     }
 
     public Dormitory addDormitory(Dormitory dormitory) {
-        return repository.save(dormitory);
+        Dormitory saved = repository.save(dormitory);
+        log.info("Dormitory added: {}", saved.getName());
+        auditService.logAction("DORMITORY_ADDED", "Name: " + saved.getName());
+        return saved;
     }
 
-    public Dormitory addIfNotExists(Dormitory dormitory) {
-        Optional<Dormitory> existing = repository.findByName(dormitory.getName());
-        if (existing.isEmpty()) {
-            return repository.save(dormitory);
-        }
-        return existing.get();
-    }
 
     public Dormitory updateDormitory(String id, Dormitory dormitory) {
         return repository.findById(id)
                 .map(existing -> {
+                    String oldName = existing.getName();
                     if (dormitory.getName() != null) existing.setName(dormitory.getName());
-                    return repository.save(existing);
+                    Dormitory updated = repository.save(existing);
+                    log.info("Dormitory updated: {} -> {}", oldName, updated.getName());
+                    auditService.logAction("DORMITORY_UPDATED", "ID: " + id + ", " + oldName + " -> " + updated.getName());
+                    return updated;
                 })
                 .orElse(null);
     }
 
     public void deleteDormitory(String id) {
         repository.deleteById(id);
+        log.warn("Dormitory deleted: {}", id);
+        auditService.logAction("DORMITORY_DELETED", "ID: " + id);
     }
     
-    public long count() {
-        return repository.count();
-    }
 }

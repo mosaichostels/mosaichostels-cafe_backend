@@ -2,23 +2,30 @@ package com.hostel.ordering.service;
 
 import com.hostel.ordering.model.OtherEssential;
 import com.hostel.ordering.repository.OtherEssentialRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+@Slf4j
 @Service
 public class OtherEssentialService {
 
     private final OtherEssentialRepository otherEssentialRepository;
+    private final AuditService auditService;
 
-    public OtherEssentialService(OtherEssentialRepository otherEssentialRepository) {
+    public OtherEssentialService(OtherEssentialRepository otherEssentialRepository, AuditService auditService) {
         this.otherEssentialRepository = otherEssentialRepository;
+        this.auditService = auditService;
     }
 
     public OtherEssential createOtherEssential(OtherEssential otherEssential) {
         otherEssential.setCreatedAt(System.currentTimeMillis());
         otherEssential.setUpdatedAt(System.currentTimeMillis());
-        return otherEssentialRepository.save(otherEssential);
+        OtherEssential saved = otherEssentialRepository.save(otherEssential);
+        log.info("Other essential created: {}", saved.getName());
+        auditService.logAction("ESSENTIAL_CREATED", "Name: " + saved.getName() + ", Price: " + saved.getPrice());
+        return saved;
     }
 
     public OtherEssential getOtherEssential(String id) {
@@ -43,18 +50,24 @@ public class OtherEssentialService {
     public OtherEssential updateOtherEssential(String id, OtherEssential otherEssential) {
         return otherEssentialRepository.findById(id)
                 .map(existing -> {
+                    String oldName = existing.getName();
                     if (otherEssential.getName() != null) existing.setName(otherEssential.getName());
                     if (otherEssential.getDescription() != null) existing.setDescription(otherEssential.getDescription());
                     if (otherEssential.getPrice() != null) existing.setPrice(otherEssential.getPrice());
                     if (otherEssential.getCategory() != null) existing.setCategory(otherEssential.getCategory());
                     if (otherEssential.getAvailable() != null) existing.setAvailable(otherEssential.getAvailable());
                     existing.setUpdatedAt(System.currentTimeMillis());
-                    return otherEssentialRepository.save(existing);
+                    OtherEssential updated = otherEssentialRepository.save(existing);
+                    log.info("Other essential updated: {} -> {}", oldName, updated.getName());
+                    auditService.logAction("ESSENTIAL_UPDATED", "ID: " + id + ", " + oldName + " -> " + updated.getName());
+                    return updated;
                 })
                 .orElse(null);
     }
 
     public void deleteOtherEssential(String id) {
         otherEssentialRepository.deleteById(id);
+        log.warn("Other essential deleted: {}", id);
+        auditService.logAction("ESSENTIAL_DELETED", "ID: " + id);
     }
 }

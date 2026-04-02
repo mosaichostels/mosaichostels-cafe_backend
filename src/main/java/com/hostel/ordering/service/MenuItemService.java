@@ -2,24 +2,31 @@ package com.hostel.ordering.service;
 
 import com.hostel.ordering.model.MenuItem;
 import com.hostel.ordering.repository.MenuItemRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
 import java.util.List;
 
+@Slf4j
 @Service
 public class MenuItemService {
 
     private final MenuItemRepository menuItemRepository;
+    private final AuditService auditService;
 
-    public MenuItemService(MenuItemRepository menuItemRepository) {
+    public MenuItemService(MenuItemRepository menuItemRepository, AuditService auditService) {
         this.menuItemRepository = menuItemRepository;
+        this.auditService = auditService;
     }
 
     public MenuItem createMenuItem(MenuItem menuItem) {
         menuItem.setCreatedAt(System.currentTimeMillis());
         menuItem.setUpdatedAt(System.currentTimeMillis());
-        return menuItemRepository.save(menuItem);
+        MenuItem saved = menuItemRepository.save(menuItem);
+        log.info("Menu item created: {}", saved.getName());
+        auditService.logAction("MENU_ITEM_CREATED", "Name: " + saved.getName() + ", Price: " + saved.getPrice());
+        return saved;
     }
 
     public MenuItem getMenuItem(String id) {
@@ -59,21 +66,28 @@ public class MenuItemService {
         return menuItemRepository.findByNameContainingIgnoreCaseOrderByNameAsc(query);
     }
 
+
     public MenuItem updateMenuItem(String id, MenuItem menuItem) {
         return menuItemRepository.findById(id)
                 .map(existing -> {
+                    String oldName = existing.getName();
                     if (menuItem.getName() != null) existing.setName(menuItem.getName());
                     if (menuItem.getDescription() != null) existing.setDescription(menuItem.getDescription());
                     if (menuItem.getPrice() != null) existing.setPrice(menuItem.getPrice());
                     if (menuItem.getCategory() != null) existing.setCategory(menuItem.getCategory());
                     if (menuItem.getAvailable() != null) existing.setAvailable(menuItem.getAvailable());
                     existing.setUpdatedAt(System.currentTimeMillis());
-                    return menuItemRepository.save(existing);
+                    MenuItem updated = menuItemRepository.save(existing);
+                    log.info("Menu item updated: {} -> {}", oldName, updated.getName());
+                    auditService.logAction("MENU_ITEM_UPDATED", "ID: " + id + ", " + oldName + " -> " + updated.getName());
+                    return updated;
                 })
                 .orElse(null);
     }
 
     public void deleteMenuItem(String id) {
         menuItemRepository.deleteById(id);
+        log.warn("Menu item deleted: {}", id);
+        auditService.logAction("MENU_ITEM_DELETED", "ID: " + id);
     }
 }
