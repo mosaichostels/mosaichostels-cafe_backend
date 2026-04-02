@@ -2,7 +2,7 @@
 title: Mosaic Hostels Cafe Backend
 emoji: ☕
 colorFrom: yellow
-colorTo: orange
+colorTo: blue
 sdk: docker
 pinned: false
 ---
