@@ -34,4 +34,23 @@ public class UserService {
     public void deleteUser(String id) {
         userRepository.deleteById(id);
     }
+
+    public User updateUser(String id, String newUsername, String newPassword, Set<String> roles) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("User not found!"));
+
+        // If username is changing, check if new one is taken
+        if (!user.getUsername().equals(newUsername) && userRepository.existsByUsername(newUsername)) {
+            throw new IllegalArgumentException("Username is already taken!");
+        }
+
+        user.setUsername(newUsername);
+        user.setRoles(roles);
+
+        if (newPassword != null && !newPassword.trim().isEmpty()) {
+            user.setPassword(encoder.encode(newPassword));
+        }
+
+        return userRepository.save(user);
+    }
 }

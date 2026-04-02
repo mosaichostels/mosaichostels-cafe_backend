@@ -19,6 +19,9 @@ public class UserController {
     @Autowired
     UserService userService;
 
+    @Autowired
+    com.hostel.ordering.service.AuditService auditService;
+
     @GetMapping
     public List<User> getAllUsers() {
         return userService.getAllUsers();
@@ -43,5 +46,24 @@ public class UserController {
     public ResponseEntity<?> deleteUser(@PathVariable String id) {
         userService.deleteUser(id);
         return ResponseEntity.ok(Map.of("message", "User deleted successfully"));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateUser(@PathVariable String id, @RequestBody Map<String, Object> userRequest) {
+        String username = (String) userRequest.get("username");
+        String password = (String) userRequest.get("password");
+        @SuppressWarnings("unchecked")
+        List<String> roles = (List<String>) userRequest.get("roles");
+
+        try {
+            User user = userService.updateUser(id, username, password, Set.copyOf(roles));
+            
+            // Log the action
+            auditService.logAction("MODIFIED_USER", "Updated credentials for user: " + username);
+            
+            return ResponseEntity.ok(user);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
     }
 }
