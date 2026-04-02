@@ -1,13 +1,17 @@
 server:
-  port: ${PORT:8080}
+  port: ${PORT:7860}
   tomcat:
     threads:
-      max: 20
-      min-spare: 2
+      # Optimized for 16GB RAM environment
+      max: 200
+      min-spare: 20
+    connection-timeout: 30000
 
 spring:
   main:
+    # Essential for fast startup and low idle RAM on containers
     lazy-initialization: true
+    banner-mode: off
 
   data:
     mongodb:
@@ -16,10 +20,9 @@ spring:
 
 logging:
   level:
-    root: WARN
+    root: INFO
     com.hostel.ordering: INFO
     org.springframework.data.mongodb: WARN
-    # suppress verbose Firebase/Google HTTP client logs
     com.google: WARN
     io.grpc: WARN
 
