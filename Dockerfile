@@ -18,9 +18,6 @@ EXPOSE 7860
 HEALTHCHECK --interval=2m --timeout=10s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:7860/health || exit 1
 
-# Production optimizations for Hugging Face (16GB RAM)
-# -Xmx4g: Utilizing a high-performance 4GB of the 16GB available.
-# -XX:+UseG1GC: Standard for modern high-RAM environments.
 ENTRYPOINT ["java", \
   "-Xmx4g", \
   "-Dserver.port=7860", \
