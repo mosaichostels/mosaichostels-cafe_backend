@@ -32,7 +32,6 @@ public class SecurityConfig {
         return new AuthTokenFilter();
     }
 
-    @Bean
     public DaoAuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
         authProvider.setUserDetailsService(userDetailsService);
