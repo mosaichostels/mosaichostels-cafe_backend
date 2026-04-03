@@ -13,6 +13,12 @@ public class FCMNotificationService {
     private static final Logger logger = LoggerFactory.getLogger(FCMNotificationService.class);
     private static final String ORDERS_TOPIC = "new_orders";
 
+    private final FirebaseMessaging firebaseMessaging;
+
+    public FCMNotificationService(FirebaseMessaging firebaseMessaging) {
+        this.firebaseMessaging = firebaseMessaging;
+    }
+
     @Async
     public void sendNewOrderNotification(Order order) {
         try {
@@ -43,7 +49,7 @@ public class FCMNotificationService {
                     .putData("body", body) // Android app reads this to build the notification
                     .build();
 
-            String response = FirebaseMessaging.getInstance().send(message);
+            String response = firebaseMessaging.send(message);
             logger.info("✅ FCM notification sent: {}", response);
 
         } catch (Exception e) {
