@@ -6,9 +6,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import lombok.extern.slf4j.Slf4j;
 import java.util.List;
 import java.util.Set;
 
+@Slf4j
 @Service
 public class UserService {
 
@@ -17,6 +19,9 @@ public class UserService {
 
     @Autowired
     PasswordEncoder encoder;
+
+    @Autowired
+    AuditService auditService;
 
     public List<User> getAllUsers() {
         return userRepository.findAll();
@@ -33,11 +38,18 @@ public class UserService {
         }
 
         User user = new User(cleanUsername, encoder.encode(password), roles);
-        return userRepository.save(user);
+        User saved = userRepository.save(user);
+        log.info("New user created: {}", saved.getUsername());
+        auditService.logAction("USER_CREATED", "Created user: " + saved.getUsername() + " with roles " + saved.getRoles());
+        return saved;
     }
 
     public void deleteUser(String id) {
-        userRepository.deleteById(id);
+        userRepository.findById(id).ifPresent(user -> {
+            userRepository.delete(user);
+            log.info("User {} deleted successfully", user.getUsername());
+            auditService.logAction("USER_DELETED", "Deleted user: " + user.getUsername());
+        });
     }
 
     public User updateUser(String id, String newUsername, String newPassword, Set<String> roles) {
@@ -58,6 +70,9 @@ public class UserService {
             user.setPassword(encoder.encode(newPassword));
         }
 
-        return userRepository.save(user);
+        User saved = userRepository.save(user);
+        log.info("User {} updated successfully", saved.getUsername());
+        auditService.logAction("USER_UPDATED", "Updated user: " + saved.getUsername() + " with roles " + saved.getRoles());
+        return saved;
     }
 }

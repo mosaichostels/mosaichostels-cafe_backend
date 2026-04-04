@@ -25,8 +25,8 @@ public class CategoryService {
 
     public Category createCategory(Category category) {
         Category saved = categoryRepository.save(category);
-        log.info("Category created: {}", saved.getName());
-        auditService.logAction("CATEGORY_CREATED", "Name: " + saved.getName());
+        log.info("New category created: {}", saved.getName());
+        auditService.logAction("CATEGORY_CREATED", "Created category: " + saved.getName());
         return saved;
     }
 
@@ -39,16 +39,18 @@ public class CategoryService {
                     if (category.getShowOrder() != 0) existing.setShowOrder(category.getShowOrder());
                     Category updated = categoryRepository.save(existing);
                     log.info("Category updated: {} -> {}", oldName, updated.getName());
-                    auditService.logAction("CATEGORY_UPDATED", "ID: " + id + ", " + oldName + " -> " + updated.getName());
+                    auditService.logAction("CATEGORY_UPDATED", "Updated category: " + oldName + " -> " + updated.getName());
                     return updated;
                 })
                 .orElse(null);
     }
 
     public void deleteCategory(String id) {
-        categoryRepository.deleteById(id);
-        log.warn("Category deleted: {}", id);
-        auditService.logAction("CATEGORY_DELETED", "ID: " + id);
+        categoryRepository.findById(id).ifPresent(category -> {
+            categoryRepository.delete(category);
+            log.info("Category {} deleted successfully", category.getName());
+            auditService.logAction("CATEGORY_DELETED", "Deleted category: " + category.getName());
+        });
     }
 
 }

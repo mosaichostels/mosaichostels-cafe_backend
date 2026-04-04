@@ -25,8 +25,8 @@ public class OrderStatusService {
 
     public OrderStatusConfig addStatus(OrderStatusConfig status) {
         OrderStatusConfig saved = repository.save(status);
-        log.info("Status added: {}", saved.getLabel());
-        auditService.logAction("STATUS_ADDED", "Label: " + saved.getLabel() + ", Value: " + saved.getValue());
+        log.info("New order status added: {}", saved.getLabel());
+        auditService.logAction("STATUS_ADDED", "Added new order status: " + saved.getLabel() + " (" + saved.getValue() + ")");
         return saved;
     }
 
@@ -35,8 +35,8 @@ public class OrderStatusService {
         repository.findById(id).ifPresent(s -> {
             if (!s.isLocked()) {
                 repository.deleteById(id);
-                log.warn("Status deleted: {}", s.getLabel());
-                auditService.logAction("STATUS_DELETED", "Label: " + s.getLabel() + ", ID: " + id);
+                log.info("Order status {} deleted successfully", s.getLabel());
+                auditService.logAction("STATUS_DELETED", "Deleted order status: " + s.getLabel());
             } else {
                 log.warn("Attempted to delete locked status: {}", s.getLabel());
             }

@@ -19,8 +19,8 @@ public class JwtUtils {
     @Value("${config.jwtSecret:mosaicHostelsDefaultSecretKeyWhichIsLongEnoughForSHA}")
     private String jwtSecret;
 
-    @Value("${config.jwtExpirationMs:86400000}")
-    private int jwtExpirationMs;
+    @Value("${config.jwtExpirationMs:315360000000}")
+    private long jwtExpirationMs;
 
     public String generateJwtToken(Authentication authentication) {
         UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();

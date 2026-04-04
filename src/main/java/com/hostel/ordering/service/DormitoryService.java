@@ -25,8 +25,8 @@ public class DormitoryService {
 
     public Dormitory addDormitory(Dormitory dormitory) {
         Dormitory saved = repository.save(dormitory);
-        log.info("Dormitory added: {}", saved.getName());
-        auditService.logAction("DORMITORY_ADDED", "Name: " + saved.getName());
+        log.info("New dormitory added: {}", saved.getName());
+        auditService.logAction("DORMITORY_ADDED", "Added dormitory: " + saved.getName());
         return saved;
     }
 
@@ -38,16 +38,18 @@ public class DormitoryService {
                     if (dormitory.getName() != null) existing.setName(dormitory.getName());
                     Dormitory updated = repository.save(existing);
                     log.info("Dormitory updated: {} -> {}", oldName, updated.getName());
-                    auditService.logAction("DORMITORY_UPDATED", "ID: " + id + ", " + oldName + " -> " + updated.getName());
+                    auditService.logAction("DORMITORY_UPDATED", "Updated dormitory: " + oldName + " -> " + updated.getName());
                     return updated;
                 })
                 .orElse(null);
     }
 
     public void deleteDormitory(String id) {
-        repository.deleteById(id);
-        log.warn("Dormitory deleted: {}", id);
-        auditService.logAction("DORMITORY_DELETED", "ID: " + id);
+        repository.findById(id).ifPresent(dorm -> {
+            repository.delete(dorm);
+            log.info("Dormitory {} deleted successfully", dorm.getName());
+            auditService.logAction("DORMITORY_DELETED", "Deleted dormitory: " + dorm.getName());
+        });
     }
     
 }

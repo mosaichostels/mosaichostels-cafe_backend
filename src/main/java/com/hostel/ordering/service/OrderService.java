@@ -35,9 +35,9 @@ public class OrderService {
             order.setStatus("ORDERED");
         }
         Order saved = orderRepository.save(order);
-        log.info("New order created: {} by {} in {}", saved.getId(), saved.getBookingName(), saved.getDormitory());
+        log.info("New order created for {} in {}", saved.getBookingName(), saved.getDormitory());
         fcmNotificationService.sendNewOrderNotification(saved);
-        auditService.logAction("ORDER_CREATED", "Order ID: " + saved.getId() + " for " + saved.getBookingName());
+        auditService.logAction("ORDER_CREATED", "Created order for " + saved.getBookingName() + " in " + saved.getDormitory());
         return saved;
     }
 
@@ -120,22 +120,24 @@ public class OrderService {
                     order.setStatus(status);
                     order.setUpdatedAt(System.currentTimeMillis());
                     Order updated = orderRepository.save(order);
-                    log.info("Order {} status updated: {} -> {}", id, oldStatus, status);
-                    auditService.logAction("ORDER_STATUS_UPDATED", "Order " + id + ": " + oldStatus + " -> " + status);
+                    log.info("Order for {} status updated: {} -> {}", order.getBookingName(), oldStatus, status);
+                    auditService.logAction("ORDER_STATUS_UPDATED", "Status updated for " + order.getBookingName() + ": " + oldStatus + " -> " + status);
                     return updated;
                 })
                 .orElse(null);
     }
 
     public void deleteOrder(String id) {
-        orderRepository.deleteById(id);
-        log.info("Order deleted: {}", id);
-        auditService.logAction("ORDER_DELETED", "Order ID: " + id);
+        orderRepository.findById(id).ifPresent(order -> {
+            orderRepository.delete(order);
+            log.info("Order for {} deleted successfully", order.getBookingName());
+            auditService.logAction("ORDER_DELETED", "Deleted order for " + order.getBookingName());
+        });
     }
 
     public void deleteAllOrders() {
         orderRepository.deleteAll();
-        log.warn("All orders deleted!");
+        log.warn("All orders cleared from the system!");
         auditService.logAction("ORDERS_BULK_DELETED", "All orders cleared");
     }
 

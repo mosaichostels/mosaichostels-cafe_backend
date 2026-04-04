@@ -24,8 +24,8 @@ public class MenuItemService {
         menuItem.setCreatedAt(System.currentTimeMillis());
         menuItem.setUpdatedAt(System.currentTimeMillis());
         MenuItem saved = menuItemRepository.save(menuItem);
-        log.info("Menu item created: {}", saved.getName());
-        auditService.logAction("MENU_ITEM_CREATED", "Name: " + saved.getName() + ", Price: " + saved.getPrice());
+        log.info("New menu item created: {}", saved.getName());
+        auditService.logAction("MENU_ITEM_CREATED", "Created menu item: " + saved.getName() + " with price " + saved.getPrice());
         return saved;
     }
 
@@ -79,15 +79,17 @@ public class MenuItemService {
                     existing.setUpdatedAt(System.currentTimeMillis());
                     MenuItem updated = menuItemRepository.save(existing);
                     log.info("Menu item updated: {} -> {}", oldName, updated.getName());
-                    auditService.logAction("MENU_ITEM_UPDATED", "ID: " + id + ", " + oldName + " -> " + updated.getName());
+                    auditService.logAction("MENU_ITEM_UPDATED", "Updated menu item: " + oldName + " -> " + updated.getName());
                     return updated;
                 })
                 .orElse(null);
     }
 
     public void deleteMenuItem(String id) {
-        menuItemRepository.deleteById(id);
-        log.warn("Menu item deleted: {}", id);
-        auditService.logAction("MENU_ITEM_DELETED", "ID: " + id);
+        menuItemRepository.findById(id).ifPresent(item -> {
+            menuItemRepository.delete(item);
+            log.info("Menu item {} deleted successfully", item.getName());
+            auditService.logAction("MENU_ITEM_DELETED", "Deleted menu item: " + item.getName());
+        });
     }
 }

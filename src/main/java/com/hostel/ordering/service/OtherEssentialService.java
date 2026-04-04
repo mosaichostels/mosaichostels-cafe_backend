@@ -23,8 +23,8 @@ public class OtherEssentialService {
         otherEssential.setCreatedAt(System.currentTimeMillis());
         otherEssential.setUpdatedAt(System.currentTimeMillis());
         OtherEssential saved = otherEssentialRepository.save(otherEssential);
-        log.info("Other essential created: {}", saved.getName());
-        auditService.logAction("ESSENTIAL_CREATED", "Name: " + saved.getName() + ", Price: " + saved.getPrice());
+        log.info("New essential item created: {}", saved.getName());
+        auditService.logAction("ESSENTIAL_CREATED", "Created essential item: " + saved.getName() + " with price " + saved.getPrice());
         return saved;
     }
 
@@ -58,16 +58,18 @@ public class OtherEssentialService {
                     if (otherEssential.getAvailable() != null) existing.setAvailable(otherEssential.getAvailable());
                     existing.setUpdatedAt(System.currentTimeMillis());
                     OtherEssential updated = otherEssentialRepository.save(existing);
-                    log.info("Other essential updated: {} -> {}", oldName, updated.getName());
-                    auditService.logAction("ESSENTIAL_UPDATED", "ID: " + id + ", " + oldName + " -> " + updated.getName());
+                    log.info("Essential item updated: {} -> {}", oldName, updated.getName());
+                    auditService.logAction("ESSENTIAL_UPDATED", "Updated essential item: " + oldName + " -> " + updated.getName());
                     return updated;
                 })
                 .orElse(null);
     }
 
     public void deleteOtherEssential(String id) {
-        otherEssentialRepository.deleteById(id);
-        log.warn("Other essential deleted: {}", id);
-        auditService.logAction("ESSENTIAL_DELETED", "ID: " + id);
+        otherEssentialRepository.findById(id).ifPresent(item -> {
+            otherEssentialRepository.delete(item);
+            log.info("Essential item {} deleted successfully", item.getName());
+            auditService.logAction("ESSENTIAL_DELETED", "Deleted essential item: " + item.getName());
+        });
     }
 }

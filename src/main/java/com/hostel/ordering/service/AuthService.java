@@ -11,11 +11,13 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import lombok.extern.slf4j.Slf4j;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class AuthService {
 
@@ -30,6 +32,9 @@ public class AuthService {
 
     @Autowired
     JwtUtils jwtUtils;
+    
+    @Autowired
+    AuditService auditService;
 
     public Map<String, Object> login(String username, String password) {
         Authentication authentication = authenticationManager.authenticate(
@@ -48,6 +53,8 @@ public class AuthService {
                 .map(item -> item.getAuthority())
                 .collect(Collectors.toList()));
 
+        log.info("User {} logged in successfully", userDetails.getUsername());
+        auditService.logAction("LOGIN_SUCCESS", "User logged in: " + userDetails.getUsername());
         return response;
     }
 
@@ -55,6 +62,8 @@ public class AuthService {
         if (!userRepository.existsByUsername(username)) {
             User user = new User(username, encoder.encode(password), Set.of("ROLE_ADMIN"));
             userRepository.save(user);
+            log.info("Initial admin registered: {}", username);
+            auditService.logAction("INITIAL_ADMIN_REGISTERED", "Initial admin registered: " + username);
         }
     }
 }
