@@ -25,7 +25,7 @@ public class FCMNotificationService {
             String title = "🛎 New Order Received!";
             String body = String.format(
                     "Order #%s from %s — ₹%.2f",
-                    order.getId().substring(0, 8),
+                    order.getId().length() >= 8 ? order.getId().substring(0, 8) : order.getId(),
                     order.getBookingName(),
                     order.getTotalAmount());
 
@@ -54,6 +54,38 @@ public class FCMNotificationService {
 
         } catch (Exception e) {
             logger.error("❌ Failed to send FCM notification", e);
+        }
+    }
+
+    @Async
+    public void sendOrderCancelledNotification(Order order) {
+        try {
+            String title = "❌ Order Cancelled!";
+            String body = String.format(
+                    "Order #%s for %s has been cancelled.",
+                    order.getId().length() >= 8 ? order.getId().substring(0, 8) : order.getId(),
+                    order.getBookingName());
+
+            AndroidConfig androidConfig = AndroidConfig.builder()
+                    .setPriority(AndroidConfig.Priority.HIGH)
+                    .setTtl(3600 * 1000L)
+                    .build();
+
+            Message message = Message.builder()
+                    .setTopic(ORDERS_TOPIC)
+                    .setAndroidConfig(androidConfig)
+                    .putData("type", "ORDER_CANCELLED")
+                    .putData("orderId", order.getId())
+                    .putData("customerName", order.getBookingName())
+                    .putData("title", title)
+                    .putData("body", body)
+                    .build();
+
+            String response = firebaseMessaging.send(message);
+            logger.info("✅ FCM cancellation notification sent: {}", response);
+
+        } catch (Exception e) {
+            logger.error("❌ Failed to send FCM cancellation notification", e);
         }
     }
 }

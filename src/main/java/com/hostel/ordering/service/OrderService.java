@@ -122,6 +122,11 @@ public class OrderService {
                     Order updated = orderRepository.save(order);
                     log.info("Order for {} status updated: {} -> {}", order.getBookingName(), oldStatus, status);
                     auditService.logAction("ORDER_STATUS_UPDATED", "Status updated for " + order.getBookingName() + ": " + oldStatus + " -> " + status);
+                    
+                    if ("CANCELLED".equalsIgnoreCase(status)) {
+                        fcmNotificationService.sendOrderCancelledNotification(updated);
+                    }
+                    
                     return updated;
                 })
                 .orElse(null);
