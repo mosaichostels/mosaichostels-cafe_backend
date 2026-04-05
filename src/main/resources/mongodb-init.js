@@ -30,6 +30,7 @@ print("Dormitories seeded successfully.");
 db.order_status_config.findOne({ value: "ORDERED" }) || db.order_status_config.insertOne({ value: "ORDERED", label: "Ordered", color: "preparing", locked: true });
 db.order_status_config.findOne({ value: "DELIVERED" }) || db.order_status_config.insertOne({ value: "DELIVERED", label: "Delivered", color: "delivered", locked: true });
 db.order_status_config.findOne({ value: "CANCELLED" }) || db.order_status_config.insertOne({ value: "CANCELLED", label: "Cancelled", color: "cancelled", locked: true });
+db.order_status_config.findOne({ value: "CHECKED" }) || db.order_status_config.insertOne({ value: "CHECKED", label: "Checked", color: "checked", locked: false });
 
 print("Order statuses seeded successfully.");
 

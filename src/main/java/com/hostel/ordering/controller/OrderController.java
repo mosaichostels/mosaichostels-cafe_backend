@@ -36,11 +36,12 @@ public class OrderController {
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Long dateFrom,
             @RequestParam(required = false) Long dateTo,
+            @RequestParam(required = false) Long date,
             @RequestParam(required = false, defaultValue = "createdAt_desc") String sort,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size) {
         return ResponseEntity.ok(orderService.getFilteredOrders(
-                status, dormitory, search, dateFrom, dateTo, sort, page, size));
+                status, dormitory, search, dateFrom, dateTo, date, sort, page, size));
     }
 
     @PutMapping("/{id}/status")
@@ -63,12 +64,13 @@ public class OrderController {
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Long dateFrom,
             @RequestParam(required = false) Long dateTo,
+            @RequestParam(required = false) Long date,
             @RequestParam(required = false, defaultValue = "false") boolean all) {
         if (all) {
             orderService.deleteAllOrders();
             return ResponseEntity.ok("All orders deleted successfully");
         }
-        orderService.deleteFilteredOrders(status, dormitory, search, dateFrom, dateTo);
+        orderService.deleteFilteredOrders(status, dormitory, search, dateFrom, dateTo, date);
         return ResponseEntity.ok("Filtered orders deleted successfully");
     }
 }

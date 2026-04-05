@@ -48,7 +48,11 @@ public class OrderRepositoryImpl implements OrderRepositoryCustom {
             criteriaList.add(Criteria.where("dormitory").is(criteria.dormitory()));
         }
 
-        if (criteria.dateFrom() != null || criteria.dateTo() != null) {
+        if (criteria.date() != null) {
+            long startOfDay = criteria.date();
+            long endOfDay = startOfDay + 24 * 60 * 60 * 1000 - 1;
+            criteriaList.add(Criteria.where("createdAt").gte(startOfDay).lte(endOfDay));
+        } else if (criteria.dateFrom() != null || criteria.dateTo() != null) {
             Criteria dateCriteria = Criteria.where("createdAt");
             if (criteria.dateFrom() != null) dateCriteria = dateCriteria.gte(criteria.dateFrom());
             if (criteria.dateTo() != null) dateCriteria = dateCriteria.lte(criteria.dateTo());

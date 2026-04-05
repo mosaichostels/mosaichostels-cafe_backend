@@ -50,21 +50,21 @@ public class OrderService {
      * Falls back to full list when pagination params are null (Android app).
      */
     public Object getFilteredOrders(String status, String dormitory, String search,
-                                     Long dateFrom, Long dateTo, String sort,
+                                     Long dateFrom, Long dateTo, Long date, String sort,
                                      Integer page, Integer size) {
         if (page != null && size != null) {
-            return getFilteredOrdersPaged(status, dormitory, search, dateFrom, dateTo, sort, page, size);
+            return getFilteredOrdersPaged(status, dormitory, search, dateFrom, dateTo, date, sort, page, size);
         } else {
-            return getFilteredOrdersList(status, dormitory, search, dateFrom, dateTo, sort);
+            return getFilteredOrdersList(status, dormitory, search, dateFrom, dateTo, date, sort);
         }
     }
 
     private PagedResponse<Order> getFilteredOrdersPaged(String status, String dormitory,
-            String search, Long dateFrom, Long dateTo, String sort, int page, int size) {
+            String search, Long dateFrom, Long dateTo, Long date, String sort, int page, int size) {
 
         boolean needsInMemorySort = "total_asc".equals(sort) || "total_desc".equals(sort);
 
-        SearchCriteria criteria = new SearchCriteria(status, dormitory, search, dateFrom, dateTo, true);
+        SearchCriteria criteria = new SearchCriteria(status, dormitory, search, dateFrom, dateTo, date, true);
         PageRequest pageable = PageRequest.of(page, needsInMemorySort ? Integer.MAX_VALUE : size);
 
         SearchResult result = orderRepository.searchOrders(criteria, pageable);
@@ -94,8 +94,8 @@ public class OrderService {
     }
 
     private List<Order> getFilteredOrdersList(String status, String dormitory, String search,
-                                               Long dateFrom, Long dateTo, String sort) {
-        SearchCriteria criteria = new SearchCriteria(status, dormitory, search, dateFrom, dateTo, false);
+                                               Long dateFrom, Long dateTo, Long date, String sort) {
+        SearchCriteria criteria = new SearchCriteria(status, dormitory, search, dateFrom, dateTo, date, false);
         List<Order> orders = orderRepository.searchOrders(criteria, null).orders();
 
         if (sort != null) {
@@ -146,8 +146,8 @@ public class OrderService {
         auditService.logAction("ORDERS_BULK_DELETED", "All orders cleared");
     }
 
-    public void deleteFilteredOrders(String status, String dormitory, String search, Long dateFrom, Long dateTo) {
-        List<Order> orders = getFilteredOrdersList(status, dormitory, search, dateFrom, dateTo, null);
+    public void deleteFilteredOrders(String status, String dormitory, String search, Long dateFrom, Long dateTo, Long date) {
+        List<Order> orders = getFilteredOrdersList(status, dormitory, search, dateFrom, dateTo, date, null);
         orderRepository.deleteAll(orders);
     }
 }

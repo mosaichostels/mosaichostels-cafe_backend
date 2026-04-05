@@ -15,6 +15,7 @@ public interface OrderRepositoryCustom {
             String search,
             Long dateFrom,
             Long dateTo,
+            Long date,
             boolean paginated
     ) {}
 
