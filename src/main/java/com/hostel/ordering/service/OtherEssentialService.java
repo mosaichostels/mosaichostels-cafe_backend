@@ -20,8 +20,6 @@ public class OtherEssentialService {
     }
 
     public OtherEssential createOtherEssential(OtherEssential otherEssential) {
-        otherEssential.setCreatedAt(System.currentTimeMillis());
-        otherEssential.setUpdatedAt(System.currentTimeMillis());
         OtherEssential saved = otherEssentialRepository.save(otherEssential);
         log.info("New essential item created: {}", saved.getName());
         auditService.logAction("ESSENTIAL_CREATED", "Created essential item: " + saved.getName() + " with price " + saved.getPrice());
@@ -56,7 +54,6 @@ public class OtherEssentialService {
                     if (otherEssential.getPrice() != null) existing.setPrice(otherEssential.getPrice());
                     if (otherEssential.getCategory() != null) existing.setCategory(otherEssential.getCategory());
                     if (otherEssential.getAvailable() != null) existing.setAvailable(otherEssential.getAvailable());
-                    existing.setUpdatedAt(System.currentTimeMillis());
                     OtherEssential updated = otherEssentialRepository.save(existing);
                     log.info("Essential item updated: {} -> {}", oldName, updated.getName());
                     auditService.logAction("ESSENTIAL_UPDATED", "Updated essential item: " + oldName + " -> " + updated.getName());

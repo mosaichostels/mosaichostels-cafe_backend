@@ -19,6 +19,4 @@ public class OtherEssential {
     private Double price;
     private String category;
     private Boolean available;
-    private Long createdAt;
-    private Long updatedAt;
 }

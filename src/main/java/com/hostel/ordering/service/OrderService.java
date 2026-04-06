@@ -52,8 +52,8 @@ public class OrderService {
 
     private List<Order> getFilteredOrdersList(String status, String dormitory, String search,
                                                Long dateFrom, Long dateTo, Long date, String sort) {
-        SearchCriteria criteria = new SearchCriteria(status, dormitory, search, dateFrom, dateTo, date, false);
-        List<Order> orders = orderRepository.searchOrders(criteria, null).orders();
+        SearchCriteria criteria = new SearchCriteria(status, dormitory, search, dateFrom, dateTo, date);
+        List<Order> orders = orderRepository.searchOrders(criteria);
 
         if (sort != null) {
             Comparator<Order> comparator = switch (sort) {

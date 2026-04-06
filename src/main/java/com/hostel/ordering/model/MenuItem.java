@@ -20,5 +20,4 @@ public class MenuItem {
     private String category;
     private Boolean available;
     private Long createdAt;
-    private Long updatedAt;
 }
