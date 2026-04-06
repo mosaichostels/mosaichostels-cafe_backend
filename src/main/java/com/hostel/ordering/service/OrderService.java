@@ -1,12 +1,9 @@
 package com.hostel.ordering.service;
 
 import com.hostel.ordering.model.Order;
-import com.hostel.ordering.model.PagedResponse;
 import com.hostel.ordering.repository.OrderRepository;
 import com.hostel.ordering.repository.OrderRepositoryCustom.SearchCriteria;
-import com.hostel.ordering.repository.OrderRepositoryCustom.SearchResult;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
@@ -46,51 +43,11 @@ public class OrderService {
     }
 
     /**
-     * Returns a paginated response when page/size are provided (web admin).
-     * Falls back to full list when pagination params are null (Android app).
+     * Returns a full list of filtered orders (pagination removed - now returns all results).
      */
-    public Object getFilteredOrders(String status, String dormitory, String search,
-                                     Long dateFrom, Long dateTo, Long date, String sort,
-                                     Integer page, Integer size) {
-        if (page != null && size != null) {
-            return getFilteredOrdersPaged(status, dormitory, search, dateFrom, dateTo, date, sort, page, size);
-        } else {
-            return getFilteredOrdersList(status, dormitory, search, dateFrom, dateTo, date, sort);
-        }
-    }
-
-    private PagedResponse<Order> getFilteredOrdersPaged(String status, String dormitory,
-            String search, Long dateFrom, Long dateTo, Long date, String sort, int page, int size) {
-
-        boolean needsInMemorySort = "total_asc".equals(sort) || "total_desc".equals(sort);
-
-        SearchCriteria criteria = new SearchCriteria(status, dormitory, search, dateFrom, dateTo, date, true);
-        PageRequest pageable = PageRequest.of(page, needsInMemorySort ? Integer.MAX_VALUE : size);
-
-        SearchResult result = orderRepository.searchOrders(criteria, pageable);
-        List<Order> orders = result.orders();
-
-        if (needsInMemorySort) {
-            Comparator<Order> comparator = "total_asc".equals(sort)
-                    ? Comparator.comparingDouble(Order::getTotalAmount)
-                    : Comparator.comparingDouble(Order::getTotalAmount).reversed();
-
-            orders = orders.stream().sorted(comparator).toList();
-
-            int fromIdx = page * size;
-            int toIdx = Math.min(fromIdx + size, orders.size());
-            long total = orders.size();
-            orders = fromIdx >= orders.size() ? List.of() : orders.subList(fromIdx, toIdx);
-            return new PagedResponse<>(orders, page, size, total);
-        }
-
-        if ("createdAt_asc".equals(sort)) {
-            orders = orders.stream()
-                    .sorted(Comparator.comparingLong(Order::getCreatedAt))
-                    .toList();
-        }
-
-        return new PagedResponse<>(orders, page, size, result.totalElements());
+    public List<Order> getFilteredOrders(String status, String dormitory, String search,
+                                     Long dateFrom, Long dateTo, Long date, String sort) {
+        return getFilteredOrdersList(status, dormitory, search, dateFrom, dateTo, date, sort);
     }
 
     private List<Order> getFilteredOrdersList(String status, String dormitory, String search,

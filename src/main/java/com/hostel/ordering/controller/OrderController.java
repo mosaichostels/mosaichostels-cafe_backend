@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -30,18 +31,16 @@ public class OrderController {
     }
 
     @GetMapping
-    public ResponseEntity<Object> getAllOrders(
+    public ResponseEntity<List<Order>> getAllOrders(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String dormitory,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Long dateFrom,
             @RequestParam(required = false) Long dateTo,
             @RequestParam(required = false) Long date,
-            @RequestParam(required = false, defaultValue = "createdAt_desc") String sort,
-            @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size) {
+            @RequestParam(required = false, defaultValue = "createdAt_desc") String sort) {
         return ResponseEntity.ok(orderService.getFilteredOrders(
-                status, dormitory, search, dateFrom, dateTo, date, sort, page, size));
+                status, dormitory, search, dateFrom, dateTo, date, sort));
     }
 
     @PutMapping("/{id}/status")
