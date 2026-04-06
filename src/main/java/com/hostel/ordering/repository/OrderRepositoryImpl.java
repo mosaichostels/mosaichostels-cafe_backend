@@ -1,7 +1,6 @@
 package com.hostel.ordering.repository;
 
 import com.hostel.ordering.model.Order;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -21,20 +20,10 @@ public class OrderRepositoryImpl implements OrderRepositoryCustom {
     }
 
     @Override
-    public SearchResult searchOrders(SearchCriteria criteria, Pageable pageable) {
+    public List<Order> searchOrders(SearchCriteria criteria) {
         Query query = buildQuery(criteria);
         query.with(Sort.by(Sort.Direction.DESC, "createdAt"));
-
-        if (pageable != null) {
-            long total = mongoTemplate.count(query, Order.class);
-            query.skip(pageable.getOffset());
-            query.limit(pageable.getPageSize());
-            List<Order> orders = mongoTemplate.find(query, Order.class);
-            return new SearchResult(orders, total);
-        } else {
-            List<Order> orders = mongoTemplate.find(query, Order.class);
-            return new SearchResult(orders, orders.size());
-        }
+        return mongoTemplate.find(query, Order.class);
     }
 
     private Query buildQuery(SearchCriteria criteria) {

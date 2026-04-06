@@ -22,7 +22,6 @@ public class MenuItemService {
 
     public MenuItem createMenuItem(MenuItem menuItem) {
         menuItem.setCreatedAt(System.currentTimeMillis());
-        menuItem.setUpdatedAt(System.currentTimeMillis());
         MenuItem saved = menuItemRepository.save(menuItem);
         log.info("New menu item created: {}", saved.getName());
         auditService.logAction("MENU_ITEM_CREATED", "Created menu item: " + saved.getName() + " with price " + saved.getPrice());
@@ -76,7 +75,6 @@ public class MenuItemService {
                     if (menuItem.getPrice() != null) existing.setPrice(menuItem.getPrice());
                     if (menuItem.getCategory() != null) existing.setCategory(menuItem.getCategory());
                     if (menuItem.getAvailable() != null) existing.setAvailable(menuItem.getAvailable());
-                    existing.setUpdatedAt(System.currentTimeMillis());
                     MenuItem updated = menuItemRepository.save(existing);
                     log.info("Menu item updated: {} -> {}", oldName, updated.getName());
                     auditService.logAction("MENU_ITEM_UPDATED", "Updated menu item: " + oldName + " -> " + updated.getName());
