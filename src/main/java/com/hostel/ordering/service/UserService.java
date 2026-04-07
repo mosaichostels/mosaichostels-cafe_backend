@@ -58,7 +58,6 @@ public class UserService {
 
         String cleanUsername = newUsername.trim();
 
-        // If username is changing, check if new one is taken
         if (!user.getUsername().equals(cleanUsername) && userRepository.existsByUsername(cleanUsername)) {
             throw new IllegalArgumentException("Username is already taken!");
         }

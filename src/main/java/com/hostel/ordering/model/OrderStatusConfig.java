@@ -10,8 +10,8 @@ public class OrderStatusConfig {
     private String id;
     private String value;
     private String label;
-    private String color; // e.g. "preparing", "delivered", "cancelled"
-    private boolean locked; // to prevent deletion of crucial statuses
+    private String color;
+    private boolean locked;
 
     public OrderStatusConfig() {}
 

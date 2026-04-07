@@ -34,23 +34,19 @@ public class ConfigController {
     public ResponseEntity<Map<String, Object>> getConfig() {
         Map<String, Object> config = new HashMap<>();
         
-        // Backend-driven Dormitories
         List<String> dormNames = dormitoryService.getAllDormitories().stream()
                 .map(Dormitory::getName)
                 .collect(Collectors.toList());
         config.put("dormitories", dormNames);
         
-        // Backend-driven Order Statuses
         config.put("orderStatuses", orderStatusService.getAllStatuses());
         
-        // Backend-driven Categories sorted by showOrder
         List<Category> categories = categoryService.getAllCategories();
         config.put("categories", categories);
         
         return ResponseEntity.ok(config);
     }
 
-    // Category Management
     @PostMapping("/categories")
     public Category addCategory(@RequestBody Category category) {
         return categoryService.createCategory(category);
@@ -66,7 +62,6 @@ public class ConfigController {
         categoryService.deleteCategory(id);
     }
 
-    // Dormitory Management
     @PostMapping("/dormitories")
     public Dormitory addDormitory(@RequestBody Dormitory dormitory) {
         return dormitoryService.addDormitory(dormitory);
@@ -87,7 +82,6 @@ public class ConfigController {
         return dormitoryService.getAllDormitories();
     }
 
-    // Status Management
     @PostMapping("/statuses")
     public OrderStatusConfig addStatus(@RequestBody OrderStatusConfig status) {
         return orderStatusService.addStatus(status);

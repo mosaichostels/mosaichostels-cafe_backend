@@ -37,14 +37,12 @@ public class FirebaseConfig {
     }
 
     private InputStream loadCredentials() {
-        // Option 1: Raw JSON string from environment variable (recommended for Railway)
         String json = System.getenv("FIREBASE_SERVICE_ACCOUNT_JSON");
         if (json != null && !json.isBlank()) {
             logger.info("✅ Loading Firebase from FIREBASE_SERVICE_ACCOUNT_JSON env var");
             return new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8));
         }
 
-        // Option 2: File fallback for local development
         InputStream file = getClass().getClassLoader()
                 .getResourceAsStream("firebase-service-account.json");
         if (file != null) {

@@ -42,9 +42,6 @@ public class OrderService {
         return orderRepository.findById(id).orElse(null);
     }
 
-    /**
-     * Returns a full list of filtered orders (pagination removed - now returns all results).
-     */
     public List<Order> getFilteredOrders(String status, String dormitory, String search,
                                      Long dateFrom, Long dateTo, Long date, String sort) {
         return getFilteredOrdersList(status, dormitory, search, dateFrom, dateTo, date, sort);

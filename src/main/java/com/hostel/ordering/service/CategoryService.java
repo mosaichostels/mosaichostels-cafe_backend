@@ -34,11 +34,9 @@ public class CategoryService {
 
     @Transactional
     public Category createCategory(Category category) {
-        // If showOrder is specified, shift existing categories up
         if (category.getShowOrder() > 0) {
             shiftCategoryOrdersUp(category.getShowOrder());
         } else {
-            // Auto-assign next available order (append to end)
             category.setShowOrder(getNextAvailableOrder());
         }
         Category saved = categoryRepository.save(category);
@@ -48,7 +46,6 @@ public class CategoryService {
         return saved;
     }
 
-
     @Transactional
     public Category updateCategory(String id, Category category) {
         return categoryRepository.findById(id)
@@ -57,12 +54,10 @@ public class CategoryService {
                     int oldOrder = existing.getShowOrder();
                     int newOrder = category.getShowOrder();
                     
-                    // Update name if provided
                     if (category.getName() != null) {
                         existing.setName(category.getName());
                     }
                     
-                    // Handle order change
                     if (newOrder != 0 && newOrder != oldOrder) {
                         renumberCategoryOrders(oldOrder, newOrder, id);
                         existing.setShowOrder(newOrder);
@@ -83,7 +78,6 @@ public class CategoryService {
         categoryRepository.findById(id).ifPresent(category -> {
             int deletedOrder = category.getShowOrder();
             categoryRepository.delete(category);
-            // Shift down categories after the deleted one to fill the gap
             shiftCategoryOrdersDown(deletedOrder);
             log.info("Category {} at order {} deleted, subsequent categories renumbered", 
                 category.getName(), deletedOrder);
@@ -92,30 +86,25 @@ public class CategoryService {
         });
     }
 
-    // Shift categories up (increment showOrder) - used when inserting at a position
     private void shiftCategoryOrdersUp(int fromOrder) {
         Query query = new Query(Criteria.where("showOrder").gte(fromOrder));
         Update update = new Update().inc("showOrder", 1);
         mongoTemplate.updateMulti(query, update, Category.class);
     }
 
-    // Shift categories down (decrement showOrder) - used when deleting to fill gap
     private void shiftCategoryOrdersDown(int fromOrder) {
         Query query = new Query(Criteria.where("showOrder").gt(fromOrder));
         Update update = new Update().inc("showOrder", -1);
         mongoTemplate.updateMulti(query, update, Category.class);
     }
 
-    // Renumber categories when moving from oldOrder to newOrder
     private void renumberCategoryOrders(int oldOrder, int newOrder, String excludeId) {
         if (oldOrder < newOrder) {
-            // Moving down: shift categories between old+1 and new down by 1
             Query query = new Query(Criteria.where("showOrder").gt(oldOrder).lte(newOrder)
                     .and("id").ne(excludeId));
             Update update = new Update().inc("showOrder", -1);
             mongoTemplate.updateMulti(query, update, Category.class);
         } else {
-            // Moving up: shift categories between new and old-1 up by 1
             Query query = new Query(Criteria.where("showOrder").gte(newOrder).lt(oldOrder)
                     .and("id").ne(excludeId));
             Update update = new Update().inc("showOrder", 1);
@@ -123,7 +112,6 @@ public class CategoryService {
         }
     }
 
-    // Get next available order (max + 1)
     private int getNextAvailableOrder() {
         List<Category> categories = categoryRepository.findAllByOrderByShowOrderDesc();
         if (categories.isEmpty()) return 1;

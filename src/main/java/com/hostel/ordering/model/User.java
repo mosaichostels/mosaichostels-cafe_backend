@@ -23,7 +23,7 @@ public class User {
 
     private String password;
 
-    private Set<String> roles; // ROLE_ADMIN, ROLE_STAFF
+    private Set<String> roles;
 
     private long createdAt;
 

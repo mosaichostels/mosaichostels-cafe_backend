@@ -17,7 +17,6 @@ public class AuditCleanupTask {
     @Autowired
     AuditRepository auditRepository;
 
-    // Run every day at MN
     @Scheduled(cron = "0 0 0 * * *")
     public void cleanupOldLogs() {
         long sevenDaysAgo = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(7);

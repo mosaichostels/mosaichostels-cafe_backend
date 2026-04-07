@@ -19,9 +19,9 @@ public class AuditLog {
 
     private String username;
 
-    private String action; // e.g., "LOGIN_SUCCESS", "ORDER_STATUS_UPDATED"
+    private String action;
 
-    private String details; // e.g., "Order ID: 123 -> DELIVERED"
+    private String details;
 
     private long timestamp;
 }
