@@ -4,9 +4,7 @@ import com.hostel.ordering.model.OtherEssential;
 import com.hostel.ordering.repository.OtherEssentialRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-
 import java.util.List;
-
 @Slf4j
 @Service
 public class OtherEssentialService {

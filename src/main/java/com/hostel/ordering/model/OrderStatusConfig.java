@@ -2,7 +2,6 @@ package com.hostel.ordering.model;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
-
 @Document(collection = "order_status_config")
 public class OrderStatusConfig {
 

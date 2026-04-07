@@ -4,9 +4,7 @@ import com.hostel.ordering.model.Dormitory;
 import com.hostel.ordering.repository.DormitoryRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-
 import java.util.List;
-
 @Slf4j
 @Service
 public class DormitoryService {
@@ -30,7 +28,6 @@ public class DormitoryService {
         return saved;
     }
 
-
     public Dormitory updateDormitory(String id, Dormitory dormitory) {
         return repository.findById(id)
                 .map(existing -> {
@@ -51,5 +48,5 @@ public class DormitoryService {
             auditService.logAction("DORMITORY_DELETED", "Deleted dormitory: " + dorm.getName());
         });
     }
-    
+
 }

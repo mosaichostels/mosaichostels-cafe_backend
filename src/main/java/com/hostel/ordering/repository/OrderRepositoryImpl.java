@@ -6,10 +6,8 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
-
 import java.util.ArrayList;
 import java.util.List;
-
 @Repository
 public class OrderRepositoryImpl implements OrderRepositoryCustom {
 
@@ -43,8 +41,10 @@ public class OrderRepositoryImpl implements OrderRepositoryCustom {
             criteriaList.add(Criteria.where("createdAt").gte(startOfDay).lte(endOfDay));
         } else if (criteria.dateFrom() != null || criteria.dateTo() != null) {
             Criteria dateCriteria = Criteria.where("createdAt");
-            if (criteria.dateFrom() != null) dateCriteria = dateCriteria.gte(criteria.dateFrom());
-            if (criteria.dateTo() != null) dateCriteria = dateCriteria.lte(criteria.dateTo());
+            if (criteria.dateFrom() != null)
+                dateCriteria = dateCriteria.gte(criteria.dateFrom());
+            if (criteria.dateTo() != null)
+                dateCriteria = dateCriteria.lte(criteria.dateTo());
             criteriaList.add(dateCriteria);
         }
 

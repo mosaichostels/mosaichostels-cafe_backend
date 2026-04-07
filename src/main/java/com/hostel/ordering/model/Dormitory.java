@@ -2,7 +2,6 @@ package com.hostel.ordering.model;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
-
 @Document(collection = "dormitories")
 public class Dormitory {
 
@@ -10,7 +9,8 @@ public class Dormitory {
     private String id;
     private String name;
 
-    public Dormitory() {}
+    public Dormitory() {
+    }
 
     public Dormitory(String name) {
         this.name = name;

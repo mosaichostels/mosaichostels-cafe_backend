@@ -1,9 +1,7 @@
 package com.hostel.ordering.repository;
 
 import com.hostel.ordering.model.Order;
-
 import java.util.List;
-
 public interface OrderRepositoryCustom {
 
     List<Order> searchOrders(SearchCriteria criteria);
@@ -14,6 +12,6 @@ public interface OrderRepositoryCustom {
             String search,
             Long dateFrom,
             Long dateTo,
-            Long date
-    ) {}
+            Long date) {
+    }
 }

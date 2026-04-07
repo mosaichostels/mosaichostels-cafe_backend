@@ -4,10 +4,8 @@ import com.hostel.ordering.model.OtherEssential;
 import com.hostel.ordering.service.OtherEssentialService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
-
+import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/other-essentials")
 public class OtherEssentialController {
@@ -20,7 +18,8 @@ public class OtherEssentialController {
 
     @PostMapping
     public ResponseEntity<OtherEssential> createOtherEssential(@RequestBody OtherEssential otherEssential) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(otherEssentialService.createOtherEssential(otherEssential));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(otherEssentialService.createOtherEssential(otherEssential));
     }
 
     @GetMapping("/{id}")
@@ -48,7 +47,7 @@ public class OtherEssentialController {
 
     @PutMapping("/{id}")
     public ResponseEntity<OtherEssential> updateOtherEssential(@PathVariable String id,
-                                                               @RequestBody OtherEssential otherEssential) {
+            @RequestBody OtherEssential otherEssential) {
         OtherEssential updated = otherEssentialService.updateOtherEssential(id, otherEssential);
         return updated != null ? ResponseEntity.ok(updated) : ResponseEntity.notFound().build();
     }

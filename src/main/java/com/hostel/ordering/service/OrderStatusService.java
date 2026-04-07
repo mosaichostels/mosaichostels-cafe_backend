@@ -4,9 +4,7 @@ import com.hostel.ordering.model.OrderStatusConfig;
 import com.hostel.ordering.repository.OrderStatusRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-
 import java.util.List;
-
 @Slf4j
 @Service
 public class OrderStatusService {
@@ -29,7 +27,6 @@ public class OrderStatusService {
         auditService.logAction("STATUS_ADDED", "Added new order status: " + saved.getLabel() + " (" + saved.getValue() + ")");
         return saved;
     }
-
 
     public void deleteStatus(String id) {
         repository.findById(id).ifPresent(s -> {

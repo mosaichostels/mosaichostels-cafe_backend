@@ -7,13 +7,11 @@ import com.hostel.ordering.service.CategoryService;
 import com.hostel.ordering.service.DormitoryService;
 import com.hostel.ordering.service.OrderStatusService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-
+import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/config")
 public class ConfigController {
@@ -33,17 +31,17 @@ public class ConfigController {
     @GetMapping
     public ResponseEntity<Map<String, Object>> getConfig() {
         Map<String, Object> config = new HashMap<>();
-        
+
         List<String> dormNames = dormitoryService.getAllDormitories().stream()
                 .map(Dormitory::getName)
                 .collect(Collectors.toList());
         config.put("dormitories", dormNames);
-        
+
         config.put("orderStatuses", orderStatusService.getAllStatuses());
-        
+
         List<Category> categories = categoryService.getAllCategories();
         config.put("categories", categories);
-        
+
         return ResponseEntity.ok(config);
     }
 

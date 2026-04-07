@@ -4,11 +4,9 @@ import com.hostel.ordering.model.Order;
 import com.hostel.ordering.service.OrderService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 import java.util.Map;
-
+import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/orders")
 public class OrderController {
@@ -45,7 +43,7 @@ public class OrderController {
 
     @PutMapping("/{id}/status")
     public ResponseEntity<Order> updateOrderStatus(@PathVariable String id,
-                                                    @RequestBody Map<String, String> payload) {
+            @RequestBody Map<String, String> payload) {
         Order updated = orderService.updateOrderStatus(id, payload.get("status"));
         return updated != null ? ResponseEntity.ok(updated) : ResponseEntity.notFound().build();
     }

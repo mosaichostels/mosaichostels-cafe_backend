@@ -4,10 +4,8 @@ import com.hostel.ordering.model.MenuItem;
 import com.hostel.ordering.repository.MenuItemRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-
 import java.util.Comparator;
 import java.util.List;
-
 @Slf4j
 @Service
 public class MenuItemService {
@@ -42,7 +40,7 @@ public class MenuItemService {
                 : menuItemRepository.findByAvailableTrueOrderByNameAsc();
 
         String finalSort = (sort == null || sort.isBlank()) ? "price_asc" : sort;
-        
+
         Comparator<MenuItem> comparator = switch (finalSort) {
             case "price_asc" -> Comparator.comparingDouble(MenuItem::getPrice);
             case "price_desc" -> Comparator.comparingDouble(MenuItem::getPrice).reversed();
@@ -64,7 +62,6 @@ public class MenuItemService {
         }
         return menuItemRepository.findByNameContainingIgnoreCaseOrderByNameAsc(query);
     }
-
 
     public MenuItem updateMenuItem(String id, MenuItem menuItem) {
         return menuItemRepository.findById(id)

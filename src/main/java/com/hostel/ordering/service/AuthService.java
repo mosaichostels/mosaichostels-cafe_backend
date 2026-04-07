@@ -10,13 +10,11 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
 import lombok.extern.slf4j.Slf4j;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-
 @Slf4j
 @Service
 public class AuthService {
@@ -32,7 +30,7 @@ public class AuthService {
 
     @Autowired
     JwtUtils jwtUtils;
-    
+
     @Autowired
     AuditService auditService;
 
@@ -43,7 +41,7 @@ public class AuthService {
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String jwt = jwtUtils.generateJwtToken(authentication);
 
-        org.springframework.security.core.userdetails.User userDetails = 
+        org.springframework.security.core.userdetails.User userDetails =
                 (org.springframework.security.core.userdetails.User) authentication.getPrincipal();
 
         Map<String, Object> response = new HashMap<>();

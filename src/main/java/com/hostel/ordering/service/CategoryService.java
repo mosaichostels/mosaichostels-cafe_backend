@@ -9,9 +9,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.util.List;
-
 @Slf4j
 @Service
 public class CategoryService {
@@ -20,7 +18,7 @@ public class CategoryService {
     private final AuditService auditService;
     private final MongoTemplate mongoTemplate;
 
-    public CategoryService(CategoryRepository categoryRepository, 
+    public CategoryService(CategoryRepository categoryRepository,
                             AuditService auditService,
                             MongoTemplate mongoTemplate) {
         this.categoryRepository = categoryRepository;
@@ -41,7 +39,7 @@ public class CategoryService {
         }
         Category saved = categoryRepository.save(category);
         log.info("New category created: {} at order {}", saved.getName(), saved.getShowOrder());
-        auditService.logAction("CATEGORY_CREATED", 
+        auditService.logAction("CATEGORY_CREATED",
             "Created category: " + saved.getName() + " at order " + saved.getShowOrder());
         return saved;
     }
@@ -53,20 +51,20 @@ public class CategoryService {
                     String oldName = existing.getName();
                     int oldOrder = existing.getShowOrder();
                     int newOrder = category.getShowOrder();
-                    
+
                     if (category.getName() != null) {
                         existing.setName(category.getName());
                     }
-                    
+
                     if (newOrder != 0 && newOrder != oldOrder) {
                         renumberCategoryOrders(oldOrder, newOrder, id);
                         existing.setShowOrder(newOrder);
                     }
-                    
+
                     Category updated = categoryRepository.save(existing);
-                    log.info("Category updated: {} order {} -> {}", 
+                    log.info("Category updated: {} order {} -> {}",
                         updated.getName(), oldOrder, newOrder);
-                    auditService.logAction("CATEGORY_UPDATED", 
+                    auditService.logAction("CATEGORY_UPDATED",
                         "Updated category: " + oldName + " order " + oldOrder + " -> " + newOrder);
                     return updated;
                 })
@@ -79,9 +77,9 @@ public class CategoryService {
             int deletedOrder = category.getShowOrder();
             categoryRepository.delete(category);
             shiftCategoryOrdersDown(deletedOrder);
-            log.info("Category {} at order {} deleted, subsequent categories renumbered", 
+            log.info("Category {} at order {} deleted, subsequent categories renumbered",
                 category.getName(), deletedOrder);
-            auditService.logAction("CATEGORY_DELETED", 
+            auditService.logAction("CATEGORY_DELETED",
                 "Deleted category: " + category.getName() + " at order " + deletedOrder);
         });
     }
