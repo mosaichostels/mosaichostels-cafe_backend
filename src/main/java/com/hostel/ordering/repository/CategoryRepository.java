@@ -10,5 +10,6 @@ import java.util.Optional;
 @Repository
 public interface CategoryRepository extends MongoRepository<Category, String> {
     List<Category> findAllByOrderByShowOrderAsc();
+    List<Category> findAllByOrderByShowOrderDesc();
     Optional<Category> findByName(String name);
 }
