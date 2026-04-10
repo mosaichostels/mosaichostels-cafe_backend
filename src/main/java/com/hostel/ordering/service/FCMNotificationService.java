@@ -21,12 +21,16 @@ public class FCMNotificationService {
     @Async
     public void sendNewOrderNotification(Order order) {
         try {
+            String orderId = order.getId() != null ? order.getId() : "UNKNOWN";
+            String bookingName = order.getBookingName() != null ? order.getBookingName() : "Guest";
+            Double totalAmount = order.getTotalAmount() != null ? order.getTotalAmount() : 0.0;
+
             String title = "🛎 New Order Received!";
             String body = String.format(
                     "Order #%s from %s — ₹%.2f",
-                    order.getId().length() >= 8 ? order.getId().substring(0, 8) : order.getId(),
-                    order.getBookingName(),
-                    order.getTotalAmount());
+                    orderId.length() >= 8 ? orderId.substring(0, 8) : orderId,
+                    bookingName,
+                    totalAmount);
 
             AndroidConfig androidConfig = AndroidConfig.builder()
                     .setPriority(AndroidConfig.Priority.HIGH)
@@ -37,9 +41,9 @@ public class FCMNotificationService {
                     .setTopic(ORDERS_TOPIC)
                     .setAndroidConfig(androidConfig)
                     .putData("type", "NEW_ORDER")
-                    .putData("orderId", order.getId())
-                    .putData("customerName", order.getBookingName())
-                    .putData("totalAmount", String.valueOf(order.getTotalAmount()))
+                    .putData("orderId", orderId)
+                    .putData("customerName", bookingName)
+                    .putData("totalAmount", String.valueOf(totalAmount))
                     .putData("title", title)
                     .putData("body", body)
                     .build();
@@ -55,11 +59,14 @@ public class FCMNotificationService {
     @Async
     public void sendOrderCancelledNotification(Order order) {
         try {
+            String orderId = order.getId() != null ? order.getId() : "UNKNOWN";
+            String bookingName = order.getBookingName() != null ? order.getBookingName() : "Guest";
+
             String title = "❌ Order Cancelled!";
             String body = String.format(
                     "Order #%s for %s has been cancelled.",
-                    order.getId().length() >= 8 ? order.getId().substring(0, 8) : order.getId(),
-                    order.getBookingName());
+                    orderId.length() >= 8 ? orderId.substring(0, 8) : orderId,
+                    bookingName);
 
             AndroidConfig androidConfig = AndroidConfig.builder()
                     .setPriority(AndroidConfig.Priority.HIGH)
@@ -70,8 +77,8 @@ public class FCMNotificationService {
                     .setTopic(ORDERS_TOPIC)
                     .setAndroidConfig(androidConfig)
                     .putData("type", "ORDER_CANCELLED")
-                    .putData("orderId", order.getId())
-                    .putData("customerName", order.getBookingName())
+                    .putData("orderId", orderId)
+                    .putData("customerName", bookingName)
                     .putData("title", title)
                     .putData("body", body)
                     .build();

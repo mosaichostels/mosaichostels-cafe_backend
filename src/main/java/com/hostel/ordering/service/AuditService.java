@@ -15,9 +15,18 @@ public class AuditService {
     AuditRepository auditRepository;
 
     public void logAction(String action, String details) {
-        String username = SecurityContextHolder.getContext().getAuthentication() != null
-                ? ((UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal()).getUsername()
-                : "SYSTEM";
+        String username = "SYSTEM";
+        if (SecurityContextHolder.getContext().getAuthentication() != null) {
+            Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+            if (principal instanceof UserDetails) {
+                username = ((UserDetails) principal).getUsername();
+            } else if (principal instanceof String) {
+                username = (String) principal;
+                if ("anonymousUser".equals(username)) {
+                    username = "GUEST";
+                }
+            }
+        }
 
         AuditLog log = AuditLog.builder()
                 .username(username)
