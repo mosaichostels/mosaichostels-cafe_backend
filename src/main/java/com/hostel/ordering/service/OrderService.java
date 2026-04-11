@@ -26,6 +26,10 @@ public class OrderService {
     public Order createOrder(Order order) {
         order.setCreatedAt(System.currentTimeMillis());
         order.setUpdatedAt(System.currentTimeMillis());
+        if (order.getCreatedBy() == null || order.getCreatedBy().isEmpty()) {
+            order.setCreatedBy("Guest");
+        }
+        order.setUpdatedBy(order.getCreatedBy());
         if (order.getStatus() == null || order.getStatus().isEmpty()) {
             order.setStatus("ORDERED");
         }
@@ -65,12 +69,15 @@ public class OrderService {
         return orders;
     }
 
-    public Order updateOrderStatus(String id, String status) {
+    public Order updateOrderStatus(String id, String status, String updatedBy) {
         return orderRepository.findById(id)
                 .map(order -> {
                     String oldStatus = order.getStatus();
                     order.setStatus(status);
                     order.setUpdatedAt(System.currentTimeMillis());
+                    if (updatedBy != null) {
+                        order.setUpdatedBy(updatedBy);
+                    }
                     Order updated = orderRepository.save(order);
                     log.info("Order for {} status updated: {} -> {}", order.getBookingName(), oldStatus, status);
                     auditService.logAction("ORDER_STATUS_UPDATED", "Status updated for " + order.getBookingName() + ": " + oldStatus + " -> " + status);

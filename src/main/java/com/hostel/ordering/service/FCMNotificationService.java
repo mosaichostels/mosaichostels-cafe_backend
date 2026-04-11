@@ -25,21 +25,26 @@ public class FCMNotificationService {
             String bookingName = order.getBookingName() != null ? order.getBookingName() : "Guest";
             Double totalAmount = order.getTotalAmount() != null ? order.getTotalAmount() : 0.0;
 
-            String title = "🛎 New Order Received!";
-            String body = String.format(
-                    "Order #%s from %s — ₹%.2f",
-                    orderId.length() >= 8 ? orderId.substring(0, 8) : orderId,
-                    bookingName,
-                    totalAmount);
+            String title = "🍽 New Order Received";
+            String body = bookingName + " placed an order ";
 
             AndroidConfig androidConfig = AndroidConfig.builder()
                     .setPriority(AndroidConfig.Priority.HIGH)
                     .setTtl(3600 * 1000L)
                     .build();
 
+            WebpushConfig webpushConfig = WebpushConfig.builder()
+                    .setNotification(WebpushNotification.builder()
+                            .setTitle(title)
+                            .setBody(body)
+                            .setIcon("/images/logo.png")
+                            .build())
+                    .build();
+
             Message message = Message.builder()
                     .setTopic(ORDERS_TOPIC)
                     .setAndroidConfig(androidConfig)
+                    .setWebpushConfig(webpushConfig)
                     .putData("type", "NEW_ORDER")
                     .putData("orderId", orderId)
                     .putData("customerName", bookingName)
@@ -73,9 +78,18 @@ public class FCMNotificationService {
                     .setTtl(3600 * 1000L)
                     .build();
 
+            WebpushConfig webpushConfig = WebpushConfig.builder()
+                    .setNotification(WebpushNotification.builder()
+                            .setTitle(title)
+                            .setBody(body)
+                            .setIcon("/images/logo.png")
+                            .build())
+                    .build();
+
             Message message = Message.builder()
                     .setTopic(ORDERS_TOPIC)
                     .setAndroidConfig(androidConfig)
+                    .setWebpushConfig(webpushConfig)
                     .putData("type", "ORDER_CANCELLED")
                     .putData("orderId", orderId)
                     .putData("customerName", bookingName)
@@ -88,6 +102,26 @@ public class FCMNotificationService {
 
         } catch (Exception e) {
             logger.error("❌ Failed to send FCM cancellation notification", e);
+        }
+    }
+
+    public void subscribeToTopic(String token) {
+        try {
+            TopicManagementResponse response = firebaseMessaging.subscribeToTopic(
+                    java.util.Collections.singletonList(token), ORDERS_TOPIC);
+            logger.info("✅ Token subscribed to topic: {} -> {} successes", token, response.getSuccessCount());
+        } catch (FirebaseMessagingException e) {
+            logger.error("❌ Failed to subscribe token to topic", e);
+        }
+    }
+
+    public void unsubscribeFromTopic(String token) {
+        try {
+            TopicManagementResponse response = firebaseMessaging.unsubscribeFromTopic(
+                    java.util.Collections.singletonList(token), ORDERS_TOPIC);
+            logger.info("✅ Token unsubscribed from topic: {} -> {} successes", token, response.getSuccessCount());
+        } catch (FirebaseMessagingException e) {
+            logger.error("❌ Failed to unsubscribe token from topic", e);
         }
     }
 }

@@ -27,6 +27,8 @@ public class Order {
 
     private Double totalAmount;
     private String status;
+    private String createdBy;
+    private String updatedBy;
     private Long createdAt;
     private Long updatedAt;
 }

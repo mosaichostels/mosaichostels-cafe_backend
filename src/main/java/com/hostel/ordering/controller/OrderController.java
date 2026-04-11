@@ -45,7 +45,7 @@ public class OrderController {
     @PutMapping("/{id}/status")
     public ResponseEntity<Order> updateOrderStatus(@PathVariable String id,
             @RequestBody Map<String, String> payload) {
-        Order updated = orderService.updateOrderStatus(id, payload.get("status"));
+        Order updated = orderService.updateOrderStatus(id, payload.get("status"), payload.get("updatedBy"));
         return updated != null ? ResponseEntity.ok(updated) : ResponseEntity.notFound().build();
     }
 
