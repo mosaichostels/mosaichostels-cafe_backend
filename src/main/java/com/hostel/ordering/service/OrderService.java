@@ -53,12 +53,7 @@ public class OrderService {
     }
 
     public List<Order> getFilteredOrders(String status, String dormitory, String search,
-                                     Long dateFrom, Long dateTo, Long date, String sort) {
-        return getFilteredOrdersList(status, dormitory, search, dateFrom, dateTo, date, sort);
-    }
-
-    private List<Order> getFilteredOrdersList(String status, String dormitory, String search,
-                                               Long dateFrom, Long dateTo, Long date, String sort) {
+                                                Long dateFrom, Long dateTo, Long date, String sort) {
         SearchCriteria criteria = new SearchCriteria(status, dormitory, search, dateFrom, dateTo, date);
         List<Order> orders = orderRepository.searchOrders(criteria);
 
@@ -127,7 +122,7 @@ public class OrderService {
     }
 
     public void deleteFilteredOrders(String status, String dormitory, String search, Long dateFrom, Long dateTo, Long date) {
-        List<Order> orders = getFilteredOrdersList(status, dormitory, search, dateFrom, dateTo, date, null);
+        List<Order> orders = getFilteredOrders(status, dormitory, search, dateFrom, dateTo, date, null);
         orderRepository.deleteAll(orders);
     }
 }
