@@ -67,6 +67,7 @@ public class OrderService {
                 case "total_asc" -> Comparator.comparingDouble(Order::getTotalAmount);
                 case "total_desc" -> Comparator.comparingDouble(Order::getTotalAmount).reversed();
                 case "createdAt_asc" -> Comparator.comparingLong(Order::getCreatedAt);
+                case "createdAt_desc" -> Comparator.comparingLong(Order::getCreatedAt).reversed();
                 default -> null;
             };
             if (comparator != null) {

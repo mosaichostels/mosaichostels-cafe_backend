@@ -34,8 +34,25 @@ public class OtherEssentialService {
         return otherEssentialRepository.findAll();
     }
 
-    public List<OtherEssential> getAvailableOtherEssentials() {
-        return otherEssentialRepository.findByAvailableTrueOrderByNameAsc();
+    public List<OtherEssential> getAvailableOtherEssentials(String category, String sort) {
+        List<OtherEssential> items = (category != null && !category.isBlank())
+                ? otherEssentialRepository.findByAvailableTrueAndCategoryOrderByNameAsc(category)
+                : otherEssentialRepository.findByAvailableTrueOrderByNameAsc();
+
+        String finalSort = (sort == null || sort.isBlank()) ? "price_asc" : sort;
+
+        java.util.Comparator<OtherEssential> comparator = switch (finalSort) {
+            case "price_asc" -> java.util.Comparator.comparingDouble(OtherEssential::getPrice);
+            case "price_desc" -> java.util.Comparator.comparingDouble(OtherEssential::getPrice).reversed();
+            case "name_asc" -> java.util.Comparator.comparing(OtherEssential::getName);
+            default -> null;
+        };
+
+        if (comparator != null) {
+            return items.stream().sorted(comparator).toList();
+        }
+
+        return items;
     }
 
     public List<OtherEssential> searchOtherEssentials(String query, boolean availableOnly) {

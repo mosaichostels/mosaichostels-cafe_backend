@@ -8,6 +8,8 @@ import java.util.List;
 public interface OtherEssentialRepository extends MongoRepository<OtherEssential, String> {
 
     List<OtherEssential> findByAvailableTrueOrderByNameAsc();
+    
+    List<OtherEssential> findByAvailableTrueAndCategoryOrderByNameAsc(String category);
 
     List<OtherEssential> findByNameContainingIgnoreCaseOrderByNameAsc(String name);
 

@@ -48,7 +48,9 @@ public class CategoryService {
 
     @Transactional
     public Category createCategory(Category category) {
-        String type = category.getType();
+        String type = category.getType() != null ? category.getType() : Category.TYPE_MENU;
+        category.setType(type);
+        
         if (category.getShowOrder() > 0) {
             shiftCategoryOrdersUp(category.getShowOrder(), type);
         } else {
@@ -74,7 +76,7 @@ public class CategoryService {
                     }
 
                     if (newOrder != 0 && newOrder != oldOrder) {
-                        String type = category.getType();
+                        String type = category.getType() != null ? category.getType() : existing.getType();
                         renumberCategoryOrders(oldOrder, newOrder, id, type);
                         existing.setShowOrder(newOrder);
                     }
@@ -132,8 +134,9 @@ public class CategoryService {
     }
 
     private int getNextAvailableOrder(String type) {
+        String finalType = type != null ? type : Category.TYPE_MENU;
         List<Category> categories = categoryRepository.findAllByOrderByShowOrderAsc().stream()
-                .filter(c -> type.equals(c.getType()))
+                .filter(c -> finalType.equals(c.getType()))
                 .collect(java.util.stream.Collectors.toList());
         if (categories.isEmpty()) return 1;
         return categories.stream()

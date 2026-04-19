@@ -34,8 +34,10 @@ public class OtherEssentialController {
     }
 
     @GetMapping("/available")
-    public ResponseEntity<List<OtherEssential>> getAvailableOtherEssentials() {
-        return ResponseEntity.ok(otherEssentialService.getAvailableOtherEssentials());
+    public ResponseEntity<List<OtherEssential>> getAvailableOtherEssentials(
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false, defaultValue = "name_asc") String sort) {
+        return ResponseEntity.ok(otherEssentialService.getAvailableOtherEssentials(category, sort));
     }
 
     @GetMapping("/search")
