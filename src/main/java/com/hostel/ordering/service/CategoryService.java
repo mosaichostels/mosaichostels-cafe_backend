@@ -46,15 +46,16 @@ public class CategoryService {
 
     @Transactional
     public Category createCategory(Category category) {
+        String type = category.getType();
         if (category.getShowOrder() > 0) {
-            shiftCategoryOrdersUp(category.getShowOrder());
+            shiftCategoryOrdersUp(category.getShowOrder(), type);
         } else {
-            category.setShowOrder(getNextAvailableOrder());
+            category.setShowOrder(getNextAvailableOrder(type));
         }
         Category saved = categoryRepository.save(category);
-        log.info("New category created: {} at order {}", saved.getName(), saved.getShowOrder());
+        log.info("New category created: {} at order {} type {}", saved.getName(), saved.getShowOrder(), saved.getType());
         auditService.logAction("CATEGORY_CREATED",
-            "Created category: " + saved.getName() + " at order " + saved.getShowOrder());
+            "Created category: " + saved.getName() + " at order " + saved.getShowOrder() + " (" + saved.getType() + ")");
         return saved;
     }
 
@@ -98,36 +99,43 @@ public class CategoryService {
         });
     }
 
-    private void shiftCategoryOrdersUp(int fromOrder) {
-        Query query = new Query(Criteria.where("showOrder").gte(fromOrder));
+    private void shiftCategoryOrdersUp(int fromOrder, String type) {
+        Query query = new Query(Criteria.where("showOrder").gte(fromOrder)
+                .and("type").is(type));
         Update update = new Update().inc("showOrder", 1);
         mongoTemplate.updateMulti(query, update, Category.class);
     }
 
-    private void shiftCategoryOrdersDown(int fromOrder) {
-        Query query = new Query(Criteria.where("showOrder").gt(fromOrder));
+    private void shiftCategoryOrdersDown(int fromOrder, String type) {
+        Query query = new Query(Criteria.where("showOrder").gt(fromOrder)
+                .and("type").is(type));
         Update update = new Update().inc("showOrder", -1);
         mongoTemplate.updateMulti(query, update, Category.class);
     }
 
-    private void renumberCategoryOrders(int oldOrder, int newOrder, String excludeId) {
+    private void renumberCategoryOrders(int oldOrder, int newOrder, String excludeId, String type) {
         if (oldOrder < newOrder) {
             Query query = new Query(Criteria.where("showOrder").gt(oldOrder).lte(newOrder)
-                    .and("id").ne(excludeId));
+                    .and("id").ne(excludeId).and("type").is(type));
             Update update = new Update().inc("showOrder", -1);
             mongoTemplate.updateMulti(query, update, Category.class);
         } else {
             Query query = new Query(Criteria.where("showOrder").gte(newOrder).lt(oldOrder)
-                    .and("id").ne(excludeId));
+                    .and("id").ne(excludeId).and("type").is(type));
             Update update = new Update().inc("showOrder", 1);
             mongoTemplate.updateMulti(query, update, Category.class);
         }
     }
 
-    private int getNextAvailableOrder() {
-        List<Category> categories = categoryRepository.findAllByOrderByShowOrderDesc();
+    private int getNextAvailableOrder(String type) {
+        List<Category> categories = categoryRepository.findAllByOrderByShowOrderAsc().stream()
+                .filter(c -> type.equals(c.getType()))
+                .collect(java.util.stream.Collectors.toList());
         if (categories.isEmpty()) return 1;
-        return categories.get(0).getShowOrder() + 1;
+        return categories.stream()
+                .mapToInt(c -> c.getShowOrder())
+                .max()
+                .orElse(0) + 1;
     }
 
 }
