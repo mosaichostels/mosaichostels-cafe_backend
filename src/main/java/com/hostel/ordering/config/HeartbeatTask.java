@@ -1,14 +1,16 @@
 package com.hostel.ordering.config;
 
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import java.time.LocalDateTime;
+
 @Configuration
 @EnableScheduling
-@Slf4j
 public class HeartbeatTask {
+    private static final Logger log = LoggerFactory.getLogger(HeartbeatTask.class);
 
     @Scheduled(fixedRate = 21600000)
     public void serverHeartbeat() {

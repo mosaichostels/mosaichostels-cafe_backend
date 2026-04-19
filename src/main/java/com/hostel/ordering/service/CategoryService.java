@@ -2,7 +2,8 @@ package com.hostel.ordering.service;
 
 import com.hostel.ordering.model.Category;
 import com.hostel.ordering.repository.CategoryRepository;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -10,9 +11,10 @@ import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
-@Slf4j
+
 @Service
 public class CategoryService {
+    private static final Logger log = LoggerFactory.getLogger(CategoryService.class);
 
     private final CategoryRepository categoryRepository;
     private final AuditService auditService;
@@ -72,7 +74,8 @@ public class CategoryService {
                     }
 
                     if (newOrder != 0 && newOrder != oldOrder) {
-                        renumberCategoryOrders(oldOrder, newOrder, id);
+                        String type = category.getType();
+                        renumberCategoryOrders(oldOrder, newOrder, id, type);
                         existing.setShowOrder(newOrder);
                     }
 
@@ -90,8 +93,9 @@ public class CategoryService {
     public void deleteCategory(String id) {
         categoryRepository.findById(id).ifPresent(category -> {
             int deletedOrder = category.getShowOrder();
+            String type = category.getType();
             categoryRepository.delete(category);
-            shiftCategoryOrdersDown(deletedOrder);
+            shiftCategoryOrdersDown(deletedOrder, type);
             log.info("Category {} at order {} deleted, subsequent categories renumbered",
                 category.getName(), deletedOrder);
             auditService.logAction("CATEGORY_DELETED",

@@ -2,12 +2,14 @@ package com.hostel.ordering.service;
 
 import com.hostel.ordering.model.Dormitory;
 import com.hostel.ordering.repository.DormitoryRepository;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import java.util.List;
-@Slf4j
+
 @Service
 public class DormitoryService {
+    private static final Logger log = LoggerFactory.getLogger(DormitoryService.class);
 
     private final DormitoryRepository repository;
     private final AuditService auditService;

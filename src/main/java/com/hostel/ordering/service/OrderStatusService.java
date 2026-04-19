@@ -2,12 +2,14 @@ package com.hostel.ordering.service;
 
 import com.hostel.ordering.model.OrderStatusConfig;
 import com.hostel.ordering.repository.OrderStatusRepository;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import java.util.List;
-@Slf4j
+
 @Service
 public class OrderStatusService {
+    private static final Logger log = LoggerFactory.getLogger(OrderStatusService.class);
 
     private final OrderStatusRepository repository;
     private final AuditService auditService;
