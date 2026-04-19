@@ -75,8 +75,9 @@ public class CategoryService {
                         existing.setName(category.getName());
                     }
 
-                    if (newOrder != 0 && newOrder != oldOrder) {
+                    if (newOrder > 0 && newOrder != oldOrder) {
                         String type = category.getType() != null ? category.getType() : existing.getType();
+                        log.info("Triggering reorder for type {}: {} -> {}", type, oldOrder, newOrder);
                         renumberCategoryOrders(oldOrder, newOrder, id, type);
                         existing.setShowOrder(newOrder);
                     }
