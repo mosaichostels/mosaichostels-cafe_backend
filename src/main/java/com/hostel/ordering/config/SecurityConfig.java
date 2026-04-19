@@ -26,6 +26,9 @@ public class SecurityConfig {
     @Autowired
     UserDetailsServiceImpl userDetailsService;
 
+    @Autowired
+    RateLimitFilter rateLimitFilter;
+
     @Bean
     public AuthTokenFilter authenticationJwtTokenFilter() {
         return new AuthTokenFilter();
@@ -62,6 +65,7 @@ public class SecurityConfig {
 
         http.authenticationProvider(authenticationProvider());
         http.addFilterBefore(authenticationJwtTokenFilter(), UsernamePasswordAuthenticationFilter.class);
+        http.addFilterBefore(rateLimitFilter, AuthTokenFilter.class);
 
         return http.build();
     }

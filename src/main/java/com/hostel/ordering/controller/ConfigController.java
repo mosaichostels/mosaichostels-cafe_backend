@@ -39,8 +39,10 @@ public class ConfigController {
 
         config.put("orderStatuses", orderStatusService.getAllStatuses());
 
-        List<Category> categories = categoryService.getAllCategories();
-        config.put("categories", categories);
+        List<Category> menuCategories = categoryService.getMenuCategories();
+        List<Category> essentialCategories = categoryService.getEssentialCategories();
+        config.put("categories", menuCategories);
+        config.put("essentialCategories", essentialCategories);
 
         return ResponseEntity.ok(config);
     }

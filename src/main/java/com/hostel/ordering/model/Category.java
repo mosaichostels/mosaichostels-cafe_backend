@@ -14,4 +14,8 @@ public class Category {
     private String id;
     private String name;
     private int showOrder;
+    private String type;
+
+    public static final String TYPE_MENU = "MENU";
+    public static final String TYPE_ESSENTIAL = "ESSENTIAL";
 }

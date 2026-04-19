@@ -30,6 +30,20 @@ public class CategoryService {
         return categoryRepository.findAllByOrderByShowOrderAsc();
     }
 
+    public List<Category> getMenuCategories() {
+        List<Category> all = categoryRepository.findAllByOrderByShowOrderAsc();
+        return all.stream()
+                .filter(c -> Category.TYPE_MENU.equals(c.getType()) || c.getType() == null)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    public List<Category> getEssentialCategories() {
+        List<Category> all = categoryRepository.findAllByOrderByShowOrderAsc();
+        return all.stream()
+                .filter(c -> Category.TYPE_ESSENTIAL.equals(c.getType()) || c.getType() == null)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
     @Transactional
     public Category createCategory(Category category) {
         if (category.getShowOrder() > 0) {

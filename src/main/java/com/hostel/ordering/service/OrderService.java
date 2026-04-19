@@ -1,12 +1,16 @@
 package com.hostel.ordering.service;
 
 import com.hostel.ordering.model.Order;
+import com.hostel.ordering.model.OrderStatusConfig;
 import com.hostel.ordering.repository.OrderRepository;
 import com.hostel.ordering.repository.OrderRepositoryCustom.SearchCriteria;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 @Slf4j
 @Service
 public class OrderService {
@@ -14,13 +18,16 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final FCMNotificationService fcmNotificationService;
     private final AuditService auditService;
+    private final OrderStatusService orderStatusService;
 
     public OrderService(OrderRepository orderRepository,
                         FCMNotificationService fcmNotificationService,
-                        AuditService auditService) {
+                        AuditService auditService,
+                        OrderStatusService orderStatusService) {
         this.orderRepository = orderRepository;
         this.fcmNotificationService = fcmNotificationService;
         this.auditService = auditService;
+        this.orderStatusService = orderStatusService;
     }
 
     public Order createOrder(Order order) {
@@ -70,6 +77,18 @@ public class OrderService {
     }
 
     public Order updateOrderStatus(String id, String status, String updatedBy) {
+        if (status == null || status.isBlank()) {
+            throw new IllegalArgumentException("Status cannot be empty");
+        }
+
+        Set<String> validStatuses = orderStatusService.getAllStatuses().stream()
+                .map(OrderStatusConfig::getValue)
+                .collect(Collectors.toSet());
+
+        if (!validStatuses.contains(status)) {
+            throw new IllegalArgumentException("Invalid status: " + status + ". Valid statuses: " + validStatuses);
+        }
+
         return orderRepository.findById(id)
                 .map(order -> {
                     String oldStatus = order.getStatus();

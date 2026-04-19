@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import java.util.List;
 import java.util.Map;
 import jakarta.validation.Valid;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/orders")
@@ -50,12 +51,14 @@ public class OrderController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> deleteOrder(@PathVariable String id) {
         orderService.deleteOrder(id);
         return ResponseEntity.ok("Order deleted successfully");
     }
 
     @DeleteMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> deleteOrders(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String dormitory,

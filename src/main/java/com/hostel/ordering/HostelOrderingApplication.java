@@ -26,7 +26,11 @@ public class HostelOrderingApplication {
     @Bean
     CommandLineRunner init(AuthService authService) {
         return args -> {
-            authService.registerInitialAdmin(adminUsername, adminPassword);
+            try {
+                authService.registerInitialAdmin(adminUsername, adminPassword);
+            } catch (Exception e) {
+                System.out.println("Admin initialization skipped: " + e.getMessage());
+            }
         };
     }
 }
