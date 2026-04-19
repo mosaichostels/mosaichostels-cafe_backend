@@ -57,6 +57,7 @@ public class CategoryService {
             category.setShowOrder(getNextAvailableOrder(type));
         }
         Category saved = categoryRepository.save(category);
+        healCategories(saved.getType());
         log.info("New category created: {} at order {} type {}", saved.getName(), saved.getShowOrder(), saved.getType());
         auditService.logAction("CATEGORY_CREATED",
             "Created category: " + saved.getName() + " at order " + saved.getShowOrder() + " (" + saved.getType() + ")");
@@ -83,6 +84,7 @@ public class CategoryService {
                     }
 
                     Category updated = categoryRepository.save(existing);
+                    healCategories(updated.getType());
                     log.info("Category updated: {} order {} -> {}",
                         updated.getName(), oldOrder, newOrder);
                     auditService.logAction("CATEGORY_UPDATED",
@@ -92,6 +94,28 @@ public class CategoryService {
                 .orElse(null);
     }
 
+    private void healCategories(String type) {
+        if (type == null) type = Category.TYPE_MENU;
+        String finalType = type;
+        List<Category> all = categoryRepository.findAllByOrderByShowOrderAsc().stream()
+                .filter(c -> finalType.equals(c.getType()))
+                .collect(java.util.stream.Collectors.toList());
+        
+        int current = 1;
+        boolean changed = false;
+        for (Category cat : all) {
+            if (cat.getShowOrder() != current) {
+                cat.setShowOrder(current);
+                categoryRepository.save(cat);
+                changed = true;
+            }
+            current++;
+        }
+        if (changed) {
+            log.info("Healed category orders for type {}", finalType);
+        }
+    }
+
     @Transactional
     public void deleteCategory(String id) {
         categoryRepository.findById(id).ifPresent(category -> {
@@ -99,6 +123,7 @@ public class CategoryService {
             String type = category.getType();
             categoryRepository.delete(category);
             shiftCategoryOrdersDown(deletedOrder, type);
+            healCategories(type);
             log.info("Category {} at order {} deleted, subsequent categories renumbered",
                 category.getName(), deletedOrder);
             auditService.logAction("CATEGORY_DELETED",
@@ -123,12 +148,12 @@ public class CategoryService {
     private void renumberCategoryOrders(int oldOrder, int newOrder, String excludeId, String type) {
         if (oldOrder < newOrder) {
             Query query = new Query(Criteria.where("showOrder").gt(oldOrder).lte(newOrder)
-                    .and("id").ne(excludeId).and("type").is(type));
+                    .and("_id").ne(excludeId).and("type").is(type));
             Update update = new Update().inc("showOrder", -1);
             mongoTemplate.updateMulti(query, update, Category.class);
         } else {
             Query query = new Query(Criteria.where("showOrder").gte(newOrder).lt(oldOrder)
-                    .and("id").ne(excludeId).and("type").is(type));
+                    .and("_id").ne(excludeId).and("type").is(type));
             Update update = new Update().inc("showOrder", 1);
             mongoTemplate.updateMulti(query, update, Category.class);
         }
