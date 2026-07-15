@@ -14,11 +14,20 @@ import java.util.Date;
 public class JwtUtils {
     private static final Logger logger = LoggerFactory.getLogger(JwtUtils.class);
 
-    @Value("${config.jwtSecret:mosaicHostelsDefaultSecretKeyWhichIsLongEnoughForSHA}")
+    @Value("${config.jwtSecret:}")
     private String jwtSecret;
 
-    @Value("${config.jwtExpirationMs:315360000000}")
+    // 7 days
+    @Value("${config.jwtExpirationMs:604800000}")
     private long jwtExpirationMs;
+
+    @jakarta.annotation.PostConstruct
+    void checkSecret() {
+        if (jwtSecret == null || jwtSecret.getBytes().length < 32) {
+            throw new IllegalStateException(
+                    "config.jwtSecret must be set (env CONFIG_JWTSECRET) and be at least 32 bytes");
+        }
+    }
 
     public String generateJwtToken(Authentication authentication) {
         UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();

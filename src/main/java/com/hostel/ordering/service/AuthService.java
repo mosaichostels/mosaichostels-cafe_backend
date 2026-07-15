@@ -59,11 +59,18 @@ public class AuthService {
     }
 
     public void registerInitialAdmin(String username, String password) {
-        if (!userRepository.existsByUsername(username)) {
+        User existing = userRepository.findByUsername(username).orElse(null);
+        if (existing == null) {
             User user = new User(username, encoder.encode(password), Set.of("ROLE_ADMIN"));
             userRepository.save(user);
             log.info("Initial admin registered: {}", username);
             auditService.logAction("INITIAL_ADMIN_REGISTERED", "Initial admin registered: " + username);
+        } else if (!encoder.matches(password, existing.getPassword())) {
+            // config.admin.password env var is the source of truth for the admin password
+            existing.setPassword(encoder.encode(password));
+            userRepository.save(existing);
+            log.info("Admin password synced from config for: {}", username);
+            auditService.logAction("ADMIN_PASSWORD_SYNCED", "Admin password updated from config: " + username);
         }
     }
 }

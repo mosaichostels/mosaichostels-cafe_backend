@@ -1,9 +1,12 @@
 package com.hostel.ordering.service;
 
 import com.hostel.ordering.model.Order;
+import com.hostel.ordering.model.OrderItem;
 import com.hostel.ordering.model.OrderStatusConfig;
+import com.hostel.ordering.repository.MenuItemRepository;
 import com.hostel.ordering.repository.OrderRepository;
 import com.hostel.ordering.repository.OrderRepositoryCustom.SearchCriteria;
+import com.hostel.ordering.repository.OtherEssentialRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -16,22 +19,32 @@ import java.util.stream.Collectors;
 public class OrderService {
     private static final Logger log = LoggerFactory.getLogger(OrderService.class);
 
+    private static final int MAX_ITEMS = 50;
+    private static final int MAX_QUANTITY = 50;
+
     private final OrderRepository orderRepository;
     private final FCMNotificationService fcmNotificationService;
     private final AuditService auditService;
     private final OrderStatusService orderStatusService;
+    private final MenuItemRepository menuItemRepository;
+    private final OtherEssentialRepository otherEssentialRepository;
 
     public OrderService(OrderRepository orderRepository,
                         FCMNotificationService fcmNotificationService,
                         AuditService auditService,
-                        OrderStatusService orderStatusService) {
+                        OrderStatusService orderStatusService,
+                        MenuItemRepository menuItemRepository,
+                        OtherEssentialRepository otherEssentialRepository) {
         this.orderRepository = orderRepository;
         this.fcmNotificationService = fcmNotificationService;
         this.auditService = auditService;
         this.orderStatusService = orderStatusService;
+        this.menuItemRepository = menuItemRepository;
+        this.otherEssentialRepository = otherEssentialRepository;
     }
 
     public Order createOrder(Order order) {
+        repriceOrder(order);
         order.setCreatedAt(System.currentTimeMillis());
         order.setUpdatedAt(System.currentTimeMillis());
         if (order.getCreatedBy() == null || order.getCreatedBy().isEmpty()) {
@@ -46,6 +59,34 @@ public class OrderService {
         fcmNotificationService.sendNewOrderNotification(saved);
         auditService.logAction("ORDER_CREATED", "Created order for " + saved.getBookingName() + " in " + saved.getDormitory());
         return saved;
+    }
+
+    // Prices come from the database, never from the client — prevents total tampering.
+    void repriceOrder(Order order) {
+        if (order.getItems().size() > MAX_ITEMS) {
+            throw new IllegalArgumentException("Too many items in order (max " + MAX_ITEMS + ")");
+        }
+        double total = 0;
+        for (OrderItem item : order.getItems()) {
+            if (item.getMenuItemId() == null || item.getMenuItemId().isBlank()) {
+                throw new IllegalArgumentException("Item id is required");
+            }
+            if (item.getQuantity() == null || item.getQuantity() < 1 || item.getQuantity() > MAX_QUANTITY) {
+                throw new IllegalArgumentException("Invalid quantity for item: " + item.getMenuItemName());
+            }
+            Double price = menuItemRepository.findById(item.getMenuItemId())
+                    .map(m -> m.getPrice())
+                    .orElseGet(() -> otherEssentialRepository.findById(item.getMenuItemId())
+                            .map(e -> e.getPrice())
+                            .orElse(null));
+            if (price == null) {
+                throw new IllegalArgumentException("Unknown item: " + item.getMenuItemId());
+            }
+            item.setPrice(price);
+            item.setSubtotal(price * item.getQuantity());
+            total += item.getSubtotal();
+        }
+        order.setTotalAmount(total);
     }
 
     public Order getOrder(String id) {
@@ -124,5 +165,6 @@ public class OrderService {
     public void deleteFilteredOrders(String status, String dormitory, String search, Long dateFrom, Long dateTo, Long date) {
         List<Order> orders = getFilteredOrders(status, dormitory, search, dateFrom, dateTo, date, null);
         orderRepository.deleteAll(orders);
+        auditService.logAction("ORDERS_FILTERED_DELETED", "Deleted " + orders.size() + " filtered orders");
     }
 }

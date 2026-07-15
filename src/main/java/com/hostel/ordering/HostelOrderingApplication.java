@@ -16,7 +16,7 @@ public class HostelOrderingApplication {
     @Value("${config.admin.username:admin}")
     private String adminUsername;
 
-    @Value("${config.admin.password:admin123}")
+    @Value("${config.admin.password:}")
     private String adminPassword;
 
     public static void main(String[] args) {
@@ -26,6 +26,10 @@ public class HostelOrderingApplication {
     @Bean
     CommandLineRunner init(AuthService authService) {
         return args -> {
+            if (adminPassword == null || adminPassword.isBlank()) {
+                System.out.println("config.admin.password not set — skipping admin bootstrap");
+                return;
+            }
             try {
                 authService.registerInitialAdmin(adminUsername, adminPassword);
             } catch (Exception e) {

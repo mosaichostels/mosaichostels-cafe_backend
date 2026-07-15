@@ -4,6 +4,7 @@ import com.hostel.ordering.model.Order;
 import com.hostel.ordering.service.OrderService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import java.util.List;
 import java.util.Map;
 import jakarta.validation.Valid;
@@ -44,9 +45,12 @@ public class OrderController {
     }
 
     @PutMapping("/{id}/status")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Order> updateOrderStatus(@PathVariable String id,
-            @RequestBody Map<String, String> payload) {
-        Order updated = orderService.updateOrderStatus(id, payload.get("status"), payload.get("updatedBy"));
+            @RequestBody Map<String, String> payload,
+            Authentication authentication) {
+        String updatedBy = authentication != null && authentication.isAuthenticated() ? authentication.getName() : "UNKNOWN";
+        Order updated = orderService.updateOrderStatus(id, payload.get("status"), updatedBy);
         return updated != null ? ResponseEntity.ok(updated) : ResponseEntity.notFound().build();
     }
 
@@ -67,6 +71,9 @@ public class OrderController {
             @RequestParam(required = false) Long dateTo,
             @RequestParam(required = false) Long date,
             @RequestParam(required = false, defaultValue = "false") boolean all) {
+        if (!all && status == null && dormitory == null && search == null && dateFrom == null && dateTo == null && date == null) {
+            throw new IllegalArgumentException("Must specify at least one filter or set all=true");
+        }
         if (all) {
             orderService.deleteAllOrders();
             return ResponseEntity.ok("All orders deleted successfully");
