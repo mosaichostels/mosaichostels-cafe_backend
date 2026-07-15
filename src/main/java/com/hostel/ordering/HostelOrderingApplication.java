@@ -29,10 +29,13 @@ public class HostelOrderingApplication {
             String passwordToUse = (adminPassword != null && !adminPassword.isBlank())
                 ? adminPassword
                 : "admin123";
+            System.out.println("[BOOTSTRAP] Initializing admin user with username=" + adminUsername);
             try {
                 authService.registerInitialAdmin(adminUsername, passwordToUse);
+                System.out.println("[BOOTSTRAP] Admin initialization complete");
             } catch (Exception e) {
-                System.out.println("Admin initialization skipped: " + e.getMessage());
+                System.out.println("[BOOTSTRAP] Admin initialization failed: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+                e.printStackTrace();
             }
         };
     }
