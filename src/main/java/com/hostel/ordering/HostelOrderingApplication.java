@@ -7,6 +7,9 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import com.hostel.ordering.service.AuthService;
+import com.hostel.ordering.model.User;
+import com.hostel.ordering.repository.UserRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.beans.factory.annotation.Value;
 @SpringBootApplication
 @EnableAsync
@@ -24,18 +27,23 @@ public class HostelOrderingApplication {
     }
 
     @Bean
-    CommandLineRunner init(AuthService authService) {
+    CommandLineRunner init(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         return args -> {
             String passwordToUse = (adminPassword != null && !adminPassword.isBlank())
                 ? adminPassword
                 : "admin123";
-            System.out.println("[BOOTSTRAP] Initializing admin user with username=" + adminUsername);
+            System.out.println("[BOOTSTRAP] Initializing admin user: " + adminUsername);
             try {
-                authService.registerInitialAdmin(adminUsername, passwordToUse);
-                System.out.println("[BOOTSTRAP] Admin initialization complete");
+                var existing = userRepository.findByUsername(adminUsername);
+                if (existing.isEmpty()) {
+                    User user = new User(adminUsername, passwordEncoder.encode(passwordToUse), java.util.Set.of("ROLE_ADMIN"));
+                    userRepository.save(user);
+                    System.out.println("[BOOTSTRAP] Created admin user");
+                } else {
+                    System.out.println("[BOOTSTRAP] Admin user already exists");
+                }
             } catch (Exception e) {
-                System.out.println("[BOOTSTRAP] Admin initialization failed: " + e.getClass().getSimpleName() + " - " + e.getMessage());
-                e.printStackTrace();
+                System.out.println("[BOOTSTRAP] Error: " + e.getMessage());
             }
         };
     }
