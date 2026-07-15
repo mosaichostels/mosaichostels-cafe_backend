@@ -51,8 +51,11 @@ class OrderServiceTest {
         order.setItems(List.of(item));
         order.setTotalAmount(999999.0);
 
-        when(menuItemRepository.findById("item1"))
-                .thenReturn(Optional.of(new com.hostel.ordering.model.MenuItem("item1", "Test", 100.0, null, null, null, null)));
+        com.hostel.ordering.model.MenuItem menuItem = new com.hostel.ordering.model.MenuItem();
+        menuItem.setId("item1");
+        menuItem.setName("Test");
+        menuItem.setPrice(100.0);
+        when(menuItemRepository.findById("item1")).thenReturn(Optional.of(menuItem));
 
         orderService.repriceOrder(order);
 
