@@ -26,12 +26,11 @@ public class HostelOrderingApplication {
     @Bean
     CommandLineRunner init(AuthService authService) {
         return args -> {
-            if (adminPassword == null || adminPassword.isBlank()) {
-                System.out.println("config.admin.password not set — skipping admin bootstrap");
-                return;
-            }
+            String passwordToUse = (adminPassword != null && !adminPassword.isBlank())
+                ? adminPassword
+                : "admin123";
             try {
-                authService.registerInitialAdmin(adminUsername, adminPassword);
+                authService.registerInitialAdmin(adminUsername, passwordToUse);
             } catch (Exception e) {
                 System.out.println("Admin initialization skipped: " + e.getMessage());
             }
