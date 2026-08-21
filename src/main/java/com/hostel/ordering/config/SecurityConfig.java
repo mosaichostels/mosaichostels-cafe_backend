@@ -62,6 +62,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/config").permitAll()
                         .requestMatchers(HttpMethod.GET, "/menu-items/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/other-essentials/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/app/version").permitAll()
                         .anyRequest().authenticated());
 
         http.authenticationProvider(authenticationProvider());
