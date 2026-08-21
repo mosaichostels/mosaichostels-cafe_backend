@@ -105,6 +105,36 @@ public class FCMNotificationService {
         }
     }
 
+    @Async
+    public void sendAppUpdateNotification(String versionName, String downloadUrl, String releaseNotes) {
+        try {
+            String title = "🔄 App Update Required";
+            String body = "Version " + versionName + " is now required. Tap to update.";
+
+            AndroidConfig androidConfig = AndroidConfig.builder()
+                    .setPriority(AndroidConfig.Priority.HIGH)
+                    .setTtl(3600 * 1000L)
+                    .build();
+
+            Message message = Message.builder()
+                    .setTopic(ORDERS_TOPIC)
+                    .setAndroidConfig(androidConfig)
+                    .putData("type", "APP_UPDATE")
+                    .putData("versionName", versionName)
+                    .putData("downloadUrl", downloadUrl)
+                    .putData("releaseNotes", releaseNotes != null ? releaseNotes : "")
+                    .putData("title", title)
+                    .putData("body", body)
+                    .build();
+
+            String response = firebaseMessaging.send(message);
+            logger.info("✅ FCM app-update notification sent: {}", response);
+
+        } catch (Exception e) {
+            logger.error("❌ Failed to send FCM app-update notification", e);
+        }
+    }
+
     public void subscribeToTopic(String token) {
         try {
             TopicManagementResponse response = firebaseMessaging.subscribeToTopic(
