@@ -58,4 +58,35 @@ public class Order {
 
     public Long getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Long updatedAt) { this.updatedAt = updatedAt; }
+
+    // eZee chargepost outcome — set only when an admin posts via
+    // POST /orders/{id}/chargepost, reversed to VOIDED on cancel.
+    // Null status = never posted. "QUEUED" = eZee accepted it (status=ok).
+    // "FAILED" = eZee rejected it or the picked room had no live folio
+    // (see chargePostError). "VOIDED" = order was cancelled after posting
+    // and the charge was reversed.
+    private String chargePostStatus;
+    private String chargePostRequestId;
+    private String chargePostError;
+    private String chargePostRoom;
+    private String chargePostFolio;
+    private Long chargePostAt;
+
+    public String getChargePostStatus() { return chargePostStatus; }
+    public void setChargePostStatus(String chargePostStatus) { this.chargePostStatus = chargePostStatus; }
+
+    public String getChargePostRequestId() { return chargePostRequestId; }
+    public void setChargePostRequestId(String chargePostRequestId) { this.chargePostRequestId = chargePostRequestId; }
+
+    public String getChargePostError() { return chargePostError; }
+    public void setChargePostError(String chargePostError) { this.chargePostError = chargePostError; }
+
+    public String getChargePostRoom() { return chargePostRoom; }
+    public void setChargePostRoom(String chargePostRoom) { this.chargePostRoom = chargePostRoom; }
+
+    public String getChargePostFolio() { return chargePostFolio; }
+    public void setChargePostFolio(String chargePostFolio) { this.chargePostFolio = chargePostFolio; }
+
+    public Long getChargePostAt() { return chargePostAt; }
+    public void setChargePostAt(Long chargePostAt) { this.chargePostAt = chargePostAt; }
 }
