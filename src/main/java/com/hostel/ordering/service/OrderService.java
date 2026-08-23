@@ -7,6 +7,7 @@ import com.hostel.ordering.repository.MenuItemRepository;
 import com.hostel.ordering.repository.OrderRepository;
 import com.hostel.ordering.repository.OrderRepositoryCustom.SearchCriteria;
 import com.hostel.ordering.repository.OtherEssentialRepository;
+import com.hostel.ordering.ezee.EzeeChargePostService;
 import com.hostel.ordering.ezee.EzeeClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +32,7 @@ public class OrderService {
     private final OrderStatusService orderStatusService;
     private final MenuItemRepository menuItemRepository;
     private final OtherEssentialRepository otherEssentialRepository;
+    private final EzeeChargePostService ezeeChargePostService;
     private final EzeeClient ezeeClient;
 
     public OrderService(OrderRepository orderRepository,
@@ -39,6 +41,7 @@ public class OrderService {
                         OrderStatusService orderStatusService,
                         MenuItemRepository menuItemRepository,
                         OtherEssentialRepository otherEssentialRepository,
+                        EzeeChargePostService ezeeChargePostService,
                         EzeeClient ezeeClient) {
         this.orderRepository = orderRepository;
         this.fcmNotificationService = fcmNotificationService;
@@ -46,6 +49,7 @@ public class OrderService {
         this.orderStatusService = orderStatusService;
         this.menuItemRepository = menuItemRepository;
         this.otherEssentialRepository = otherEssentialRepository;
+        this.ezeeChargePostService = ezeeChargePostService;
         this.ezeeClient = ezeeClient;
     }
 
@@ -147,6 +151,10 @@ public class OrderService {
 
                     if ("CANCELLED".equalsIgnoreCase(status)) {
                         fcmNotificationService.sendOrderCancelledNotification(updated);
+                        if ("QUEUED".equals(updated.getChargePostStatus())) {
+                            Order voided = ezeeChargePostService.voidPost(updated);
+                            updated = orderRepository.save(voided);
+                        }
                     }
 
                     return updated;
@@ -172,6 +180,32 @@ public class OrderService {
         List<Order> orders = getFilteredOrders(status, dormitory, search, dateFrom, dateTo, date, null);
         orderRepository.deleteAll(orders);
         auditService.logAction("ORDERS_FILTERED_DELETED", "Deleted " + orders.size() + " filtered orders");
+    }
+
+    public Order postChargeForOrder(String orderId, String room, String updatedBy) {
+        Order order = orderRepository.findById(orderId).orElse(null);
+        if (order == null) {
+            return null;
+        }
+
+        Order result = ezeeChargePostService.post(order, room);
+        if (updatedBy != null) {
+            result.setUpdatedBy(updatedBy);
+        }
+        Order saved = orderRepository.save(result);
+
+        if ("QUEUED".equals(saved.getChargePostStatus())) {
+            saved.setStatus("CHECKED");
+            saved.setUpdatedAt(System.currentTimeMillis());
+            saved = orderRepository.save(saved);
+            log.info("Order for {} posted to eZee and marked CHECKED", saved.getBookingName());
+            auditService.logAction("ORDER_CHECKED", "Order for " + saved.getBookingName() + " posted to eZee room " + room + " and marked CHECKED");
+        } else {
+            log.warn("Chargepost failed for order {}, status unchanged: {}", saved.getId(), saved.getChargePostError());
+            auditService.logAction("ORDER_CHARGEPOST_FAILED", "Chargepost failed for " + saved.getBookingName() + ": " + saved.getChargePostError());
+        }
+
+        return saved;
     }
 
     public List<Map<String, String>> searchEzeeCandidates(String room, String dormitory) {

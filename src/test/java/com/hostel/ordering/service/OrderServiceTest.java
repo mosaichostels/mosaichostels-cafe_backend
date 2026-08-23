@@ -3,6 +3,7 @@ package com.hostel.ordering.service;
 import com.hostel.ordering.model.Order;
 import com.hostel.ordering.model.OrderItem;
 import com.hostel.ordering.repository.MenuItemRepository;
+import com.hostel.ordering.repository.OrderRepository;
 import com.hostel.ordering.repository.OtherEssentialRepository;
 import com.hostel.ordering.ezee.EzeeClient;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +34,21 @@ class OrderServiceTest {
     @Mock
     EzeeClient ezeeClient;
 
+    @Mock
+    OrderRepository orderRepository;
+
+    @Mock
+    FCMNotificationService fcmNotificationService;
+
+    @Mock
+    AuditService auditService;
+
+    @Mock
+    OrderStatusService orderStatusService;
+
+    @Mock
+    com.hostel.ordering.ezee.EzeeChargePostService ezeeChargePostService;
+
     @InjectMocks
     OrderService orderService;
 
@@ -42,7 +58,7 @@ class OrderServiceTest {
     void setUp() {
         order = new Order();
         order.setItems(new ArrayList<>());
-        orderService = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, ezeeClient);
+        orderService = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient);
     }
 
     @Test
@@ -115,7 +131,7 @@ class OrderServiceTest {
 
     @Test
     void searchEzeeCandidates_byRoom_wrapsRoomqueryAsSingleRow() {
-        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, ezeeClient);
+        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient);
 
         LinkedHashMap<String, String> roomqueryResponse = new LinkedHashMap<>();
         roomqueryResponse.put("status", "ok");
@@ -133,7 +149,7 @@ class OrderServiceTest {
 
     @Test
     void searchEzeeCandidates_byRoom_roomqueryFails_returnsEmptyList() {
-        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, ezeeClient);
+        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient);
 
         LinkedHashMap<String, String> roomqueryResponse = new LinkedHashMap<>();
         roomqueryResponse.put("status", "error");
@@ -147,7 +163,7 @@ class OrderServiceTest {
 
     @Test
     void searchEzeeCandidates_noRoom_returnsWholeRoomlistFilteredByDormitory() {
-        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, ezeeClient);
+        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient);
 
         LinkedHashMap<String, String> row1 = new LinkedHashMap<>();
         row1.put("guestname", "Mr. Joy");
@@ -167,5 +183,109 @@ class OrderServiceTest {
 
         assertEquals(1, result.size());
         assertEquals("Mr. Joy", result.get(0).get("guestname"));
+    }
+
+    @Test
+    void postChargeForOrder_ezeeAccepts_savesQueuedAndSetsChecked() {
+        OrderService svc = new OrderService(orderRepository, null, auditService, orderStatusService,
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient);
+
+        Order existing = new Order();
+        existing.setId("order1");
+        existing.setStatus("DELIVERED");
+        existing.setBookingName("Test Guest");
+
+        when(orderRepository.findById("order1")).thenReturn(java.util.Optional.of(existing));
+        when(ezeeChargePostService.post(existing, "106")).thenAnswer(inv -> {
+            Order o = inv.getArgument(0);
+            o.setChargePostStatus("QUEUED");
+            o.setChargePostRequestId("2805");
+            return o;
+        });
+        when(orderRepository.save(existing)).thenReturn(existing);
+
+        Order result = svc.postChargeForOrder("order1", "106", "staff1");
+
+        assertEquals("QUEUED", result.getChargePostStatus());
+        assertEquals("CHECKED", result.getStatus());
+        org.mockito.Mockito.verify(orderRepository, org.mockito.Mockito.times(2)).save(existing);
+    }
+
+    @Test
+    void postChargeForOrder_ezeeRejects_savesFailedAndLeavesStatusUnchanged() {
+        OrderService svc = new OrderService(orderRepository, null, auditService, orderStatusService,
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient);
+
+        Order existing = new Order();
+        existing.setId("order1");
+        existing.setStatus("DELIVERED");
+        existing.setBookingName("Test Guest");
+
+        when(orderRepository.findById("order1")).thenReturn(java.util.Optional.of(existing));
+        when(ezeeChargePostService.post(existing, "106")).thenAnswer(inv -> {
+            Order o = inv.getArgument(0);
+            o.setChargePostStatus("FAILED");
+            o.setChargePostError("Room not occupied");
+            return o;
+        });
+        when(orderRepository.save(existing)).thenReturn(existing);
+
+        Order result = svc.postChargeForOrder("order1", "106", "staff1");
+
+        assertEquals("FAILED", result.getChargePostStatus());
+        assertEquals("DELIVERED", result.getStatus());
+        org.mockito.Mockito.verify(orderRepository, org.mockito.Mockito.times(1)).save(existing);
+    }
+
+    @Test
+    void postChargeForOrder_unknownOrder_returnsNull() {
+        OrderService svc = new OrderService(orderRepository, null, auditService, orderStatusService,
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient);
+
+        when(orderRepository.findById("missing")).thenReturn(java.util.Optional.empty());
+
+        Order result = svc.postChargeForOrder("missing", "106", "staff1");
+
+        assertNull(result);
+    }
+
+    @Test
+    void updateOrderStatus_toCancelled_chargeQueued_voidsIt() {
+        OrderService svc = new OrderService(orderRepository, fcmNotificationService, auditService, orderStatusService,
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient);
+
+        Order existing = new Order();
+        existing.setId("order1");
+        existing.setStatus("CHECKED");
+        existing.setChargePostStatus("QUEUED");
+        existing.setChargePostRequestId("2805");
+
+        when(orderStatusService.getAllStatuses()).thenReturn(List.of(
+                new com.hostel.ordering.model.OrderStatusConfig("CANCELLED", "Cancelled", "cancelled", false)));
+        when(orderRepository.findById("order1")).thenReturn(java.util.Optional.of(existing));
+        when(orderRepository.save(existing)).thenReturn(existing);
+
+        svc.updateOrderStatus("order1", "CANCELLED", "staff1");
+
+        org.mockito.Mockito.verify(ezeeChargePostService).voidPost(existing);
+    }
+
+    @Test
+    void updateOrderStatus_toCancelled_chargeNotQueued_doesNotCallVoid() {
+        OrderService svc = new OrderService(orderRepository, fcmNotificationService, auditService, orderStatusService,
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient);
+
+        Order existing = new Order();
+        existing.setId("order1");
+        existing.setStatus("DELIVERED");
+
+        when(orderStatusService.getAllStatuses()).thenReturn(List.of(
+                new com.hostel.ordering.model.OrderStatusConfig("CANCELLED", "Cancelled", "cancelled", false)));
+        when(orderRepository.findById("order1")).thenReturn(java.util.Optional.of(existing));
+        when(orderRepository.save(existing)).thenReturn(existing);
+
+        svc.updateOrderStatus("order1", "CANCELLED", "staff1");
+
+        org.mockito.Mockito.verifyNoInteractions(ezeeChargePostService);
     }
 }

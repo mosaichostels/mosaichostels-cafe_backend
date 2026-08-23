@@ -82,6 +82,16 @@ public class OrderController {
         return ResponseEntity.ok("Filtered orders deleted successfully");
     }
 
+    @PostMapping("/{id}/chargepost")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Order> postCharge(@PathVariable String id,
+            @RequestBody Map<String, String> payload,
+            Authentication authentication) {
+        String updatedBy = authentication != null && authentication.isAuthenticated() ? authentication.getName() : "UNKNOWN";
+        Order result = orderService.postChargeForOrder(id, payload.get("room"), updatedBy);
+        return result != null ? ResponseEntity.ok(result) : ResponseEntity.notFound().build();
+    }
+
     @GetMapping("/{id}/ezee-candidates")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<Map<String, String>>> searchEzeeCandidates(
