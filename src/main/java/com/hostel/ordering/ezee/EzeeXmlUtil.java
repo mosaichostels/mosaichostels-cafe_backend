@@ -28,9 +28,23 @@ public final class EzeeXmlUtil {
 
     private EzeeXmlUtil() {}
 
+    private static DocumentBuilderFactory secureFactory() {
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+            factory.setXIncludeAware(false);
+            factory.setExpandEntityReferences(false);
+            return factory;
+        } catch (javax.xml.parsers.ParserConfigurationException e) {
+            throw new IllegalStateException("Failed to configure secure XML parser", e);
+        }
+    }
+
     public static String buildRequest(LinkedHashMap<String, String> fields) {
         try {
-            DocumentBuilder builder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+            DocumentBuilder builder = secureFactory().newDocumentBuilder();
             Document doc = builder.newDocument();
             Element root = doc.createElement("request");
             doc.appendChild(root);
@@ -86,7 +100,7 @@ public final class EzeeXmlUtil {
 
     private static Element parseRoot(String xml) {
         try {
-            DocumentBuilder builder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+            DocumentBuilder builder = secureFactory().newDocumentBuilder();
             Document doc = builder.parse(new InputSource(new StringReader(xml)));
             return doc.getDocumentElement();
         } catch (Exception e) {

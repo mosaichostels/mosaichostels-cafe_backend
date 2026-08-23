@@ -37,3 +37,10 @@ management:
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:*}
+
+ezee:
+  mock: false
+  endpoint: ${EZEE_ENDPOINT:https://live.ipms247.com/index.php/page/service.pos2pms}
+  auth-code: ${EZEE_AUTH_CODE:}
+  outlet: ${EZEE_OUTLET:Cafe}
+  timezone: ${EZEE_TIMEZONE:Asia/Kolkata}
