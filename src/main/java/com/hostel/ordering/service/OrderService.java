@@ -9,6 +9,7 @@ import com.hostel.ordering.repository.OrderRepositoryCustom.SearchCriteria;
 import com.hostel.ordering.repository.OtherEssentialRepository;
 import com.hostel.ordering.ezee.EzeeChargePostService;
 import com.hostel.ordering.ezee.EzeeClient;
+import com.hostel.ordering.ezee.RoomQueryResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -154,6 +155,10 @@ public class OrderService {
                         if ("QUEUED".equals(updated.getChargePostStatus())) {
                             Order voided = ezeeChargePostService.voidPost(updated);
                             updated = orderRepository.save(voided);
+                            if (!"VOIDED".equals(voided.getChargePostStatus())) {
+                                auditService.logAction("ORDER_CHARGEPOST_VOID_FAILED",
+                                        "Failed to void eZee charge for " + updated.getBookingName() + ": " + voided.getChargePostError());
+                            }
                         }
                     }
 
@@ -188,6 +193,11 @@ public class OrderService {
             return null;
         }
 
+        if ("QUEUED".equals(order.getChargePostStatus())) {
+            log.warn("Chargepost already queued for order {}, ignoring duplicate post request", orderId);
+            return order;
+        }
+
         Order result = ezeeChargePostService.post(order, room);
         if (updatedBy != null) {
             result.setUpdatedBy(updatedBy);
@@ -209,29 +219,37 @@ public class OrderService {
     }
 
     public List<Map<String, String>> searchEzeeCandidates(String room, String dormitory) {
-        if (room != null && !room.isBlank()) {
+        try {
+            if (room != null && !room.isBlank()) {
+                LinkedHashMap<String, String> fields = new LinkedHashMap<>();
+                fields.put("auth", ezeeClient.getAuthCode());
+                fields.put("oprn", "roomquery");
+                fields.put("room", room);
+                RoomQueryResult result = ezeeClient.postRoomQuery(fields);
+                if (!"ok".equals(result.fields().get("status"))) {
+                    return List.of();
+                }
+                List<Map<String, String>> rows = result.rows().stream()
+                        .filter(r -> room.equals(r.get("room")))
+                        .toList();
+                return rows.isEmpty() ? List.of(result.fields()) : rows;
+            }
+
             LinkedHashMap<String, String> fields = new LinkedHashMap<>();
             fields.put("auth", ezeeClient.getAuthCode());
-            fields.put("oprn", "roomquery");
-            fields.put("room", room);
-            Map<String, String> response = ezeeClient.post(fields);
-            if (!"ok".equals(response.get("status"))) {
-                return List.of();
+            fields.put("oprn", "roomlist");
+            List<Map<String, String>> rows = ezeeClient.postForRoomRows(fields);
+
+            if (dormitory == null || dormitory.isBlank()) {
+                return rows;
             }
-            return List.of(response);
+            String needle = dormitory.toLowerCase();
+            return rows.stream()
+                    .filter(row -> row.get("roomtype") != null && row.get("roomtype").toLowerCase().contains(needle))
+                    .toList();
+        } catch (IllegalStateException e) {
+            log.warn("eZee search failed for room={}, dormitory={}: {}", room, dormitory, e.getMessage());
+            return List.of();
         }
-
-        LinkedHashMap<String, String> fields = new LinkedHashMap<>();
-        fields.put("auth", ezeeClient.getAuthCode());
-        fields.put("oprn", "roomlist");
-        List<Map<String, String>> rows = ezeeClient.postForRoomRows(fields);
-
-        if (dormitory == null || dormitory.isBlank()) {
-            return rows;
-        }
-        String needle = dormitory.toLowerCase();
-        return rows.stream()
-                .filter(row -> row.get("roomtype") != null && row.get("roomtype").toLowerCase().contains(needle))
-                .toList();
     }
 }

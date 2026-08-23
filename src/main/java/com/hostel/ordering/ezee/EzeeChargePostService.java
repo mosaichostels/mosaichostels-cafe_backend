@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -27,13 +28,22 @@ public class EzeeChargePostService {
 
     private final EzeeClient ezeeClient;
     private final String outlet;
+    private final java.time.ZoneId zoneId;
 
-    public EzeeChargePostService(EzeeClient ezeeClient, @Value("${ezee.outlet:Cafe}") String outlet) {
+    public EzeeChargePostService(EzeeClient ezeeClient,
+            @Value("${ezee.outlet:Cafe}") String outlet,
+            @Value("${ezee.timezone:Asia/Kolkata}") String timezone) {
         this.ezeeClient = ezeeClient;
         this.outlet = outlet;
+        this.zoneId = java.time.ZoneId.of(timezone);
     }
 
     public Order post(Order order, String room) {
+        if ("QUEUED".equals(order.getChargePostStatus())) {
+            log.warn("post() called on order {} that already has a QUEUED chargepost — ignoring", order.getId());
+            return order;
+        }
+
         order.setChargePostAt(System.currentTimeMillis());
 
         if (order.getTotalAmount() == null) {
@@ -45,13 +55,30 @@ public class EzeeChargePostService {
             roomqueryFields.put("auth", ezeeClient.getAuthCode());
             roomqueryFields.put("oprn", "roomquery");
             roomqueryFields.put("room", room);
-            Map<String, String> roomqueryResponse = ezeeClient.post(roomqueryFields);
+            RoomQueryResult roomqueryResult = ezeeClient.postRoomQuery(roomqueryFields);
+            Map<String, String> roomqueryResponse = roomqueryResult.fields();
 
             if (!"ok".equals(roomqueryResponse.get("status"))) {
                 return markFailed(order, roomqueryResponse.getOrDefault("msg", "roomquery failed"));
             }
 
-            String folio = roomqueryResponse.get("masterfolio");
+            List<Map<String, String>> occupants = roomqueryResult.rows().stream()
+                    .filter(row -> room.equals(row.get("room")))
+                    .toList();
+
+            String folio;
+            if (occupants.isEmpty()) {
+                folio = roomqueryResponse.get("masterfolio");
+            } else {
+                java.util.Set<String> folios = occupants.stream()
+                        .map(row -> row.get("masterfolio"))
+                        .filter(f -> f != null)
+                        .collect(java.util.stream.Collectors.toSet());
+                if (folios.size() > 1) {
+                    return markFailed(order, "Room " + room + " has multiple occupants on different folios — cannot determine which guest to charge");
+                }
+                folio = folios.isEmpty() ? roomqueryResponse.get("masterfolio") : folios.iterator().next();
+            }
 
             LinkedHashMap<String, String> chargepostFields = buildChargePostFields(order, room, folio);
             Map<String, String> response = ezeeClient.post(chargepostFields);
@@ -84,7 +111,7 @@ public class EzeeChargePostService {
     }
 
     private LinkedHashMap<String, String> buildChargePostFields(Order order, String room, String folio) {
-        String today = LocalDate.now().format(DATE_FORMAT);
+        String today = LocalDate.now(zoneId).format(DATE_FORMAT);
         String remark = order.getItems().stream()
                 .map(OrderItem::getMenuItemName)
                 .filter(name -> name != null && !name.isBlank())

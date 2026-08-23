@@ -1,5 +1,7 @@
 package com.hostel.ordering.ezee;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -19,6 +21,8 @@ import java.util.Map;
 @Component
 public class EzeeClient {
 
+    private static final Logger log = LoggerFactory.getLogger(EzeeClient.class);
+
     private final String endpoint;
     private final String authCode;
     private final boolean mock;
@@ -32,17 +36,16 @@ public class EzeeClient {
         this.authCode = authCode;
         this.mock = mock;
         this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+        if (mock) {
+            log.warn("EzeeClient running in MOCK mode — chargepost/roomquery calls will NOT reach live eZee PMS");
+        }
     }
 
     public String getAuthCode() {
         return authCode;
     }
 
-    public Map<String, String> post(LinkedHashMap<String, String> fields) {
-        if (mock) {
-            return EzeeMockResponses.forOprn(fields.get("oprn"));
-        }
-
+    private String send(LinkedHashMap<String, String> fields) {
         String requestXml = EzeeXmlUtil.buildRequest(fields);
         try {
             HttpRequest request = HttpRequest.newBuilder()
@@ -52,31 +55,34 @@ public class EzeeClient {
                     .POST(HttpRequest.BodyPublishers.ofString(requestXml))
                     .build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            return EzeeXmlUtil.parseFlatResponse(response.body());
+            return response.body();
         } catch (IOException | InterruptedException e) {
             if (e instanceof InterruptedException) Thread.currentThread().interrupt();
             throw new IllegalStateException("eZee request failed for oprn=" + fields.get("oprn"), e);
         }
     }
 
+    public Map<String, String> post(LinkedHashMap<String, String> fields) {
+        if (mock) {
+            return EzeeMockResponses.forOprn(fields.get("oprn"));
+        }
+        return EzeeXmlUtil.parseFlatResponse(send(fields));
+    }
+
     public List<Map<String, String>> postForRoomRows(LinkedHashMap<String, String> fields) {
         if (mock) {
             return EzeeMockResponses.roomRowsForOprn(fields.get("oprn"));
         }
+        return EzeeXmlUtil.parseRoomRows(send(fields));
+    }
 
-        String requestXml = EzeeXmlUtil.buildRequest(fields);
-        try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(endpoint))
-                    .timeout(Duration.ofSeconds(15))
-                    .header("Content-Type", "application/xml")
-                    .POST(HttpRequest.BodyPublishers.ofString(requestXml))
-                    .build();
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            return EzeeXmlUtil.parseRoomRows(response.body());
-        } catch (IOException | InterruptedException e) {
-            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
-            throw new IllegalStateException("eZee request failed for oprn=" + fields.get("oprn"), e);
+    public RoomQueryResult postRoomQuery(LinkedHashMap<String, String> fields) {
+        if (mock) {
+            return new RoomQueryResult(
+                    EzeeMockResponses.forOprn(fields.get("oprn")),
+                    EzeeMockResponses.roomRowsForOprn(fields.get("oprn")));
         }
+        String body = send(fields);
+        return new RoomQueryResult(EzeeXmlUtil.parseFlatResponse(body), EzeeXmlUtil.parseRoomRows(body));
     }
 }

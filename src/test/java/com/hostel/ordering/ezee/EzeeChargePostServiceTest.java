@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -39,13 +40,14 @@ class EzeeChargePostServiceTest {
 
     @Test
     void post_roomHasLiveFolio_chargepostSucceeds_marksQueued() {
-        service = new EzeeChargePostService(ezeeClient, "Cafe");
+        service = new EzeeChargePostService(ezeeClient, "Cafe", "Asia/Kolkata");
 
         Map<String, String> roomqueryResponse = new LinkedHashMap<>();
         roomqueryResponse.put("status", "ok");
         roomqueryResponse.put("guestname", "Denial Mark");
         roomqueryResponse.put("masterfolio", "8");
-        when(ezeeClient.post(argWithOprn("roomquery"))).thenReturn(roomqueryResponse);
+        when(ezeeClient.postRoomQuery(argWithOprn("roomquery")))
+                .thenReturn(new RoomQueryResult(roomqueryResponse, List.of()));
 
         Map<String, String> chargepostResponse = new LinkedHashMap<>();
         chargepostResponse.put("status", "ok");
@@ -65,12 +67,13 @@ class EzeeChargePostServiceTest {
 
     @Test
     void post_roomHasNoLiveFolio_marksFailedWithoutCallingChargepost() {
-        service = new EzeeChargePostService(ezeeClient, "Cafe");
+        service = new EzeeChargePostService(ezeeClient, "Cafe", "Asia/Kolkata");
 
         Map<String, String> roomqueryResponse = new LinkedHashMap<>();
         roomqueryResponse.put("status", "error");
         roomqueryResponse.put("msg", "Room not occupied");
-        when(ezeeClient.post(argWithOprn("roomquery"))).thenReturn(roomqueryResponse);
+        when(ezeeClient.postRoomQuery(argWithOprn("roomquery")))
+                .thenReturn(new RoomQueryResult(roomqueryResponse, List.of()));
 
         Order result = service.post(sampleOrder(), "106");
 
@@ -81,13 +84,14 @@ class EzeeChargePostServiceTest {
 
     @Test
     void post_ezeeReturnsChargepostError_marksFailed() {
-        service = new EzeeChargePostService(ezeeClient, "Cafe");
+        service = new EzeeChargePostService(ezeeClient, "Cafe", "Asia/Kolkata");
 
         Map<String, String> roomqueryResponse = new LinkedHashMap<>();
         roomqueryResponse.put("status", "ok");
         roomqueryResponse.put("guestname", "Denial Mark");
         roomqueryResponse.put("masterfolio", "8");
-        when(ezeeClient.post(argWithOprn("roomquery"))).thenReturn(roomqueryResponse);
+        when(ezeeClient.postRoomQuery(argWithOprn("roomquery")))
+                .thenReturn(new RoomQueryResult(roomqueryResponse, List.of()));
 
         Map<String, String> chargepostResponse = new LinkedHashMap<>();
         chargepostResponse.put("status", "error");
@@ -102,7 +106,7 @@ class EzeeChargePostServiceTest {
 
     @Test
     void voidPost_ezeeConfirms_marksVoided() {
-        service = new EzeeChargePostService(ezeeClient, "Cafe");
+        service = new EzeeChargePostService(ezeeClient, "Cafe", "Asia/Kolkata");
         Order order = sampleOrder();
         order.setChargePostStatus("QUEUED");
         order.setChargePostRequestId("2805");
@@ -119,7 +123,7 @@ class EzeeChargePostServiceTest {
 
     @Test
     void voidPost_ezeeRejects_leavesStatusQueuedAndRecordsError() {
-        service = new EzeeChargePostService(ezeeClient, "Cafe");
+        service = new EzeeChargePostService(ezeeClient, "Cafe", "Asia/Kolkata");
         Order order = sampleOrder();
         order.setChargePostStatus("QUEUED");
         order.setChargePostRequestId("2805");
@@ -137,7 +141,7 @@ class EzeeChargePostServiceTest {
 
     @Test
     void post_orderHasNullTotalAmount_marksFailedWithoutCallingEzee() {
-        service = new EzeeChargePostService(ezeeClient, "Cafe");
+        service = new EzeeChargePostService(ezeeClient, "Cafe", "Asia/Kolkata");
         Order order = sampleOrder();
         order.setTotalAmount(null);
 
@@ -146,6 +150,45 @@ class EzeeChargePostServiceTest {
         assertEquals("FAILED", result.getChargePostStatus());
         assertEquals("Order has no total amount", result.getChargePostError());
         assertNull(result.getChargePostRequestId());
+    }
+
+    @Test
+    void post_orderAlreadyQueued_returnsUnchangedWithoutCallingEzee() {
+        service = new EzeeChargePostService(ezeeClient, "Cafe", "Asia/Kolkata");
+        Order order = sampleOrder();
+        order.setChargePostStatus("QUEUED");
+        order.setChargePostRequestId("2805");
+
+        Order result = service.post(order, "106");
+
+        assertSame(order, result);
+        assertEquals("QUEUED", result.getChargePostStatus());
+        assertEquals("2805", result.getChargePostRequestId());
+        verifyNoInteractions(ezeeClient);
+    }
+
+    @Test
+    void post_roomHasMultipleOccupantsOnDifferentFolios_marksFailedAsAmbiguous() {
+        service = new EzeeChargePostService(ezeeClient, "Cafe", "Asia/Kolkata");
+
+        Map<String, String> roomqueryResponse = new LinkedHashMap<>();
+        roomqueryResponse.put("status", "ok");
+        roomqueryResponse.put("masterfolio", "8");
+
+        Map<String, String> row1 = new LinkedHashMap<>();
+        row1.put("room", "106");
+        row1.put("masterfolio", "10");
+        Map<String, String> row2 = new LinkedHashMap<>();
+        row2.put("room", "106");
+        row2.put("masterfolio", "11");
+
+        when(ezeeClient.postRoomQuery(argWithOprn("roomquery")))
+                .thenReturn(new RoomQueryResult(roomqueryResponse, List.of(row1, row2)));
+
+        Order result = service.post(sampleOrder(), "106");
+
+        assertEquals("FAILED", result.getChargePostStatus());
+        assertTrue(result.getChargePostError().contains("multiple occupants"));
     }
 
     private LinkedHashMap<String, String> argWithOprn(String oprn) {
