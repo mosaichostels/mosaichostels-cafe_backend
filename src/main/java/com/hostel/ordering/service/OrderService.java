@@ -7,11 +7,14 @@ import com.hostel.ordering.repository.MenuItemRepository;
 import com.hostel.ordering.repository.OrderRepository;
 import com.hostel.ordering.repository.OrderRepositoryCustom.SearchCriteria;
 import com.hostel.ordering.repository.OtherEssentialRepository;
+import com.hostel.ordering.ezee.EzeeClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -28,19 +31,22 @@ public class OrderService {
     private final OrderStatusService orderStatusService;
     private final MenuItemRepository menuItemRepository;
     private final OtherEssentialRepository otherEssentialRepository;
+    private final EzeeClient ezeeClient;
 
     public OrderService(OrderRepository orderRepository,
                         FCMNotificationService fcmNotificationService,
                         AuditService auditService,
                         OrderStatusService orderStatusService,
                         MenuItemRepository menuItemRepository,
-                        OtherEssentialRepository otherEssentialRepository) {
+                        OtherEssentialRepository otherEssentialRepository,
+                        EzeeClient ezeeClient) {
         this.orderRepository = orderRepository;
         this.fcmNotificationService = fcmNotificationService;
         this.auditService = auditService;
         this.orderStatusService = orderStatusService;
         this.menuItemRepository = menuItemRepository;
         this.otherEssentialRepository = otherEssentialRepository;
+        this.ezeeClient = ezeeClient;
     }
 
     public Order createOrder(Order order) {
@@ -166,5 +172,32 @@ public class OrderService {
         List<Order> orders = getFilteredOrders(status, dormitory, search, dateFrom, dateTo, date, null);
         orderRepository.deleteAll(orders);
         auditService.logAction("ORDERS_FILTERED_DELETED", "Deleted " + orders.size() + " filtered orders");
+    }
+
+    public List<Map<String, String>> searchEzeeCandidates(String room, String dormitory) {
+        if (room != null && !room.isBlank()) {
+            LinkedHashMap<String, String> fields = new LinkedHashMap<>();
+            fields.put("auth", ezeeClient.getAuthCode());
+            fields.put("oprn", "roomquery");
+            fields.put("room", room);
+            Map<String, String> response = ezeeClient.post(fields);
+            if (!"ok".equals(response.get("status"))) {
+                return List.of();
+            }
+            return List.of(response);
+        }
+
+        LinkedHashMap<String, String> fields = new LinkedHashMap<>();
+        fields.put("auth", ezeeClient.getAuthCode());
+        fields.put("oprn", "roomlist");
+        List<Map<String, String>> rows = ezeeClient.postForRoomRows(fields);
+
+        if (dormitory == null || dormitory.isBlank()) {
+            return rows;
+        }
+        String needle = dormitory.toLowerCase();
+        return rows.stream()
+                .filter(row -> row.get("roomtype") != null && row.get("roomtype").toLowerCase().contains(needle))
+                .toList();
     }
 }

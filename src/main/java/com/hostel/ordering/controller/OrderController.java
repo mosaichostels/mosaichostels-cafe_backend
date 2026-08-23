@@ -81,4 +81,13 @@ public class OrderController {
         orderService.deleteFilteredOrders(status, dormitory, search, dateFrom, dateTo, date);
         return ResponseEntity.ok("Filtered orders deleted successfully");
     }
+
+    @GetMapping("/{id}/ezee-candidates")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<Map<String, String>>> searchEzeeCandidates(
+            @PathVariable String id,
+            @RequestParam(required = false) String room,
+            @RequestParam(required = false) String dormitory) {
+        return ResponseEntity.ok(orderService.searchEzeeCandidates(room, dormitory));
+    }
 }
