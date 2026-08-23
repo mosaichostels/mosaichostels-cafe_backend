@@ -135,6 +135,19 @@ class EzeeChargePostServiceTest {
         assertEquals("Void failed: requestid not found", result.getChargePostError());
     }
 
+    @Test
+    void post_orderHasNullTotalAmount_marksFailedWithoutCallingEzee() {
+        service = new EzeeChargePostService(ezeeClient, "Cafe");
+        Order order = sampleOrder();
+        order.setTotalAmount(null);
+
+        Order result = service.post(order, "106");
+
+        assertEquals("FAILED", result.getChargePostStatus());
+        assertEquals("Order has no total amount", result.getChargePostError());
+        assertNull(result.getChargePostRequestId());
+    }
+
     private LinkedHashMap<String, String> argWithOprn(String oprn) {
         return org.mockito.ArgumentMatchers.argThat(m -> m != null && oprn.equals(m.get("oprn")));
     }

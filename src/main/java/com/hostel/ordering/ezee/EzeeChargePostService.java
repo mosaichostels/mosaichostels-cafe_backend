@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -34,6 +35,11 @@ public class EzeeChargePostService {
 
     public Order post(Order order, String room) {
         order.setChargePostAt(System.currentTimeMillis());
+
+        if (order.getTotalAmount() == null) {
+            return markFailed(order, "Order has no total amount");
+        }
+
         try {
             LinkedHashMap<String, String> roomqueryFields = new LinkedHashMap<>();
             roomqueryFields.put("auth", ezeeClient.getAuthCode());
@@ -44,6 +50,7 @@ public class EzeeChargePostService {
             if (!"ok".equals(roomqueryResponse.get("status"))) {
                 return markFailed(order, roomqueryResponse.getOrDefault("msg", "roomquery failed"));
             }
+
             String folio = roomqueryResponse.get("masterfolio");
 
             LinkedHashMap<String, String> chargepostFields = buildChargePostFields(order, room, folio);
@@ -82,7 +89,7 @@ public class EzeeChargePostService {
                 .map(OrderItem::getMenuItemName)
                 .filter(name -> name != null && !name.isBlank())
                 .collect(Collectors.joining(", "));
-        String amount = String.format("%.2f", order.getTotalAmount());
+        String amount = String.format(Locale.US, "%.2f", order.getTotalAmount());
 
         LinkedHashMap<String, String> fields = new LinkedHashMap<>();
         fields.put("auth", ezeeClient.getAuthCode());
