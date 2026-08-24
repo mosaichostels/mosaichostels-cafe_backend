@@ -9,7 +9,6 @@ import com.hostel.ordering.repository.OrderRepositoryCustom.SearchCriteria;
 import com.hostel.ordering.repository.OtherEssentialRepository;
 import com.hostel.ordering.ezee.EzeeChargePostService;
 import com.hostel.ordering.ezee.EzeeClient;
-import com.hostel.ordering.ezee.RoomQueryResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -218,37 +217,22 @@ public class OrderService {
         return saved;
     }
 
-    public List<Map<String, String>> searchEzeeCandidates(String room, String dormitory) {
+    public List<Map<String, String>> searchEzeeCandidates(String name) {
         try {
-            if (room != null && !room.isBlank()) {
-                LinkedHashMap<String, String> fields = new LinkedHashMap<>();
-                fields.put("auth", ezeeClient.getAuthCode());
-                fields.put("oprn", "roomquery");
-                fields.put("room", room);
-                RoomQueryResult result = ezeeClient.postRoomQuery(fields);
-                if (!"ok".equals(result.fields().get("status"))) {
-                    return List.of();
-                }
-                List<Map<String, String>> rows = result.rows().stream()
-                        .filter(r -> room.equals(r.get("room")))
-                        .toList();
-                return rows.isEmpty() ? List.of(result.fields()) : rows;
-            }
-
             LinkedHashMap<String, String> fields = new LinkedHashMap<>();
             fields.put("auth", ezeeClient.getAuthCode());
             fields.put("oprn", "roomlist");
             List<Map<String, String>> rows = ezeeClient.postForRoomRows(fields);
 
-            if (dormitory == null || dormitory.isBlank()) {
+            if (name == null || name.isBlank()) {
                 return rows;
             }
-            String needle = dormitory.toLowerCase();
+            String needle = name.toLowerCase();
             return rows.stream()
-                    .filter(row -> row.get("roomtype") != null && row.get("roomtype").toLowerCase().contains(needle))
+                    .filter(row -> row.get("guestname") != null && row.get("guestname").toLowerCase().contains(needle))
                     .toList();
         } catch (IllegalStateException e) {
-            log.warn("eZee search failed for room={}, dormitory={}: {}", room, dormitory, e.getMessage());
+            log.warn("eZee search failed for name={}: {}", name, e.getMessage());
             return List.of();
         }
     }
