@@ -130,54 +130,7 @@ class OrderServiceTest {
     }
 
     @Test
-    void searchEzeeCandidates_byRoom_wrapsRoomqueryAsSingleRow() {
-        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient);
-
-        LinkedHashMap<String, String> roomqueryResponse = new LinkedHashMap<>();
-        roomqueryResponse.put("status", "ok");
-        roomqueryResponse.put("guestname", "Denial Mark");
-        roomqueryResponse.put("room", "106");
-        roomqueryResponse.put("masterfolio", "10");
-        when(ezeeClient.postRoomQuery(org.mockito.ArgumentMatchers.argThat(
-                m -> m != null && "roomquery".equals(m.get("oprn")))))
-                .thenReturn(new com.hostel.ordering.ezee.RoomQueryResult(roomqueryResponse, List.of()));
-
-        List<Map<String, String>> result = svc.searchEzeeCandidates("106", null);
-
-        assertEquals(1, result.size());
-        assertEquals("Denial Mark", result.get(0).get("guestname"));
-    }
-
-    @Test
-    void searchEzeeCandidates_byRoom_roomqueryFails_returnsEmptyList() {
-        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient);
-
-        LinkedHashMap<String, String> roomqueryResponse = new LinkedHashMap<>();
-        roomqueryResponse.put("status", "error");
-        when(ezeeClient.postRoomQuery(org.mockito.ArgumentMatchers.argThat(
-                m -> m != null && "roomquery".equals(m.get("oprn")))))
-                .thenReturn(new com.hostel.ordering.ezee.RoomQueryResult(roomqueryResponse, List.of()));
-
-        List<Map<String, String>> result = svc.searchEzeeCandidates("106", null);
-
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    void searchEzeeCandidates_ezeeThrows_returnsEmptyListInsteadOfPropagating() {
-        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient);
-
-        when(ezeeClient.postRoomQuery(org.mockito.ArgumentMatchers.argThat(
-                m -> m != null && "roomquery".equals(m.get("oprn")))))
-                .thenThrow(new IllegalStateException("connection refused"));
-
-        List<Map<String, String>> result = svc.searchEzeeCandidates("106", null);
-
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    void searchEzeeCandidates_noRoom_returnsWholeRoomlistFilteredByDormitory() {
+    void searchEzeeCandidates_byName_returnsMatchingRowsCaseInsensitive() {
         OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient);
 
         LinkedHashMap<String, String> row1 = new LinkedHashMap<>();
@@ -194,10 +147,40 @@ class OrderServiceTest {
                 m -> m != null && "roomlist".equals(m.get("oprn")))))
                 .thenReturn(List.of(row1, row2));
 
-        List<Map<String, String>> result = svc.searchEzeeCandidates(null, "8 - Bed Mixed Dorm");
+        List<Map<String, String>> result = svc.searchEzeeCandidates("joy");
 
         assertEquals(1, result.size());
         assertEquals("Mr. Joy", result.get(0).get("guestname"));
+    }
+
+    @Test
+    void searchEzeeCandidates_blankName_returnsWholeRoomlist() {
+        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient);
+
+        LinkedHashMap<String, String> row1 = new LinkedHashMap<>();
+        row1.put("guestname", "Mr. Joy");
+        row1.put("room", "106");
+
+        when(ezeeClient.postForRoomRows(org.mockito.ArgumentMatchers.argThat(
+                m -> m != null && "roomlist".equals(m.get("oprn")))))
+                .thenReturn(List.of(row1));
+
+        List<Map<String, String>> result = svc.searchEzeeCandidates(null);
+
+        assertEquals(1, result.size());
+    }
+
+    @Test
+    void searchEzeeCandidates_ezeeThrows_returnsEmptyListInsteadOfPropagating() {
+        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient);
+
+        when(ezeeClient.postForRoomRows(org.mockito.ArgumentMatchers.argThat(
+                m -> m != null && "roomlist".equals(m.get("oprn")))))
+                .thenThrow(new IllegalStateException("connection refused"));
+
+        List<Map<String, String>> result = svc.searchEzeeCandidates("joy");
+
+        assertTrue(result.isEmpty());
     }
 
     @Test
