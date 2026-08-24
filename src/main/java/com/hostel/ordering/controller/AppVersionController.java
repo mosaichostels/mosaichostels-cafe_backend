@@ -3,6 +3,7 @@ package com.hostel.ordering.controller;
 import com.hostel.ordering.model.AppVersion;
 import com.hostel.ordering.service.AppVersionService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -29,6 +30,7 @@ public class AppVersionController {
     }
 
     @PostMapping("/publish")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<AppVersion> publish(@RequestBody AppVersion request) {
         return ResponseEntity.ok(appVersionService.publish(request));
     }
