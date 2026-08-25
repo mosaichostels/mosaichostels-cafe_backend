@@ -55,6 +55,21 @@ public class EzeeClient {
         return authCode;
     }
 
+    // ponytail: temp lookup to find an ExtraChargeId in eZee admin — delete once used.
+    public String listExtraCharges() {
+        String url = "https://live.ipms247.com/booking/reservation_api/listing.php"
+                + "?request_type=ExtraCharges&HotelCode=" + hotelCode + "&APIKey=" + authCode + "&language=en";
+        try {
+            HttpRequest request = HttpRequest.newBuilder().uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(15)).GET().build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            return response.body();
+        } catch (IOException | InterruptedException e) {
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            throw new IllegalStateException("eZee ExtraCharges listing request failed", e);
+        }
+    }
+
     // Posts a charge to a reservation via Kiosk Connectivity's AddExtraCharge —
     // unlike POS2PMS chargepost, this doesn't need an outlet configured on the
     // PMS side, but eZee also exposes no API to void/remove it afterward.
