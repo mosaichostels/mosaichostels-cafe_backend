@@ -41,6 +41,7 @@ cors:
 ezee:
   mock: false
   endpoint: ${EZEE_ENDPOINT:https://live.ipms247.com/index.php/page/service.pos2pms}
+  kiosk-endpoint: ${EZEE_KIOSK_ENDPOINT:https://live.ipms247.com/index.php/page/service.kioskconnectivity}
   auth-code: ${EZEE_AUTH_CODE:}
-  outlet: ${EZEE_OUTLET:Cafe}
-  timezone: ${EZEE_TIMEZONE:Asia/Kolkata}
+  hotel-code: ${EZEE_HOTEL_CODE:}
+  food-charge-id: ${EZEE_FOOD_CHARGE_ID:}

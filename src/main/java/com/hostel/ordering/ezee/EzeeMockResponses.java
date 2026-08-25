@@ -38,12 +38,14 @@ final class EzeeMockResponses {
         row1.put("room", "106");
         row1.put("masterfolio", "10");
         row1.put("roomtype", "8 - Bed Mixed Dorm");
+        row1.put("resno", "1001");
         rows.add(row1);
         Map<String, String> row2 = new LinkedHashMap<>();
         row2.put("guestname", "Second Mock Guest");
         row2.put("room", "107");
         row2.put("masterfolio", "11");
         row2.put("roomtype", "8 - Bed Mixed Dorm");
+        row2.put("resno", "1002");
         rows.add(row2);
         return rows;
     }

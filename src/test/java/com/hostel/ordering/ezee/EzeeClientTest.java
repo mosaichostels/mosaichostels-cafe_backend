@@ -36,7 +36,7 @@ class EzeeClientTest {
         server.start();
         String endpoint = "http://127.0.0.1:" + server.getAddress().getPort() + "/pos2pms";
 
-        EzeeClient client = new EzeeClient(endpoint, "auth-code", false);
+        EzeeClient client = new EzeeClient(endpoint, "http://unused.invalid", "auth-code", "hotel-code", false);
         LinkedHashMap<String, String> fields = new LinkedHashMap<>();
         fields.put("auth", "auth-code");
         fields.put("oprn", "chargepost");
@@ -64,7 +64,7 @@ class EzeeClientTest {
         server.start();
         String endpoint = "http://127.0.0.1:" + server.getAddress().getPort() + "/pos2pms";
 
-        EzeeClient client = new EzeeClient(endpoint, "auth-code", false);
+        EzeeClient client = new EzeeClient(endpoint, "http://unused.invalid", "auth-code", "hotel-code", false);
         LinkedHashMap<String, String> fields = new LinkedHashMap<>();
         fields.put("auth", "auth-code");
         fields.put("oprn", "roomquery");
@@ -81,7 +81,7 @@ class EzeeClientTest {
 
     @Test
     void post_mockMode_returnsCannedRoomlistWithoutNetworkCall() {
-        EzeeClient client = new EzeeClient("http://unused.invalid", "auth-code", true);
+        EzeeClient client = new EzeeClient("http://unused.invalid", "http://unused.invalid", "auth-code", "hotel-code", true);
         LinkedHashMap<String, String> fields = new LinkedHashMap<>();
         fields.put("oprn", "roomlist");
 
@@ -92,7 +92,7 @@ class EzeeClientTest {
 
     @Test
     void postForRoomRows_mockMode_returnsCannedRows() {
-        EzeeClient client = new EzeeClient("http://unused.invalid", "auth-code", true);
+        EzeeClient client = new EzeeClient("http://unused.invalid", "http://unused.invalid", "auth-code", "hotel-code", true);
         LinkedHashMap<String, String> fields = new LinkedHashMap<>();
         fields.put("oprn", "roomlist");
 
@@ -100,5 +100,58 @@ class EzeeClientTest {
 
         assertFalse(rows.isEmpty());
         assertEquals("Mock Guest", rows.get(0).get("guestname"));
+    }
+
+    @Test
+    void postExtraCharge_sendsJsonAndParsesSuccess() throws IOException {
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/kiosk", exchange -> {
+            String responseJson = "{\"Success\":{\"SuccessMsg\":\"Extra charge is added successfully for booking 1547\"},"
+                    + "\"Errors\":[{\"ErrorCode\":\"0\",\"ErrorMessage\":\"Success\"}]}";
+            byte[] bytes = responseJson.getBytes();
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
+        });
+        server.start();
+        String kioskEndpoint = "http://127.0.0.1:" + server.getAddress().getPort() + "/kiosk";
+
+        EzeeClient client = new EzeeClient("http://unused.invalid", kioskEndpoint, "auth-code", "57677", false);
+
+        Map<String, String> result = client.postExtraCharge("1547", "711", "5767700000000000003", "70.00", "1", "Butter Maggi");
+
+        assertEquals("ok", result.get("status"));
+    }
+
+    @Test
+    void postExtraCharge_parsesErrorResponse() throws IOException {
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/kiosk", exchange -> {
+            String responseJson = "{\"Errors\":[{\"ErrorCode\":\"104\",\"ErrorMessage\":\"Charge Id is missing for booking 1547\"}]}";
+            byte[] bytes = responseJson.getBytes();
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
+        });
+        server.start();
+        String kioskEndpoint = "http://127.0.0.1:" + server.getAddress().getPort() + "/kiosk";
+
+        EzeeClient client = new EzeeClient("http://unused.invalid", kioskEndpoint, "auth-code", "57677", false);
+
+        Map<String, String> result = client.postExtraCharge("1547", "711", "", "70.00", "1", "Butter Maggi");
+
+        assertEquals("error", result.get("status"));
+        assertEquals("Charge Id is missing for booking 1547", result.get("msg"));
+    }
+
+    @Test
+    void postExtraCharge_mockMode_returnsOkWithoutNetworkCall() {
+        EzeeClient client = new EzeeClient("http://unused.invalid", "http://unused.invalid", "auth-code", "hotel-code", true);
+
+        Map<String, String> result = client.postExtraCharge("1547", "711", "id", "70.00", "1", "Butter Maggi");
+
+        assertEquals("ok", result.get("status"));
     }
 }

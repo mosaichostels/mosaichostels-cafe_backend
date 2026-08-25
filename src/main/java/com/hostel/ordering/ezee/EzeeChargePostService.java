@@ -7,12 +7,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 // Given an admin-picked eZee room number, resolves the live folio and posts
@@ -24,18 +23,14 @@ import java.util.stream.Collectors;
 public class EzeeChargePostService {
 
     private static final Logger log = LoggerFactory.getLogger(EzeeChargePostService.class);
-    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     private final EzeeClient ezeeClient;
-    private final String outlet;
-    private final java.time.ZoneId zoneId;
+    private final String foodChargeId;
 
     public EzeeChargePostService(EzeeClient ezeeClient,
-            @Value("${ezee.outlet:Cafe}") String outlet,
-            @Value("${ezee.timezone:Asia/Kolkata}") String timezone) {
+            @Value("${ezee.food-charge-id:}") String foodChargeId) {
         this.ezeeClient = ezeeClient;
-        this.outlet = outlet;
-        this.zoneId = java.time.ZoneId.of(timezone);
+        this.foodChargeId = foodChargeId;
     }
 
     public Order post(Order order, String room) {
@@ -66,30 +61,36 @@ public class EzeeChargePostService {
                     .filter(row -> room.equals(row.get("room")))
                     .toList();
 
-            String folio;
             if (occupants.isEmpty()) {
-                folio = roomqueryResponse.get("masterfolio");
-            } else {
-                java.util.Set<String> folios = occupants.stream()
-                        .map(row -> row.get("masterfolio"))
-                        .filter(f -> f != null)
-                        .collect(java.util.stream.Collectors.toSet());
-                if (folios.size() > 1) {
-                    return markFailed(order, "Room " + room + " has multiple occupants on different folios — cannot determine which guest to charge");
-                }
-                folio = folios.isEmpty() ? roomqueryResponse.get("masterfolio") : folios.iterator().next();
+                return markFailed(order, "No occupant found for room " + room);
             }
 
-            LinkedHashMap<String, String> chargepostFields = buildChargePostFields(order, room, folio);
-            Map<String, String> response = ezeeClient.post(chargepostFields);
+            Set<String> folios = occupants.stream()
+                    .map(row -> row.get("masterfolio"))
+                    .filter(f -> f != null)
+                    .collect(Collectors.toSet());
+            Set<String> resnos = occupants.stream()
+                    .map(row -> row.get("resno"))
+                    .filter(r -> r != null)
+                    .collect(Collectors.toSet());
+            if (folios.size() > 1 || resnos.size() > 1) {
+                return markFailed(order, "Room " + room + " has multiple occupants on different folios/reservations — cannot determine which guest to charge");
+            }
+            if (resnos.isEmpty()) {
+                return markFailed(order, "eZee did not return a reservation number for room " + room);
+            }
+            String folio = folios.iterator().next();
+            String resno = resnos.iterator().next();
+
+            String amount = String.format(Locale.US, "%.2f", order.getTotalAmount());
+            Map<String, String> response = ezeeClient.postExtraCharge(resno, folio, foodChargeId, amount, "1", buildRemark(order));
 
             if ("ok".equals(response.get("status"))) {
                 order.setChargePostStatus("QUEUED");
-                order.setChargePostRequestId(response.get("requestid"));
                 order.setChargePostRoom(room);
                 order.setChargePostFolio(folio);
                 order.setChargePostError(null);
-                log.info("Chargepost queued for order {}: requestid={}", order.getId(), response.get("requestid"));
+                log.info("Chargepost posted for order {} via AddExtraCharge: resno={}", order.getId(), resno);
                 return order;
             }
 
@@ -110,57 +111,23 @@ public class EzeeChargePostService {
         return order;
     }
 
-    private LinkedHashMap<String, String> buildChargePostFields(Order order, String room, String folio) {
-        String today = LocalDate.now(zoneId).format(DATE_FORMAT);
-        String remark = order.getItems().stream()
+    private String buildRemark(Order order) {
+        String items = order.getItems().stream()
                 .map(OrderItem::getMenuItemName)
                 .filter(name -> name != null && !name.isBlank())
                 .collect(Collectors.joining(", "));
-        String amount = String.format(Locale.US, "%.2f", order.getTotalAmount());
-
-        LinkedHashMap<String, String> fields = new LinkedHashMap<>();
-        fields.put("auth", ezeeClient.getAuthCode());
-        fields.put("oprn", "chargepost");
-        fields.put("room", room);
-        fields.put("folio", folio);
-        fields.put("table", "chargepost");
-        fields.put("outlet", outlet);
-        fields.put("charge", "Room Charges");
-        fields.put("postingdate", today);
-        fields.put("trandate", today);
-        fields.put("amount", amount);
-        fields.put("tax", "0.00");
-        fields.put("gross_amount", amount);
-        fields.put("voucherno", order.getId());
-        fields.put("remark", remark.isEmpty() ? "Cafe order" : remark);
-        fields.put("posuser", order.getUpdatedBy() == null ? "system" : order.getUpdatedBy());
-        return fields;
+        String posuser = order.getUpdatedBy() == null ? "system" : order.getUpdatedBy();
+        return (items.isEmpty() ? "Cafe order" : items) + " (posted by " + posuser + ")";
     }
 
-    // Reverses a QUEUED chargepost via voidcharge. Never touches
-    // chargePostStatus on failure — the charge is still live in eZee, so the
-    // Order must keep saying QUEUED rather than claiming a void that didn't
-    // happen.
+    // eZee's Kiosk Connectivity API (AddExtraCharge) has no void/remove
+    // counterpart, unlike POS2PMS's voidcharge. Never touches
+    // chargePostStatus — the charge is still live in eZee, so the Order must
+    // keep saying QUEUED rather than claiming a void that can't happen.
     public Order voidPost(Order order) {
-        try {
-            LinkedHashMap<String, String> fields = new LinkedHashMap<>();
-            fields.put("auth", ezeeClient.getAuthCode());
-            fields.put("oprn", "voidcharge");
-            fields.put("requestid", order.getChargePostRequestId());
-            Map<String, String> response = ezeeClient.post(fields);
-
-            if ("ok".equals(response.get("status"))) {
-                order.setChargePostStatus("VOIDED");
-                order.setChargePostError(null);
-                log.info("Chargepost voided for order {}: requestid={}", order.getId(), order.getChargePostRequestId());
-            } else {
-                order.setChargePostError("Void failed: " + response.getOrDefault("msg", "eZee returned an error"));
-                log.warn("Chargepost void failed for order {}: {}", order.getId(), order.getChargePostError());
-            }
-        } catch (Exception e) {
-            order.setChargePostError("Void failed: " + e.getMessage());
-            log.error("Chargepost void threw for order {}", order.getId(), e);
-        }
+        order.setChargePostError("eZee has no API to void this charge — remove the \"Food Charge\" line for folio "
+                + order.getChargePostFolio() + " manually in eZee PMS");
+        log.warn("Chargepost cannot be auto-voided for order {}: no void API for AddExtraCharge", order.getId());
         return order;
     }
 }
