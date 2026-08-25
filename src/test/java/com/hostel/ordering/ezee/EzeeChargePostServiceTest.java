@@ -228,6 +228,41 @@ class EzeeChargePostServiceTest {
     }
 
     @Test
+    void post_retryAfterPartialFailure_skipsAlreadyPostedGroupAndOnlyRetriesFailedOne() {
+        service = new EzeeChargePostService(ezeeClient, "FOOD1", "ESSENTIAL1");
+
+        Order order = sampleOrder();
+        OrderItem essential = new OrderItem();
+        essential.setMenuItemName("Toothbrush");
+        essential.setQuantity(1);
+        essential.setSubtotal(90.0);
+        essential.setType("ESSENTIAL");
+        order.setItems(List.of(order.getItems().get(0), essential));
+        // Simulate a prior attempt where the MENU group already posted
+        // successfully and the ESSENTIAL group failed.
+        order.setChargePostStatus("FAILED");
+        order.setChargePostedGroups(new java.util.ArrayList<>(List.of("MENU")));
+
+        Map<String, String> roomqueryResponse = new LinkedHashMap<>();
+        roomqueryResponse.put("status", "ok");
+        when(ezeeClient.postRoomQuery(any()))
+                .thenReturn(new RoomQueryResult(roomqueryResponse, List.of(occupantRow("8", "1001"))));
+
+        Map<String, String> ok = new LinkedHashMap<>();
+        ok.put("status", "ok");
+        when(ezeeClient.postExtraCharge(eq("1001"), eq("8"), eq("ESSENTIAL1"), eq("90.00"), eq("1"), any()))
+                .thenReturn(ok);
+
+        Order result = service.post(order, "106");
+
+        assertEquals("QUEUED", result.getChargePostStatus());
+        assertTrue(result.getChargePostedGroups().containsAll(List.of("MENU", "ESSENTIAL")));
+        // MENU already succeeded on the prior attempt — must not be posted again.
+        org.mockito.Mockito.verify(ezeeClient, org.mockito.Mockito.never())
+                .postExtraCharge(any(), any(), eq("FOOD1"), any(), any(), any());
+    }
+
+    @Test
     void voidPost_recordsManualRemovalInstructionWithoutCallingEzee() {
         service = new EzeeChargePostService(ezeeClient, "FOOD1", "ESSENTIAL1");
         Order order = sampleOrder();

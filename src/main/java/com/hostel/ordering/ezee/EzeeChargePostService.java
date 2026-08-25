@@ -95,8 +95,17 @@ public class EzeeChargePostService {
             Map<String, List<OrderItem>> itemsByType = order.getItems().stream()
                     .collect(Collectors.groupingBy(item -> "ESSENTIAL".equals(item.getType()) ? "ESSENTIAL" : "MENU"));
 
+            // Retrying after a partial failure must not re-post a group that
+            // already succeeded — AddExtraCharge has no rollback, so doing so
+            // would double-charge the guest for that group.
+            List<String> postedGroups = order.getChargePostedGroups() != null
+                    ? new ArrayList<>(order.getChargePostedGroups())
+                    : new ArrayList<>();
+
             List<String> errors = new ArrayList<>();
             for (Map.Entry<String, List<OrderItem>> group : itemsByType.entrySet()) {
+                if (postedGroups.contains(group.getKey())) continue;
+
                 String chargeId = "ESSENTIAL".equals(group.getKey()) ? essentialChargeId : foodChargeId;
                 double subtotal = group.getValue().stream()
                         .mapToDouble(item -> item.getSubtotal() == null ? 0 : item.getSubtotal())
@@ -108,10 +117,13 @@ public class EzeeChargePostService {
                 }
                 String amount = String.format(Locale.US, "%.2f", subtotal);
                 Map<String, String> response = ezeeClient.postExtraCharge(resno, folio, chargeId, amount, "1", buildRemark(group.getValue(), order.getUpdatedBy()));
-                if (!"ok".equals(response.get("status"))) {
+                if ("ok".equals(response.get("status"))) {
+                    postedGroups.add(group.getKey());
+                } else {
                     errors.add(response.getOrDefault("msg", "eZee returned an error"));
                 }
             }
+            order.setChargePostedGroups(postedGroups);
 
             if (errors.isEmpty()) {
                 order.setChargePostStatus("QUEUED");
@@ -121,7 +133,8 @@ public class EzeeChargePostService {
             }
 
             // ponytail: no cross-call rollback — if the menu group posts and the
-            // essential group then fails, the menu charge is already live in eZee.
+            // essential group then fails, the menu charge is already live in eZee
+            // and chargePostedGroups above stops a retry from posting it again.
             // Upgrade path: void the succeeded group before marking FAILED, once
             // eZee exposes a void API for AddExtraCharge (it currently doesn't).
             return markFailed(order, String.join("; ", errors));
