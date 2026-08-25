@@ -40,9 +40,10 @@ class EzeeChargePostServiceTest {
         return order;
     }
 
-    private Map<String, String> occupantRow(String room, String masterfolio, String resno) {
+    // roomquery scoped to a single room returns rows with no "room" tag —
+    // occupancy is per-bed via masterfolio/resno, not a repeated room field.
+    private Map<String, String> occupantRow(String masterfolio, String resno) {
         Map<String, String> row = new LinkedHashMap<>();
-        row.put("room", room);
         row.put("masterfolio", masterfolio);
         row.put("resno", resno);
         return row;
@@ -55,7 +56,7 @@ class EzeeChargePostServiceTest {
         Map<String, String> roomqueryResponse = new LinkedHashMap<>();
         roomqueryResponse.put("status", "ok");
         when(ezeeClient.postRoomQuery(any()))
-                .thenReturn(new RoomQueryResult(roomqueryResponse, List.of(occupantRow("106", "8", "1001"))));
+                .thenReturn(new RoomQueryResult(roomqueryResponse, List.of(occupantRow("8", "1001"))));
 
         Map<String, String> extraChargeResponse = new LinkedHashMap<>();
         extraChargeResponse.put("status", "ok");
@@ -96,7 +97,7 @@ class EzeeChargePostServiceTest {
         Map<String, String> roomqueryResponse = new LinkedHashMap<>();
         roomqueryResponse.put("status", "ok");
         when(ezeeClient.postRoomQuery(any()))
-                .thenReturn(new RoomQueryResult(roomqueryResponse, List.of(occupantRow("107", "8", "1001"))));
+                .thenReturn(new RoomQueryResult(roomqueryResponse, List.of()));
 
         Order result = service.post(sampleOrder(), "106");
 
@@ -111,7 +112,7 @@ class EzeeChargePostServiceTest {
         Map<String, String> roomqueryResponse = new LinkedHashMap<>();
         roomqueryResponse.put("status", "ok");
         when(ezeeClient.postRoomQuery(any()))
-                .thenReturn(new RoomQueryResult(roomqueryResponse, List.of(occupantRow("106", "8", "1001"))));
+                .thenReturn(new RoomQueryResult(roomqueryResponse, List.of(occupantRow("8", "1001"))));
 
         Map<String, String> extraChargeResponse = new LinkedHashMap<>();
         extraChargeResponse.put("status", "error");
@@ -164,8 +165,8 @@ class EzeeChargePostServiceTest {
         roomqueryResponse.put("status", "ok");
         when(ezeeClient.postRoomQuery(any()))
                 .thenReturn(new RoomQueryResult(roomqueryResponse, List.of(
-                        occupantRow("106", "10", "1001"),
-                        occupantRow("106", "11", "1002"))));
+                        occupantRow("10", "1001"),
+                        occupantRow("11", "1002"))));
 
         Order result = service.post(sampleOrder(), "106");
 

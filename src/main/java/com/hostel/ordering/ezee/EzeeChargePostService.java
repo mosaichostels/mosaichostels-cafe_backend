@@ -57,9 +57,9 @@ public class EzeeChargePostService {
                 return markFailed(order, roomqueryResponse.getOrDefault("msg", "roomquery failed"));
             }
 
-            List<Map<String, String>> occupants = roomqueryResult.rows().stream()
-                    .filter(row -> room.equals(row.get("room")))
-                    .toList();
+            // roomquery is already scoped to `room` via the request field above —
+            // its roomrows carry no per-row "room" tag to filter on, unlike roomlist.
+            List<Map<String, String>> occupants = roomqueryResult.rows();
 
             if (occupants.isEmpty()) {
                 return markFailed(order, "No occupant found for room " + room);
