@@ -223,6 +223,7 @@ public class OrderService {
             fields.put("auth", ezeeClient.getAuthCode());
             fields.put("oprn", "roomlist");
             List<Map<String, String>> rows = ezeeClient.postForRoomRows(fields);
+            log.info("eZee roomlist returned {} rows for search name={}", rows.size(), name);
 
             if (name == null || name.isBlank()) {
                 return rows;
