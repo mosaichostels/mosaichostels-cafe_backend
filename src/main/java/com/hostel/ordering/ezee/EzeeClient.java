@@ -73,7 +73,10 @@ public class EzeeClient {
         if (mock) {
             return EzeeMockResponses.roomRowsForOprn(fields.get("oprn"));
         }
-        return EzeeXmlUtil.parseRoomRows(send(fields));
+        String body = send(fields);
+        log.info("eZee raw response for oprn={}: {}", fields.get("oprn"),
+                body.length() > 1000 ? body.substring(0, 1000) + "...(truncated)" : body);
+        return EzeeXmlUtil.parseRoomRows(body);
     }
 
     public RoomQueryResult postRoomQuery(LinkedHashMap<String, String> fields) {
