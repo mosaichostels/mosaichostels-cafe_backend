@@ -6,6 +6,7 @@ public class OrderItem {
     private Integer quantity;
     private Double price;
     private Double subtotal;
+    private String type;
 
     public OrderItem() {}
 
@@ -23,4 +24,7 @@ public class OrderItem {
 
     public Double getSubtotal() { return subtotal; }
     public void setSubtotal(Double subtotal) { this.subtotal = subtotal; }
+
+    public String getType() { return type; }
+    public void setType(String type) { this.type = type; }
 }

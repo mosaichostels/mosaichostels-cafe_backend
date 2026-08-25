@@ -45,3 +45,4 @@ ezee:
   auth-code: ${EZEE_AUTH_CODE:}
   hotel-code: ${EZEE_HOTEL_CODE:}
   food-charge-id: ${EZEE_FOOD_CHARGE_ID:}
+  essential-charge-id: ${EZEE_ESSENTIAL_CHARGE_ID:}

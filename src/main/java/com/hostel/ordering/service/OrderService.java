@@ -85,9 +85,9 @@ public class OrderService {
                 throw new IllegalArgumentException("Invalid quantity for item: " + item.getMenuItemName());
             }
             Double price = menuItemRepository.findById(item.getMenuItemId())
-                    .map(m -> m.getPrice())
+                    .map(m -> { item.setType("MENU"); return m.getPrice(); })
                     .orElseGet(() -> otherEssentialRepository.findById(item.getMenuItemId())
-                            .map(e -> e.getPrice())
+                            .map(e -> { item.setType("ESSENTIAL"); return e.getPrice(); })
                             .orElse(null));
             if (price == null) {
                 throw new IllegalArgumentException("Unknown item: " + item.getMenuItemId());

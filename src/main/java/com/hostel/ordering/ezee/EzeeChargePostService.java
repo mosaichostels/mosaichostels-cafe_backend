@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -26,11 +27,14 @@ public class EzeeChargePostService {
 
     private final EzeeClient ezeeClient;
     private final String foodChargeId;
+    private final String essentialChargeId;
 
     public EzeeChargePostService(EzeeClient ezeeClient,
-            @Value("${ezee.food-charge-id:}") String foodChargeId) {
+            @Value("${ezee.food-charge-id:}") String foodChargeId,
+            @Value("${ezee.essential-charge-id:}") String essentialChargeId) {
         this.ezeeClient = ezeeClient;
         this.foodChargeId = foodChargeId;
+        this.essentialChargeId = essentialChargeId;
     }
 
     public Order post(Order order, String room) {
@@ -82,21 +86,45 @@ public class EzeeChargePostService {
             String folio = folios.iterator().next();
             String resno = resnos.iterator().next();
 
-            String amount = String.format(Locale.US, "%.2f", order.getTotalAmount());
-            Map<String, String> response = ezeeClient.postExtraCharge(resno, folio, foodChargeId, amount, "1", buildRemark(order));
+            order.setChargePostRoom(room);
+            order.setChargePostFolio(folio);
 
-            if ("ok".equals(response.get("status"))) {
+            // Guest cart mixes menu items and essentials in one order — each type
+            // posts to its own pre-configured eZee extra-charge item, so a mixed
+            // order needs one AddExtraCharge call per non-zero group.
+            Map<String, List<OrderItem>> itemsByType = order.getItems().stream()
+                    .collect(Collectors.groupingBy(item -> "ESSENTIAL".equals(item.getType()) ? "ESSENTIAL" : "MENU"));
+
+            List<String> errors = new ArrayList<>();
+            for (Map.Entry<String, List<OrderItem>> group : itemsByType.entrySet()) {
+                String chargeId = "ESSENTIAL".equals(group.getKey()) ? essentialChargeId : foodChargeId;
+                double subtotal = group.getValue().stream()
+                        .mapToDouble(item -> item.getSubtotal() == null ? 0 : item.getSubtotal())
+                        .sum();
+                if (subtotal <= 0) continue;
+                if (chargeId == null || chargeId.isBlank()) {
+                    errors.add((("ESSENTIAL".equals(group.getKey())) ? "Essential" : "Food") + " charge id not configured");
+                    continue;
+                }
+                String amount = String.format(Locale.US, "%.2f", subtotal);
+                Map<String, String> response = ezeeClient.postExtraCharge(resno, folio, chargeId, amount, "1", buildRemark(group.getValue(), order.getUpdatedBy()));
+                if (!"ok".equals(response.get("status"))) {
+                    errors.add(response.getOrDefault("msg", "eZee returned an error"));
+                }
+            }
+
+            if (errors.isEmpty()) {
                 order.setChargePostStatus("QUEUED");
-                order.setChargePostRoom(room);
-                order.setChargePostFolio(folio);
                 order.setChargePostError(null);
                 log.info("Chargepost posted for order {} via AddExtraCharge: resno={}", order.getId(), resno);
                 return order;
             }
 
-            order.setChargePostRoom(room);
-            order.setChargePostFolio(folio);
-            return markFailed(order, response.getOrDefault("msg", "eZee returned an error"));
+            // ponytail: no cross-call rollback — if the menu group posts and the
+            // essential group then fails, the menu charge is already live in eZee.
+            // Upgrade path: void the succeeded group before marking FAILED, once
+            // eZee exposes a void API for AddExtraCharge (it currently doesn't).
+            return markFailed(order, String.join("; ", errors));
         } catch (Exception e) {
             log.error("Chargepost threw for order {}", order.getId(), e);
             return markFailed(order, "Unexpected error: " + e.getMessage());
@@ -111,13 +139,13 @@ public class EzeeChargePostService {
         return order;
     }
 
-    private String buildRemark(Order order) {
-        String items = order.getItems().stream()
+    private String buildRemark(List<OrderItem> items, String updatedBy) {
+        String names = items.stream()
                 .map(OrderItem::getMenuItemName)
                 .filter(name -> name != null && !name.isBlank())
                 .collect(Collectors.joining(", "));
-        String posuser = order.getUpdatedBy() == null ? "system" : order.getUpdatedBy();
-        return (items.isEmpty() ? "Cafe order" : items) + " (posted by " + posuser + ")";
+        String posuser = updatedBy == null ? "system" : updatedBy;
+        return (names.isEmpty() ? "Cafe order" : names) + " (posted by " + posuser + ")";
     }
 
     // eZee's Kiosk Connectivity API (AddExtraCharge) has no void/remove

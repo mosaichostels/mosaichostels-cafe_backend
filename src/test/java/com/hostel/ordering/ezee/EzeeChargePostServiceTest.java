@@ -51,7 +51,7 @@ class EzeeChargePostServiceTest {
 
     @Test
     void post_roomHasSingleOccupant_extraChargeSucceeds_marksQueued() {
-        service = new EzeeChargePostService(ezeeClient, "FOOD1");
+        service = new EzeeChargePostService(ezeeClient, "FOOD1", "ESSENTIAL1");
 
         Map<String, String> roomqueryResponse = new LinkedHashMap<>();
         roomqueryResponse.put("status", "ok");
@@ -61,7 +61,7 @@ class EzeeChargePostServiceTest {
         Map<String, String> extraChargeResponse = new LinkedHashMap<>();
         extraChargeResponse.put("status", "ok");
         extraChargeResponse.put("msg", "Extra charge is added successfully");
-        when(ezeeClient.postExtraCharge(eq("1001"), eq("8"), eq("FOOD1"), eq("250.00"), eq("1"), any()))
+        when(ezeeClient.postExtraCharge(eq("1001"), eq("8"), eq("FOOD1"), eq("160.00"), eq("1"), any()))
                 .thenReturn(extraChargeResponse);
 
         Order result = service.post(sampleOrder(), "106");
@@ -74,8 +74,61 @@ class EzeeChargePostServiceTest {
     }
 
     @Test
+    void post_mixedCart_postsMenuAndEssentialAsSeparateCharges_marksQueued() {
+        service = new EzeeChargePostService(ezeeClient, "FOOD1", "ESSENTIAL1");
+
+        Order order = sampleOrder();
+        OrderItem essential = new OrderItem();
+        essential.setMenuItemName("Toothbrush");
+        essential.setQuantity(1);
+        essential.setSubtotal(90.0);
+        essential.setType("ESSENTIAL");
+        order.setItems(List.of(order.getItems().get(0), essential));
+
+        Map<String, String> roomqueryResponse = new LinkedHashMap<>();
+        roomqueryResponse.put("status", "ok");
+        when(ezeeClient.postRoomQuery(any()))
+                .thenReturn(new RoomQueryResult(roomqueryResponse, List.of(occupantRow("8", "1001"))));
+
+        Map<String, String> ok = new LinkedHashMap<>();
+        ok.put("status", "ok");
+        when(ezeeClient.postExtraCharge(eq("1001"), eq("8"), eq("FOOD1"), eq("160.00"), eq("1"), any()))
+                .thenReturn(ok);
+        when(ezeeClient.postExtraCharge(eq("1001"), eq("8"), eq("ESSENTIAL1"), eq("90.00"), eq("1"), any()))
+                .thenReturn(ok);
+
+        Order result = service.post(order, "106");
+
+        assertEquals("QUEUED", result.getChargePostStatus());
+        assertNull(result.getChargePostError());
+    }
+
+    @Test
+    void post_essentialItemWithoutChargeIdConfigured_marksFailed() {
+        service = new EzeeChargePostService(ezeeClient, "FOOD1", "");
+
+        Order order = sampleOrder();
+        OrderItem essential = new OrderItem();
+        essential.setMenuItemName("Toothbrush");
+        essential.setQuantity(1);
+        essential.setSubtotal(90.0);
+        essential.setType("ESSENTIAL");
+        order.setItems(List.of(essential));
+
+        Map<String, String> roomqueryResponse = new LinkedHashMap<>();
+        roomqueryResponse.put("status", "ok");
+        when(ezeeClient.postRoomQuery(any()))
+                .thenReturn(new RoomQueryResult(roomqueryResponse, List.of(occupantRow("8", "1001"))));
+
+        Order result = service.post(order, "106");
+
+        assertEquals("FAILED", result.getChargePostStatus());
+        assertTrue(result.getChargePostError().contains("Essential charge id not configured"));
+    }
+
+    @Test
     void post_roomqueryFails_marksFailedWithoutCallingExtraCharge() {
-        service = new EzeeChargePostService(ezeeClient, "FOOD1");
+        service = new EzeeChargePostService(ezeeClient, "FOOD1", "ESSENTIAL1");
 
         Map<String, String> roomqueryResponse = new LinkedHashMap<>();
         roomqueryResponse.put("status", "error");
@@ -92,7 +145,7 @@ class EzeeChargePostServiceTest {
 
     @Test
     void post_noOccupantForRoom_marksFailed() {
-        service = new EzeeChargePostService(ezeeClient, "FOOD1");
+        service = new EzeeChargePostService(ezeeClient, "FOOD1", "ESSENTIAL1");
 
         Map<String, String> roomqueryResponse = new LinkedHashMap<>();
         roomqueryResponse.put("status", "ok");
@@ -107,7 +160,7 @@ class EzeeChargePostServiceTest {
 
     @Test
     void post_ezeeReturnsExtraChargeError_marksFailed() {
-        service = new EzeeChargePostService(ezeeClient, "FOOD1");
+        service = new EzeeChargePostService(ezeeClient, "FOOD1", "ESSENTIAL1");
 
         Map<String, String> roomqueryResponse = new LinkedHashMap<>();
         roomqueryResponse.put("status", "ok");
@@ -117,7 +170,7 @@ class EzeeChargePostServiceTest {
         Map<String, String> extraChargeResponse = new LinkedHashMap<>();
         extraChargeResponse.put("status", "error");
         extraChargeResponse.put("msg", "Charge Id is missing for booking 1001");
-        when(ezeeClient.postExtraCharge(eq("1001"), eq("8"), eq("FOOD1"), eq("250.00"), eq("1"), any()))
+        when(ezeeClient.postExtraCharge(eq("1001"), eq("8"), eq("FOOD1"), eq("160.00"), eq("1"), any()))
                 .thenReturn(extraChargeResponse);
 
         Order result = service.post(sampleOrder(), "106");
@@ -130,7 +183,7 @@ class EzeeChargePostServiceTest {
 
     @Test
     void post_orderHasNullTotalAmount_marksFailedWithoutCallingEzee() {
-        service = new EzeeChargePostService(ezeeClient, "FOOD1");
+        service = new EzeeChargePostService(ezeeClient, "FOOD1", "ESSENTIAL1");
         Order order = sampleOrder();
         order.setTotalAmount(null);
 
@@ -144,7 +197,7 @@ class EzeeChargePostServiceTest {
 
     @Test
     void post_orderAlreadyQueued_returnsUnchangedWithoutCallingEzee() {
-        service = new EzeeChargePostService(ezeeClient, "FOOD1");
+        service = new EzeeChargePostService(ezeeClient, "FOOD1", "ESSENTIAL1");
         Order order = sampleOrder();
         order.setChargePostStatus("QUEUED");
         order.setChargePostRequestId("2805");
@@ -159,7 +212,7 @@ class EzeeChargePostServiceTest {
 
     @Test
     void post_roomHasMultipleOccupantsOnDifferentFolios_marksFailedAsAmbiguous() {
-        service = new EzeeChargePostService(ezeeClient, "FOOD1");
+        service = new EzeeChargePostService(ezeeClient, "FOOD1", "ESSENTIAL1");
 
         Map<String, String> roomqueryResponse = new LinkedHashMap<>();
         roomqueryResponse.put("status", "ok");
@@ -176,7 +229,7 @@ class EzeeChargePostServiceTest {
 
     @Test
     void voidPost_recordsManualRemovalInstructionWithoutCallingEzee() {
-        service = new EzeeChargePostService(ezeeClient, "FOOD1");
+        service = new EzeeChargePostService(ezeeClient, "FOOD1", "ESSENTIAL1");
         Order order = sampleOrder();
         order.setChargePostStatus("QUEUED");
         order.setChargePostFolio("8");
