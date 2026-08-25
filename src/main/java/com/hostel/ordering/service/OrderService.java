@@ -197,10 +197,10 @@ public class OrderService {
             return order;
         }
 
-        Order result = ezeeChargePostService.post(order, room);
         if (updatedBy != null) {
-            result.setUpdatedBy(updatedBy);
+            order.setUpdatedBy(updatedBy);
         }
+        Order result = ezeeChargePostService.post(order, room);
         Order saved = orderRepository.save(result);
 
         if ("QUEUED".equals(saved.getChargePostStatus())) {

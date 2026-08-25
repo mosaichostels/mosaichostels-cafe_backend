@@ -125,7 +125,7 @@ public class EzeeChargePostService {
         fields.put("folio", folio);
         fields.put("table", "chargepost");
         fields.put("outlet", outlet);
-        fields.put("charge", "Restaurant Charge");
+        fields.put("charge", "Room Charges");
         fields.put("postingdate", today);
         fields.put("trandate", today);
         fields.put("amount", amount);
