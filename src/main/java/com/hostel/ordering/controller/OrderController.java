@@ -1,6 +1,5 @@
 package com.hostel.ordering.controller;
 
-import com.hostel.ordering.ezee.EzeeClient;
 import com.hostel.ordering.model.Order;
 import com.hostel.ordering.service.OrderService;
 import org.springframework.http.HttpStatus;
@@ -16,11 +15,9 @@ import org.springframework.web.bind.annotation.*;
 public class OrderController {
 
     private final OrderService orderService;
-    private final EzeeClient ezeeClient;
 
-    public OrderController(OrderService orderService, EzeeClient ezeeClient) {
+    public OrderController(OrderService orderService) {
         this.orderService = orderService;
-        this.ezeeClient = ezeeClient;
     }
 
     @PostMapping
@@ -101,12 +98,5 @@ public class OrderController {
             @PathVariable String id,
             @RequestParam(required = false) String name) {
         return ResponseEntity.ok(orderService.searchEzeeCandidates(name));
-    }
-
-    // ponytail: temp lookup to find an ExtraChargeId in eZee admin — delete once used.
-    @GetMapping("/ezee-extra-charges")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<String> listEzeeExtraCharges() {
-        return ResponseEntity.ok(ezeeClient.listExtraCharges());
     }
 }
