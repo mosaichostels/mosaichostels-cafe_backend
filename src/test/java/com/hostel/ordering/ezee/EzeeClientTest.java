@@ -147,6 +147,28 @@ class EzeeClientTest {
     }
 
     @Test
+    void postExtraCharge_parsesSingularErrorKey() throws IOException {
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/kiosk", exchange -> {
+            String responseJson = "{\"Error\":[{\"ErrorCode\":\"101\",\"ErrorMessage\":\"Hotel Code is missing\"}]}";
+            byte[] bytes = responseJson.getBytes();
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
+        });
+        server.start();
+        String kioskEndpoint = "http://127.0.0.1:" + server.getAddress().getPort() + "/kiosk";
+
+        EzeeClient client = new EzeeClient("http://unused.invalid", kioskEndpoint, "auth-code", "", false);
+
+        Map<String, String> result = client.postExtraCharge("1547", "711", "id", "70.00", "1", "Butter Maggi");
+
+        assertEquals("error", result.get("status"));
+        assertEquals("Hotel Code is missing", result.get("msg"));
+    }
+
+    @Test
     void postExtraCharge_mockMode_returnsOkWithoutNetworkCall() {
         EzeeClient client = new EzeeClient("http://unused.invalid", "http://unused.invalid", "auth-code", "hotel-code", true);
 

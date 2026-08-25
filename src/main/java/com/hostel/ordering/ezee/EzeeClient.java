@@ -102,7 +102,11 @@ public class EzeeClient {
     private Map<String, String> parseExtraChargeResponse(String json) {
         try {
             JsonNode root = objectMapper.readTree(json);
+            // eZee is inconsistent: success payloads use "Errors" (plural, ErrorCode 0),
+            // but rejections use "Error" (singular) — check both or a rejection silently
+            // parses as success.
             JsonNode errors = root.path("Errors");
+            if (!errors.isArray()) errors = root.path("Error");
             String errorCode = errors.isArray() && !errors.isEmpty() ? errors.get(0).path("ErrorCode").asText() : "0";
             String errorMessage = errors.isArray() && !errors.isEmpty() ? errors.get(0).path("ErrorMessage").asText() : "";
             Map<String, String> result = new LinkedHashMap<>();
