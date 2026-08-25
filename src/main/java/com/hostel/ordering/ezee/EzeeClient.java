@@ -160,6 +160,8 @@ public class EzeeClient {
                     EzeeMockResponses.roomRowsForOprn(fields.get("oprn")));
         }
         String body = send(fields);
+        log.info("eZee raw response for oprn={} room={}: {}", fields.get("oprn"), fields.get("room"),
+                body.length() > 1000 ? body.substring(0, 1000) + "...(truncated)" : body);
         return new RoomQueryResult(EzeeXmlUtil.parseFlatResponse(body), EzeeXmlUtil.parseRoomRows(body));
     }
 }
