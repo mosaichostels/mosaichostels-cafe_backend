@@ -8,7 +8,25 @@ on:
   workflow_dispatch:
 
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build and test
+        run: mvn -B verify
+
   sync-to-hub:
+    # Deploy is a force-push to the live Space. Gate it on a green build so a
+    # broken tree can't restart production.
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,5 +38,4 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          # 🚨 REPLACE 'YOUR_HF_USERNAME' with your actual Hugging Face ID
           git push --force https://mosaichostels:$HF_TOKEN@huggingface.co/spaces/mosaichostels/cafe_backend main
