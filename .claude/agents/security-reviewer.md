@@ -14,7 +14,7 @@ JWT auth, MongoDB, deployed publicly on Hugging Face Spaces.
 
 - `POST /orders` — anyone on the internet can create an order
 - `GET /config`, `GET /menu-items/**`, `GET /other-essentials/**`,
-  `GET /app/version`, `/health`, `/auth/**`
+  `/health`, `/auth/**`
 
 Any new `permitAll()` is a finding until justified. Any handler reachable
 from one of the above that mutates data beyond creating an order is a
