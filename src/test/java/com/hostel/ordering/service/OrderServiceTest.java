@@ -206,7 +206,7 @@ class OrderServiceTest {
 
         assertEquals("QUEUED", result.getChargePostStatus());
         assertEquals("CHECKED", result.getStatus());
-        org.mockito.Mockito.verify(orderRepository, org.mockito.Mockito.times(2)).save(existing);
+        org.mockito.Mockito.verify(orderRepository, org.mockito.Mockito.times(1)).save(existing);
     }
 
     @Test

@@ -201,12 +201,16 @@ public class OrderService {
             order.setUpdatedBy(updatedBy);
         }
         Order result = ezeeChargePostService.post(order, room);
+
+        // Combine status changes before save for atomicity
+        if ("QUEUED".equals(result.getChargePostStatus())) {
+            result.setStatus("CHECKED");
+            result.setUpdatedAt(System.currentTimeMillis());
+        }
+
         Order saved = orderRepository.save(result);
 
         if ("QUEUED".equals(saved.getChargePostStatus())) {
-            saved.setStatus("CHECKED");
-            saved.setUpdatedAt(System.currentTimeMillis());
-            saved = orderRepository.save(saved);
             log.info("Order for {} posted to eZee and marked CHECKED", saved.getBookingName());
             auditService.logAction("ORDER_CHECKED", "Order for " + saved.getBookingName() + " posted to eZee room " + room + " and marked CHECKED");
         } else {

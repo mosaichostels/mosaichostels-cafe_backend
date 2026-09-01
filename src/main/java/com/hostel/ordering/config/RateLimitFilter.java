@@ -5,6 +5,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -32,8 +34,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         if (limit > 0) {
-            String clientIp = getClientIp(request);
-            String key = method + ":" + path + ":" + clientIp;
+            String limitKey = getRateLimitKey(request, method, path);
+            String key = method + ":" + path + ":" + limitKey;
 
             RateLimit rl = limits.computeIfAbsent(key, k -> new RateLimit());
             if (!rl.allowRequest(limit, WINDOW_MS)) {
@@ -46,11 +48,29 @@ public class RateLimitFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
+    private String getRateLimitKey(HttpServletRequest request, String method, String path) {
+        // Use username from JWT if authenticated (more reliable than IP behind proxy)
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && !auth.getPrincipal().equals("anonymousUser")) {
+            return "user:" + auth.getName();
+        }
+        // Fall back to IP for unauthenticated routes (e.g., /orders POST by guests)
+        return getClientIp(request);
+    }
+
     private String getClientIp(HttpServletRequest request) {
+        // Hugging Face Spaces proxy: X-Forwarded-For may not be reliable
+        // Prefer Cloudflare header if available, otherwise use remote address
+        String cfIP = request.getHeader("CF-Connecting-IP");
+        if (cfIP != null && !cfIP.isEmpty()) {
+            return cfIP.trim();
+        }
+
         String xff = request.getHeader("X-Forwarded-For");
         if (xff != null && !xff.isEmpty()) {
             return xff.split(",")[0].trim();
         }
+
         return request.getRemoteAddr();
     }
 
