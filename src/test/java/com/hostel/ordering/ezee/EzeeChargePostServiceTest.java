@@ -91,6 +91,7 @@ class EzeeChargePostServiceTest {
         OrderItem essential = new OrderItem();
         essential.setMenuItemId("item-toothbrush");
         essential.setMenuItemName("Toothbrush");
+        essential.setPrice(90.0);
         essential.setQuantity(1);
         essential.setSubtotal(90.0);
         essential.setType("ESSENTIAL");
@@ -252,6 +253,7 @@ class EzeeChargePostServiceTest {
         OrderItem essential = new OrderItem();
         essential.setMenuItemId("item-toothbrush");
         essential.setMenuItemName("Toothbrush");
+        essential.setPrice(90.0);
         essential.setQuantity(1);
         essential.setSubtotal(90.0);
         essential.setType("ESSENTIAL");
