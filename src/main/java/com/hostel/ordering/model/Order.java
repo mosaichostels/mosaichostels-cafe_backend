@@ -79,11 +79,11 @@ public class Order {
     private String chargePostFolio;
     private Long chargePostAt;
 
-    // Item-type groups ("MENU"/"ESSENTIAL") that have already been posted to
-    // eZee. AddExtraCharge has no cross-call rollback, so a retry after a
-    // partial failure (e.g. MENU posted, ESSENTIAL rejected) must skip
-    // groups already in this list instead of posting them a second time.
-    private List<String> chargePostedGroups = new ArrayList<>();
+    // OrderItem menuItemIds that have already been posted to eZee.
+    // AddExtraCharge has no cross-call rollback, so a retry after a
+    // partial failure must skip items already in this list to avoid
+    // double-charging the guest.
+    private List<String> chargePostedItems = new ArrayList<>();
 
     public String getChargePostStatus() { return chargePostStatus; }
     public void setChargePostStatus(String chargePostStatus) { this.chargePostStatus = chargePostStatus; }
@@ -103,6 +103,6 @@ public class Order {
     public Long getChargePostAt() { return chargePostAt; }
     public void setChargePostAt(Long chargePostAt) { this.chargePostAt = chargePostAt; }
 
-    public List<String> getChargePostedGroups() { return chargePostedGroups; }
-    public void setChargePostedGroups(List<String> chargePostedGroups) { this.chargePostedGroups = chargePostedGroups; }
+    public List<String> getChargePostedItems() { return chargePostedItems; }
+    public void setChargePostedItems(List<String> chargePostedItems) { this.chargePostedItems = chargePostedItems; }
 }

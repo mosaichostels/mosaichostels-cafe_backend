@@ -247,7 +247,7 @@ public class OrderService {
         } catch (Exception e) {
             log.error("Chargepost threw exception for order {}, clearing partial state", orderId, e);
             // On exception, clear any partial state and mark as failed for rollback
-            order.setChargePostedGroups(new ArrayList<>());
+            order.setChargePostedItems(new ArrayList<>());
             order.setChargePostStatus("FAILED");
             order.setChargePostError("Chargepost exception: " + e.getMessage());
             result = order;

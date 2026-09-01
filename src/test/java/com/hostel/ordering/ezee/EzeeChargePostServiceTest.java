@@ -53,6 +53,10 @@ class EzeeChargePostServiceTest {
     void post_roomHasSingleOccupant_extraChargeSucceeds_marksQueued() {
         service = new EzeeChargePostService(ezeeClient, "FOOD1", "ESSENTIAL1");
 
+        Order order = sampleOrder();
+        // Set menuItemId for the test item
+        order.getItems().get(0).setMenuItemId("item-aloo-paratha");
+
         Map<String, String> roomqueryResponse = new LinkedHashMap<>();
         roomqueryResponse.put("status", "ok");
         when(ezeeClient.postRoomQuery(any()))
@@ -61,16 +65,19 @@ class EzeeChargePostServiceTest {
         Map<String, String> extraChargeResponse = new LinkedHashMap<>();
         extraChargeResponse.put("status", "ok");
         extraChargeResponse.put("msg", "Extra charge is added successfully");
-        when(ezeeClient.postExtraCharge(eq("1001"), eq("8"), eq("FOOD1"), eq("160.00"), eq("1"), any()))
+        // Now expects qty="2" (the actual quantity) not "1"
+        when(ezeeClient.postExtraCharge(eq("1001"), eq("8"), eq("FOOD1"), eq("160.00"), eq("2"), any()))
                 .thenReturn(extraChargeResponse);
 
-        Order result = service.post(sampleOrder(), "106");
+        Order result = service.post(order, "106");
 
         assertEquals("QUEUED", result.getChargePostStatus());
         assertEquals("106", result.getChargePostRoom());
         assertEquals("8", result.getChargePostFolio());
         assertNull(result.getChargePostError());
         assertNotNull(result.getChargePostAt());
+        // Should have posted the item (tracked by menuItemId)
+        assertTrue(result.getChargePostedItems().contains("item-aloo-paratha"));
     }
 
     @Test
@@ -78,7 +85,10 @@ class EzeeChargePostServiceTest {
         service = new EzeeChargePostService(ezeeClient, "FOOD1", "ESSENTIAL1");
 
         Order order = sampleOrder();
+        order.getItems().get(0).setMenuItemId("item-aloo-paratha");
+
         OrderItem essential = new OrderItem();
+        essential.setMenuItemId("item-toothbrush");
         essential.setMenuItemName("Toothbrush");
         essential.setQuantity(1);
         essential.setSubtotal(90.0);
@@ -92,8 +102,10 @@ class EzeeChargePostServiceTest {
 
         Map<String, String> ok = new LinkedHashMap<>();
         ok.put("status", "ok");
-        when(ezeeClient.postExtraCharge(eq("1001"), eq("8"), eq("FOOD1"), eq("160.00"), eq("1"), any()))
+        // Menu item posts with qty="2" (its actual quantity)
+        when(ezeeClient.postExtraCharge(eq("1001"), eq("8"), eq("FOOD1"), eq("160.00"), eq("2"), any()))
                 .thenReturn(ok);
+        // Essential item posts with qty="1"
         when(ezeeClient.postExtraCharge(eq("1001"), eq("8"), eq("ESSENTIAL1"), eq("90.00"), eq("1"), any()))
                 .thenReturn(ok);
 
@@ -101,6 +113,8 @@ class EzeeChargePostServiceTest {
 
         assertEquals("QUEUED", result.getChargePostStatus());
         assertNull(result.getChargePostError());
+        // Both items should be tracked in postedItems
+        assertTrue(result.getChargePostedItems().containsAll(List.of("item-aloo-paratha", "item-toothbrush")));
     }
 
     @Test
@@ -228,20 +242,23 @@ class EzeeChargePostServiceTest {
     }
 
     @Test
-    void post_retryAfterPartialFailure_skipsAlreadyPostedGroupAndOnlyRetriesFailedOne() {
+    void post_retryAfterPartialFailure_skipsAlreadyPostedItemAndOnlyRetriesFailedOne() {
         service = new EzeeChargePostService(ezeeClient, "FOOD1", "ESSENTIAL1");
 
         Order order = sampleOrder();
+        order.getItems().get(0).setMenuItemId("item-aloo-paratha");
+
         OrderItem essential = new OrderItem();
+        essential.setMenuItemId("item-toothbrush");
         essential.setMenuItemName("Toothbrush");
         essential.setQuantity(1);
         essential.setSubtotal(90.0);
         essential.setType("ESSENTIAL");
         order.setItems(List.of(order.getItems().get(0), essential));
-        // Simulate a prior attempt where the MENU group already posted
-        // successfully and the ESSENTIAL group failed.
+        // Simulate a prior attempt where the menu item already posted
+        // successfully and the essential item failed.
         order.setChargePostStatus("FAILED");
-        order.setChargePostedGroups(new java.util.ArrayList<>(List.of("MENU")));
+        order.setChargePostedItems(new java.util.ArrayList<>(List.of("item-aloo-paratha")));
 
         Map<String, String> roomqueryResponse = new LinkedHashMap<>();
         roomqueryResponse.put("status", "ok");
@@ -256,10 +273,10 @@ class EzeeChargePostServiceTest {
         Order result = service.post(order, "106");
 
         assertEquals("QUEUED", result.getChargePostStatus());
-        assertTrue(result.getChargePostedGroups().containsAll(List.of("MENU", "ESSENTIAL")));
-        // MENU already succeeded on the prior attempt — must not be posted again.
+        assertTrue(result.getChargePostedItems().containsAll(List.of("item-aloo-paratha", "item-toothbrush")));
+        // item-aloo-paratha already succeeded on the prior attempt — must not be posted again.
         org.mockito.Mockito.verify(ezeeClient, org.mockito.Mockito.never())
-                .postExtraCharge(any(), any(), eq("FOOD1"), any(), any(), any());
+                .postExtraCharge(any(), any(), eq("FOOD1"), eq("160.00"), eq("2"), any());
     }
 
     @Test
@@ -275,5 +292,101 @@ class EzeeChargePostServiceTest {
         assertTrue(result.getChargePostError().contains("Food Charge"));
         assertTrue(result.getChargePostError().contains("8"));
         verifyNoInteractions(ezeeClient);
+    }
+
+    // Test to verify eZee AddExtraCharge API accepts and handles qty > 1
+    @Test
+    void post_itemWithQtyGreaterThanOne_postWithActualQuantity() {
+        service = new EzeeChargePostService(ezeeClient, "FOOD1", "ESSENTIAL1");
+
+        Order order = new Order();
+        order.setId("order456");
+        order.setBookingName("Test Guest");
+        order.setDormitory("Dorm A");
+        order.setUpdatedBy("staff1");
+        order.setTotalAmount(450.0);
+
+        // Item with qty=3, subtotal=150.0 (50 per unit)
+        OrderItem item = new OrderItem();
+        item.setMenuItemName("Egg Boiled");
+        item.setQuantity(3);
+        item.setSubtotal(150.0);
+        item.setType("MENU");
+        order.setItems(List.of(item));
+
+        Map<String, String> roomqueryResponse = new LinkedHashMap<>();
+        roomqueryResponse.put("status", "ok");
+        when(ezeeClient.postRoomQuery(any()))
+                .thenReturn(new RoomQueryResult(roomqueryResponse, List.of(occupantRow("8", "1001"))));
+
+        // Verify that postExtraCharge is called with qty="3", not "1"
+        Map<String, String> extraChargeResponse = new LinkedHashMap<>();
+        extraChargeResponse.put("status", "ok");
+        extraChargeResponse.put("msg", "Extra charge added successfully");
+        when(ezeeClient.postExtraCharge(eq("1001"), eq("8"), eq("FOOD1"), eq("150.00"), eq("3"), any()))
+                .thenReturn(extraChargeResponse);
+
+        Order result = service.post(order, "106");
+
+        assertEquals("QUEUED", result.getChargePostStatus());
+        assertEquals("106", result.getChargePostRoom());
+        assertEquals("8", result.getChargePostFolio());
+        assertNull(result.getChargePostError());
+
+        // Verify eZee was called with the actual quantity
+        org.mockito.Mockito.verify(ezeeClient)
+                .postExtraCharge(eq("1001"), eq("8"), eq("FOOD1"), eq("150.00"), eq("3"), any());
+    }
+
+    @Test
+    void post_multipleItemsSameType_eachPostedSeparatelyWithOwnQty() {
+        service = new EzeeChargePostService(ezeeClient, "FOOD1", "ESSENTIAL1");
+
+        Order order = new Order();
+        order.setId("order789");
+        order.setBookingName("Multi Item Guest");
+        order.setDormitory("Dorm B");
+        order.setUpdatedBy("staff2");
+        order.setTotalAmount(400.0);
+
+        // Two menu items with different quantities
+        OrderItem item1 = new OrderItem();
+        item1.setMenuItemName("Aloo Paratha");
+        item1.setQuantity(2);
+        item1.setSubtotal(120.0);
+        item1.setType("MENU");
+
+        OrderItem item2 = new OrderItem();
+        item2.setMenuItemName("Tea");
+        item2.setQuantity(4);
+        item2.setSubtotal(80.0);
+        item2.setType("MENU");
+
+        order.setItems(List.of(item1, item2));
+
+        Map<String, String> roomqueryResponse = new LinkedHashMap<>();
+        roomqueryResponse.put("status", "ok");
+        when(ezeeClient.postRoomQuery(any()))
+                .thenReturn(new RoomQueryResult(roomqueryResponse, List.of(occupantRow("9", "2002"))));
+
+        Map<String, String> ok = new LinkedHashMap<>();
+        ok.put("status", "ok");
+
+        // Verify each item is posted separately with its own qty
+        when(ezeeClient.postExtraCharge(eq("2002"), eq("9"), eq("FOOD1"), eq("120.00"), eq("2"), any()))
+                .thenReturn(ok);
+        when(ezeeClient.postExtraCharge(eq("2002"), eq("9"), eq("FOOD1"), eq("80.00"), eq("4"), any()))
+                .thenReturn(ok);
+
+        Order result = service.post(order, "107");
+
+        assertEquals("QUEUED", result.getChargePostStatus());
+        assertNull(result.getChargePostError());
+
+        // Verify both items were posted with correct quantities
+        org.mockito.Mockito.verify(ezeeClient)
+                .postExtraCharge(eq("2002"), eq("9"), eq("FOOD1"), eq("120.00"), eq("2"), any());
+        org.mockito.Mockito.verify(ezeeClient)
+                .postExtraCharge(eq("2002"), eq("9"), eq("FOOD1"), eq("80.00"), eq("4"), any());
     }
 }

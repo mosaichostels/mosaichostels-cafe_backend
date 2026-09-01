@@ -127,74 +127,85 @@ public class EzeeChargePostService {
             order.setChargePostFolio(folio);
 
             // Guest cart mixes menu items and essentials in one order — each type
-            // posts to its own pre-configured eZee extra-charge item, so a mixed
-            // order needs one AddExtraCharge call per non-zero group.
+            // posts to its own pre-configured eZee extra-charge item. Post each
+            // OrderItem individually with its actual quantity to eZee.
             Map<String, List<OrderItem>> itemsByType = order.getItems().stream()
                     .collect(Collectors.groupingBy(item -> "ESSENTIAL".equals(item.getType()) ? "ESSENTIAL" : "MENU"));
 
-            // Ensure at least one group has a positive subtotal before attempting to post
+            // Ensure at least one item has a positive subtotal before attempting to post
             boolean hasPositiveSubtotal = itemsByType.values().stream()
                     .anyMatch(group -> group.stream()
-                            .mapToDouble(item -> item.getSubtotal() == null ? 0 : item.getSubtotal())
-                            .sum() > 0);
+                            .anyMatch(item -> item.getSubtotal() != null && item.getSubtotal() > 0));
             if (!hasPositiveSubtotal) {
                 return markFailed(order, "No items with positive subtotal to charge");
             }
 
-            // Retrying after a partial failure must not re-post a group that
+            // Retrying after a partial failure must not re-post an item that
             // already succeeded — AddExtraCharge has no rollback, so doing so
-            // would double-charge the guest for that group.
-            List<String> postedGroups = order.getChargePostedGroups() != null
-                    ? new ArrayList<>(order.getChargePostedGroups())
+            // would double-charge the guest for that item.
+            List<String> postedItems = order.getChargePostedItems() != null
+                    ? new ArrayList<>(order.getChargePostedItems())
                     : new ArrayList<>();
 
             List<String> errors = new ArrayList<>();
-            for (Map.Entry<String, List<OrderItem>> group : itemsByType.entrySet()) {
-                if (postedGroups.contains(group.getKey())) continue;
-
-                String chargeId = "ESSENTIAL".equals(group.getKey()) ? essentialChargeId : foodChargeId;
-                double subtotal = group.getValue().stream()
-                        .mapToDouble(item -> item.getSubtotal() == null ? 0 : item.getSubtotal())
-                        .sum();
-                if (subtotal <= 0) continue;
+            for (Map.Entry<String, List<OrderItem>> typeGroup : itemsByType.entrySet()) {
+                String chargeId = "ESSENTIAL".equals(typeGroup.getKey()) ? essentialChargeId : foodChargeId;
                 if (chargeId == null || chargeId.isBlank()) {
-                    errors.add((("ESSENTIAL".equals(group.getKey())) ? "Essential" : "Food") + " charge id not configured");
+                    errors.add((("ESSENTIAL".equals(typeGroup.getKey())) ? "Essential" : "Food") + " charge id not configured");
                     continue;
                 }
-                String amount = String.format(Locale.US, "%.2f", subtotal);
 
-                // Retry logic: if postExtraCharge fails with folio/occupant/room error,
-                // re-query once and retry. Max 1 retry to avoid loops.
-                String currentFolio = folio;
-                String currentResno = resno;
-                Map<String, String> response = ezeeClient.postExtraCharge(currentResno, currentFolio, chargeId, amount, "1", buildRemark(group.getValue(), order.getUpdatedBy()));
+                // Post each item in this type group individually
+                for (OrderItem item : typeGroup.getValue()) {
+                    String itemId = item.getMenuItemId();
 
-                if (!"ok".equals(response.get("status"))) {
-                    String errorMsg = response.getOrDefault("msg", "eZee returned an error");
-                    if (errorMsg.toLowerCase().contains("occupant") || errorMsg.toLowerCase().contains("folio") || errorMsg.toLowerCase().contains("room")) {
-                        log.warn("postExtraCharge failed with folio error for order {}, retrying with fresh roomquery", order.getId());
-                        RoomFolioResult retryFolioResult = queryRoomFolio(room);
-                        if (retryFolioResult.isSuccess()) {
-                            currentFolio = retryFolioResult.folio;
-                            currentResno = retryFolioResult.resno;
-                            order.setChargePostFolio(currentFolio);
-                            response = ezeeClient.postExtraCharge(currentResno, currentFolio, chargeId, amount, "1", buildRemark(group.getValue(), order.getUpdatedBy()));
-                            if ("ok".equals(response.get("status"))) {
-                                postedGroups.add(group.getKey());
+                    // Skip if already posted
+                    if (postedItems.contains(itemId)) continue;
+
+                    // Validate item
+                    if (item.getSubtotal() == null || item.getSubtotal() <= 0) continue;
+                    if (item.getQuantity() == null || item.getQuantity() < 1) {
+                        errors.add(item.getMenuItemName() + ": invalid quantity");
+                        continue;
+                    }
+
+                    String amount = String.format(Locale.US, "%.2f", item.getSubtotal());
+                    String qty = item.getQuantity().toString(); // ACTUAL QUANTITY
+                    String comment = buildCommentForItem(item, order.getUpdatedBy());
+
+                    // Retry logic: if postExtraCharge fails with folio/occupant/room error,
+                    // re-query once and retry. Max 1 retry to avoid loops.
+                    String currentFolio = folio;
+                    String currentResno = resno;
+                    Map<String, String> response = ezeeClient.postExtraCharge(currentResno, currentFolio, chargeId, amount, qty, comment);
+
+                    if (!"ok".equals(response.get("status"))) {
+                        String errorMsg = response.getOrDefault("msg", "eZee returned an error");
+                        if (errorMsg.toLowerCase().contains("occupant") || errorMsg.toLowerCase().contains("folio") || errorMsg.toLowerCase().contains("room")) {
+                            log.warn("postExtraCharge failed with folio error for order {} item {}, retrying with fresh roomquery", order.getId(), itemId);
+                            RoomFolioResult retryFolioResult = queryRoomFolio(room);
+                            if (retryFolioResult.isSuccess()) {
+                                currentFolio = retryFolioResult.folio;
+                                currentResno = retryFolioResult.resno;
+                                order.setChargePostFolio(currentFolio);
+                                response = ezeeClient.postExtraCharge(currentResno, currentFolio, chargeId, amount, qty, comment);
+                                if ("ok".equals(response.get("status"))) {
+                                    postedItems.add(itemId);
+                                } else {
+                                    errors.add(item.getMenuItemName() + ": " + response.getOrDefault("msg", "eZee returned an error after retry"));
+                                }
                             } else {
-                                errors.add(response.getOrDefault("msg", "eZee returned an error after retry"));
+                                errors.add(item.getMenuItemName() + ": Failed to retry: " + retryFolioResult.error);
                             }
                         } else {
-                            errors.add("Failed to retry: " + retryFolioResult.error);
+                            errors.add(item.getMenuItemName() + ": " + errorMsg);
                         }
                     } else {
-                        errors.add(errorMsg);
+                        postedItems.add(itemId);
                     }
-                } else {
-                    postedGroups.add(group.getKey());
                 }
             }
-            order.setChargePostedGroups(postedGroups);
+            order.setChargePostedItems(postedItems);
 
             if (errors.isEmpty()) {
                 order.setChargePostStatus("QUEUED");
@@ -203,11 +214,11 @@ public class EzeeChargePostService {
                 return order;
             }
 
-            // ponytail: no cross-call rollback — if the menu group posts and the
-            // essential group then fails, the menu charge is already live in eZee
-            // and chargePostedGroups above stops a retry from posting it again.
-            // Upgrade path: void the succeeded group before marking FAILED, once
-            // eZee exposes a void API for AddExtraCharge (it currently doesn't).
+            // ponytail: no cross-call rollback — if item1 posts and item2 then fails,
+            // item1's charge is already live in eZee and chargePostedItems above stops
+            // a retry from posting it again. Upgrade path: void the succeeded items
+            // before marking FAILED, once eZee exposes a void API for AddExtraCharge
+            // (it currently doesn't).
             return markFailed(order, String.join("; ", errors));
         } catch (Exception e) {
             log.error("Chargepost threw for order {}", order.getId(), e);
@@ -223,13 +234,12 @@ public class EzeeChargePostService {
         return order;
     }
 
-    private String buildRemark(List<OrderItem> items, String updatedBy) {
-        String names = items.stream()
-                .map(OrderItem::getMenuItemName)
-                .filter(name -> name != null && !name.isBlank())
-                .collect(Collectors.joining(", "));
+    private String buildCommentForItem(OrderItem item, String updatedBy) {
+        String name = item.getMenuItemName() != null && !item.getMenuItemName().isBlank()
+                ? item.getMenuItemName()
+                : "Item";
         String posuser = updatedBy == null ? "system" : updatedBy;
-        return (names.isEmpty() ? "Cafe order" : names) + " (posted by " + posuser + ")";
+        return name + " x" + item.getQuantity() + " (posted by " + posuser + ")";
     }
 
     // eZee's Kiosk Connectivity API (AddExtraCharge) has no void/remove
