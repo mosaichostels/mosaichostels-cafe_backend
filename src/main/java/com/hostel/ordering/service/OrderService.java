@@ -38,6 +38,7 @@ public class OrderService {
     private final EzeeChargePostService ezeeChargePostService;
     private final EzeeClient ezeeClient;
     private final com.hostel.ordering.repository.UserRepository userRepository;
+    private final IdempotencyService idempotencyService;
 
     public OrderService(OrderRepository orderRepository,
                         FCMNotificationService fcmNotificationService,
@@ -47,7 +48,8 @@ public class OrderService {
                         OtherEssentialRepository otherEssentialRepository,
                         EzeeChargePostService ezeeChargePostService,
                         EzeeClient ezeeClient,
-                        com.hostel.ordering.repository.UserRepository userRepository) {
+                        com.hostel.ordering.repository.UserRepository userRepository,
+                        IdempotencyService idempotencyService) {
         this.orderRepository = orderRepository;
         this.fcmNotificationService = fcmNotificationService;
         this.auditService = auditService;
@@ -57,6 +59,7 @@ public class OrderService {
         this.ezeeChargePostService = ezeeChargePostService;
         this.ezeeClient = ezeeClient;
         this.userRepository = userRepository;
+        this.idempotencyService = idempotencyService;
     }
 
     public Order createOrder(Order order) {
@@ -291,5 +294,13 @@ public class OrderService {
             log.warn("eZee search failed for name={}: {}", name, e.getMessage());
             return List.of();
         }
+    }
+
+    public Object getIdempotencyResult(String idempotencyKey) {
+        return idempotencyService.getIfPresent(idempotencyKey);
+    }
+
+    public void cacheIdempotencyResult(String idempotencyKey, Object result) {
+        idempotencyService.put(idempotencyKey, result);
     }
 }

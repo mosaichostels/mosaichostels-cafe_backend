@@ -121,13 +121,27 @@ public class OrderController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Order> postCharge(@PathVariable String id,
             @RequestBody Map<String, String> payload,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             Authentication authentication) {
         String room = payload.get("room");
         if (room == null || room.isBlank()) {
             throw new IllegalArgumentException("Room parameter cannot be null or empty");
         }
+
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            Order cached = (Order) orderService.getIdempotencyResult(idempotencyKey);
+            if (cached != null) {
+                return ResponseEntity.ok(cached);
+            }
+        }
+
         String updatedBy = authentication != null && authentication.isAuthenticated() ? authentication.getName() : "UNKNOWN";
         Order result = orderService.postChargeForOrder(id, room, updatedBy);
+
+        if (result != null && idempotencyKey != null && !idempotencyKey.isBlank()) {
+            orderService.cacheIdempotencyResult(idempotencyKey, result);
+        }
+
         return result != null ? ResponseEntity.ok(result) : ResponseEntity.notFound().build();
     }
 
