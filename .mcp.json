@@ -7,6 +7,9 @@
     "mongodb": {
       "command": "npx",
       "args": ["-y", "mongodb-mcp-server", "--connectionString", "${MONGODB_URI}"]
+    },
+    "uptimerobot": {
+      "url": "https://mcp.uptimerobot.com/mcp"
     }
   }
 }
