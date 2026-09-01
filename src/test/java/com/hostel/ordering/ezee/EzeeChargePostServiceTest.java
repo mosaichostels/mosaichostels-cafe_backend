@@ -184,7 +184,7 @@ class EzeeChargePostServiceTest {
         Map<String, String> extraChargeResponse = new LinkedHashMap<>();
         extraChargeResponse.put("status", "error");
         extraChargeResponse.put("msg", "Charge Id is missing for booking 1001");
-        when(ezeeClient.postExtraCharge(eq("1001"), eq("8"), eq("FOOD1"), eq("160.00"), eq("2"), any()))
+        when(ezeeClient.postExtraCharge(eq("1001"), eq("8"), eq("FOOD1"), eq("80.00"), eq("2"), any()))
                 .thenReturn(extraChargeResponse);
 
         Order result = service.post(sampleOrder(), "106");
@@ -374,10 +374,10 @@ class EzeeChargePostServiceTest {
         Map<String, String> ok = new LinkedHashMap<>();
         ok.put("status", "ok");
 
-        // Verify each item is posted separately with its own qty
-        when(ezeeClient.postExtraCharge(eq("2002"), eq("9"), eq("FOOD1"), eq("120.00"), eq("2"), any()))
+        // Verify each item is posted separately with unit price × qty
+        when(ezeeClient.postExtraCharge(eq("2002"), eq("9"), eq("FOOD1"), eq("60.00"), eq("2"), any()))
                 .thenReturn(ok);
-        when(ezeeClient.postExtraCharge(eq("2002"), eq("9"), eq("FOOD1"), eq("80.00"), eq("4"), any()))
+        when(ezeeClient.postExtraCharge(eq("2002"), eq("9"), eq("FOOD1"), eq("20.00"), eq("4"), any()))
                 .thenReturn(ok);
 
         Order result = service.post(order, "107");
@@ -385,10 +385,10 @@ class EzeeChargePostServiceTest {
         assertEquals("QUEUED", result.getChargePostStatus());
         assertNull(result.getChargePostError());
 
-        // Verify both items were posted with correct quantities
+        // Verify both items were posted with correct unit prices and quantities
         org.mockito.Mockito.verify(ezeeClient)
-                .postExtraCharge(eq("2002"), eq("9"), eq("FOOD1"), eq("120.00"), eq("2"), any());
+                .postExtraCharge(eq("2002"), eq("9"), eq("FOOD1"), eq("60.00"), eq("2"), any());
         org.mockito.Mockito.verify(ezeeClient)
-                .postExtraCharge(eq("2002"), eq("9"), eq("FOOD1"), eq("80.00"), eq("4"), any());
+                .postExtraCharge(eq("2002"), eq("9"), eq("FOOD1"), eq("20.00"), eq("4"), any());
     }
 }

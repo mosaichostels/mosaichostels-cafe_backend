@@ -169,8 +169,8 @@ public class EzeeChargePostService {
                         continue;
                     }
 
-                    String amount = String.format(Locale.US, "%.2f", item.getSubtotal());
-                    String qty = item.getQuantity().toString(); // ACTUAL QUANTITY
+                    String amount = String.format(Locale.US, "%.2f", item.getPrice());
+                    String qty = item.getQuantity().toString();
                     String comment = buildCommentForItem(item, order.getUpdatedBy());
 
                     // Retry logic: if postExtraCharge fails with folio/occupant/room error,
