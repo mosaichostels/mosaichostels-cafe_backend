@@ -38,4 +38,4 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git push --force https://mosaichostels:$HF_TOKEN@huggingface.co/spaces/mosaichostels/cafe_backend main
+          git push --force https://mosaichostels:$HF_TOKEN@huggingface.co/spaces/mosaichostels/cafe_backend HEAD:main
