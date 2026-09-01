@@ -66,7 +66,7 @@ class EzeeChargePostServiceTest {
         extraChargeResponse.put("status", "ok");
         extraChargeResponse.put("msg", "Extra charge is added successfully");
         // Now expects qty="2" (the actual quantity) not "1"
-        when(ezeeClient.postExtraCharge(eq("1001"), eq("8"), eq("FOOD1"), eq("160.00"), eq("2"), any()))
+        when(ezeeClient.postExtraCharge(eq("1001"), eq("8"), eq("FOOD1"), eq("80.00"), eq("2"), any()))
                 .thenReturn(extraChargeResponse);
 
         Order result = service.post(order, "106");
@@ -103,7 +103,7 @@ class EzeeChargePostServiceTest {
         Map<String, String> ok = new LinkedHashMap<>();
         ok.put("status", "ok");
         // Menu item posts with qty="2" (its actual quantity)
-        when(ezeeClient.postExtraCharge(eq("1001"), eq("8"), eq("FOOD1"), eq("160.00"), eq("2"), any()))
+        when(ezeeClient.postExtraCharge(eq("1001"), eq("8"), eq("FOOD1"), eq("80.00"), eq("2"), any()))
                 .thenReturn(ok);
         // Essential item posts with qty="1"
         when(ezeeClient.postExtraCharge(eq("1001"), eq("8"), eq("ESSENTIAL1"), eq("90.00"), eq("1"), any()))
