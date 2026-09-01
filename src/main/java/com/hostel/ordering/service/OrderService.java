@@ -303,13 +303,13 @@ public class OrderService {
     public void cacheIdempotencyResult(String idempotencyKey, Object result) {
         idempotencyService.put(idempotencyKey, result);
     }
-}
 
     public void logChargePost(Order order, String action) {
-        String details = "Order: " + order.getId() + ", Status: " + order.getChargePostStatus() 
+        String details = "Order: " + order.getId() + ", Status: " + order.getChargePostStatus()
                        + ", Room: " + order.getChargePostRoom() + ", Folio: " + order.getChargePostFolio();
         if (order.getChargePostError() != null) {
             details += ", Error: " + order.getChargePostError();
         }
         log.info("CHARGEPOST_" + action.toUpperCase() + " - " + details);
     }
+}
