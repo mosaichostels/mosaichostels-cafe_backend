@@ -34,6 +34,7 @@ class EzeeChargePostServiceTest {
         order.setTotalAmount(250.0);
         OrderItem item = new OrderItem();
         item.setMenuItemName("Aloo Paratha");
+        item.setPrice(80.0);
         item.setQuantity(2);
         item.setSubtotal(160.0);
         order.setItems(List.of(item));
@@ -308,7 +309,9 @@ class EzeeChargePostServiceTest {
 
         // Item with qty=3, subtotal=150.0 (50 per unit)
         OrderItem item = new OrderItem();
+        item.setMenuItemId("item-egg-boiled");
         item.setMenuItemName("Egg Boiled");
+        item.setPrice(50.0);
         item.setQuantity(3);
         item.setSubtotal(150.0);
         item.setType("MENU");
@@ -353,6 +356,7 @@ class EzeeChargePostServiceTest {
         OrderItem item1 = new OrderItem();
         item1.setMenuItemId("item-aloo-paratha");
         item1.setMenuItemName("Aloo Paratha");
+        item1.setPrice(60.0);
         item1.setQuantity(2);
         item1.setSubtotal(120.0);
         item1.setType("MENU");
@@ -360,6 +364,7 @@ class EzeeChargePostServiceTest {
         OrderItem item2 = new OrderItem();
         item2.setMenuItemId("item-tea");
         item2.setMenuItemName("Tea");
+        item2.setPrice(20.0);
         item2.setQuantity(4);
         item2.setSubtotal(80.0);
         item2.setType("MENU");
