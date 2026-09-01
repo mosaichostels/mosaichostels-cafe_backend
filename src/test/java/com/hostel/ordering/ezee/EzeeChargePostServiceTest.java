@@ -190,7 +190,7 @@ class EzeeChargePostServiceTest {
         Order result = service.post(sampleOrder(), "106");
 
         assertEquals("FAILED", result.getChargePostStatus());
-        assertEquals("Charge Id is missing for booking 1001", result.getChargePostError());
+        assertEquals("Aloo Paratha: Charge Id is missing for booking 1001", result.getChargePostError());
         assertEquals("106", result.getChargePostRoom());
         assertEquals("8", result.getChargePostFolio());
     }
