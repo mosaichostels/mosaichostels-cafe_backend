@@ -184,7 +184,7 @@ class EzeeChargePostServiceTest {
         Map<String, String> extraChargeResponse = new LinkedHashMap<>();
         extraChargeResponse.put("status", "error");
         extraChargeResponse.put("msg", "Charge Id is missing for booking 1001");
-        when(ezeeClient.postExtraCharge(eq("1001"), eq("8"), eq("FOOD1"), eq("160.00"), eq("1"), any()))
+        when(ezeeClient.postExtraCharge(eq("1001"), eq("8"), eq("FOOD1"), eq("160.00"), eq("2"), any()))
                 .thenReturn(extraChargeResponse);
 
         Order result = service.post(sampleOrder(), "106");
@@ -351,12 +351,14 @@ class EzeeChargePostServiceTest {
 
         // Two menu items with different quantities
         OrderItem item1 = new OrderItem();
+        item1.setMenuItemId("item-aloo-paratha");
         item1.setMenuItemName("Aloo Paratha");
         item1.setQuantity(2);
         item1.setSubtotal(120.0);
         item1.setType("MENU");
 
         OrderItem item2 = new OrderItem();
+        item2.setMenuItemId("item-tea");
         item2.setMenuItemName("Tea");
         item2.setQuantity(4);
         item2.setSubtotal(80.0);
