@@ -276,7 +276,7 @@ class EzeeChargePostServiceTest {
         assertTrue(result.getChargePostedItems().containsAll(List.of("item-aloo-paratha", "item-toothbrush")));
         // item-aloo-paratha already succeeded on the prior attempt — must not be posted again.
         org.mockito.Mockito.verify(ezeeClient, org.mockito.Mockito.never())
-                .postExtraCharge(any(), any(), eq("FOOD1"), eq("160.00"), eq("2"), any());
+                .postExtraCharge(any(), any(), eq("FOOD1"), eq("80.00"), eq("2"), any());
     }
 
     @Test
@@ -323,7 +323,7 @@ class EzeeChargePostServiceTest {
         Map<String, String> extraChargeResponse = new LinkedHashMap<>();
         extraChargeResponse.put("status", "ok");
         extraChargeResponse.put("msg", "Extra charge added successfully");
-        when(ezeeClient.postExtraCharge(eq("1001"), eq("8"), eq("FOOD1"), eq("150.00"), eq("3"), any()))
+        when(ezeeClient.postExtraCharge(eq("1001"), eq("8"), eq("FOOD1"), eq("50.00"), eq("3"), any()))
                 .thenReturn(extraChargeResponse);
 
         Order result = service.post(order, "106");
@@ -335,7 +335,7 @@ class EzeeChargePostServiceTest {
 
         // Verify eZee was called with the actual quantity
         org.mockito.Mockito.verify(ezeeClient)
-                .postExtraCharge(eq("1001"), eq("8"), eq("FOOD1"), eq("150.00"), eq("3"), any());
+                .postExtraCharge(eq("1001"), eq("8"), eq("FOOD1"), eq("50.00"), eq("3"), any());
     }
 
     @Test
