@@ -48,20 +48,47 @@ public class OrderController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Order> updateOrderStatus(@PathVariable String id,
             @RequestBody Map<String, String> payload,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             Authentication authentication) {
         String status = payload.get("status");
         if (status == null || status.isBlank()) {
             throw new IllegalArgumentException("Status parameter cannot be null or empty");
         }
+
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            Order cached = (Order) orderService.getIdempotencyResult(idempotencyKey);
+            if (cached != null) {
+                return ResponseEntity.ok(cached);
+            }
+        }
+
         String updatedBy = authentication != null && authentication.isAuthenticated() ? authentication.getName() : "UNKNOWN";
         Order updated = orderService.updateOrderStatus(id, status, updatedBy);
+
+        if (updated != null && idempotencyKey != null && !idempotencyKey.isBlank()) {
+            orderService.cacheIdempotencyResult(idempotencyKey, updated);
+        }
+
         return updated != null ? ResponseEntity.ok(updated) : ResponseEntity.notFound().build();
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<String> deleteOrder(@PathVariable String id) {
+    public ResponseEntity<String> deleteOrder(@PathVariable String id,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            Object cached = orderService.getIdempotencyResult(idempotencyKey);
+            if (cached != null) {
+                return ResponseEntity.ok("Order deleted successfully");
+            }
+        }
+
         orderService.deleteOrder(id);
+
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            orderService.cacheIdempotencyResult(idempotencyKey, "deleted");
+        }
+
         return ResponseEntity.ok("Order deleted successfully");
     }
 
@@ -76,10 +103,20 @@ public class OrderController {
             @RequestParam(required = false) Long date,
             @RequestParam(required = false, defaultValue = "false") boolean all,
             @RequestParam(required = false) String confirmToken,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             Authentication authentication) {
         if (!all && status == null && dormitory == null && search == null && dateFrom == null && dateTo == null && date == null) {
             throw new IllegalArgumentException("Must specify at least one filter or set all=true");
         }
+
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            Object cached = orderService.getIdempotencyResult(idempotencyKey);
+            if (cached != null) {
+                return ResponseEntity.ok(cached.toString());
+            }
+        }
+
+        String result;
         if (all) {
             // Delete-all requires explicit confirmation token for safety
             if (confirmToken == null || confirmToken.isEmpty()) {
@@ -111,10 +148,17 @@ public class OrderController {
             String message = "Admin deleted ALL orders - User: " + auditedBy + ", Timestamp: " + System.currentTimeMillis();
             // auditService.logAction("DELETE_ALL_ORDERS", message);
 
-            return ResponseEntity.ok("All orders deleted successfully (admin: " + auditedBy + ")");
+            result = "All orders deleted successfully (admin: " + auditedBy + ")";
+        } else {
+            orderService.deleteFilteredOrders(status, dormitory, search, dateFrom, dateTo, date);
+            result = "Filtered orders deleted successfully";
         }
-        orderService.deleteFilteredOrders(status, dormitory, search, dateFrom, dateTo, date);
-        return ResponseEntity.ok("Filtered orders deleted successfully");
+
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            orderService.cacheIdempotencyResult(idempotencyKey, result);
+        }
+
+        return ResponseEntity.ok(result);
     }
 
     @PostMapping("/{id}/chargepost")
