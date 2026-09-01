@@ -49,6 +49,9 @@ class OrderServiceTest {
     @Mock
     com.hostel.ordering.ezee.EzeeChargePostService ezeeChargePostService;
 
+    @Mock
+    com.hostel.ordering.repository.UserRepository userRepository;
+
     @InjectMocks
     OrderService orderService;
 
@@ -58,7 +61,7 @@ class OrderServiceTest {
     void setUp() {
         order = new Order();
         order.setItems(new ArrayList<>());
-        orderService = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient);
+        orderService = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient, userRepository);
     }
 
     @Test
@@ -131,7 +134,7 @@ class OrderServiceTest {
 
     @Test
     void searchEzeeCandidates_byName_returnsMatchingRowsCaseInsensitive() {
-        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient);
+        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient, userRepository);
 
         LinkedHashMap<String, String> row1 = new LinkedHashMap<>();
         row1.put("guestname", "Mr. Joy");
@@ -155,7 +158,7 @@ class OrderServiceTest {
 
     @Test
     void searchEzeeCandidates_blankName_returnsWholeRoomlist() {
-        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient);
+        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient, userRepository);
 
         LinkedHashMap<String, String> row1 = new LinkedHashMap<>();
         row1.put("guestname", "Mr. Joy");
@@ -172,7 +175,7 @@ class OrderServiceTest {
 
     @Test
     void searchEzeeCandidates_ezeeThrows_returnsEmptyListInsteadOfPropagating() {
-        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient);
+        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient, userRepository);
 
         when(ezeeClient.postForRoomRows(org.mockito.ArgumentMatchers.argThat(
                 m -> m != null && "roomlist".equals(m.get("oprn")))))
@@ -186,7 +189,7 @@ class OrderServiceTest {
     @Test
     void postChargeForOrder_ezeeAccepts_savesQueuedAndSetsChecked() {
         OrderService svc = new OrderService(orderRepository, null, auditService, orderStatusService,
-                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient);
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository);
 
         Order existing = new Order();
         existing.setId("order1");
@@ -212,7 +215,7 @@ class OrderServiceTest {
     @Test
     void postChargeForOrder_ezeeRejects_savesFailedAndLeavesStatusUnchanged() {
         OrderService svc = new OrderService(orderRepository, null, auditService, orderStatusService,
-                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient);
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository);
 
         Order existing = new Order();
         existing.setId("order1");
@@ -238,7 +241,7 @@ class OrderServiceTest {
     @Test
     void postChargeForOrder_alreadyQueued_returnsUnchangedWithoutCallingEzee() {
         OrderService svc = new OrderService(orderRepository, null, auditService, orderStatusService,
-                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient);
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository);
 
         Order existing = new Order();
         existing.setId("order1");
@@ -259,7 +262,7 @@ class OrderServiceTest {
     @Test
     void postChargeForOrder_unknownOrder_returnsNull() {
         OrderService svc = new OrderService(orderRepository, null, auditService, orderStatusService,
-                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient);
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository);
 
         when(orderRepository.findById("missing")).thenReturn(java.util.Optional.empty());
 
@@ -271,7 +274,7 @@ class OrderServiceTest {
     @Test
     void updateOrderStatus_toCancelled_chargeQueued_voidsIt() {
         OrderService svc = new OrderService(orderRepository, fcmNotificationService, auditService, orderStatusService,
-                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient);
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository);
 
         Order existing = new Order();
         existing.setId("order1");
@@ -300,7 +303,7 @@ class OrderServiceTest {
     @Test
     void updateOrderStatus_toCancelled_voidFails_logsAuditEntry() {
         OrderService svc = new OrderService(orderRepository, fcmNotificationService, auditService, orderStatusService,
-                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient);
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository);
 
         Order existing = new Order();
         existing.setId("order1");
@@ -330,7 +333,7 @@ class OrderServiceTest {
     @Test
     void updateOrderStatus_toCancelled_chargeNotQueued_doesNotCallVoid() {
         OrderService svc = new OrderService(orderRepository, fcmNotificationService, auditService, orderStatusService,
-                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient);
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository);
 
         Order existing = new Order();
         existing.setId("order1");
