@@ -154,4 +154,38 @@ public class FCMNotificationService {
             logger.error("❌ Failed to unsubscribe token from topic", e);
         }
     }
+
+    @Async
+    public void sendNotificationToToken(String token, String title, String body, java.util.Map<String, String> data) {
+        if (token == null || token.isBlank()) {
+            logger.warn("⚠️ FCM token is null or blank, skipping notification");
+            return;
+        }
+        try {
+            Message.Builder messageBuilder = Message.builder()
+                    .setToken(token)
+                    .putData("title", title)
+                    .putData("body", body);
+
+            if (data != null && !data.isEmpty()) {
+                for (java.util.Map.Entry<String, String> entry : data.entrySet()) {
+                    messageBuilder.putData(entry.getKey(), entry.getValue());
+                }
+            }
+
+            AndroidConfig androidConfig = AndroidConfig.builder()
+                    .setPriority(AndroidConfig.Priority.HIGH)
+                    .setTtl(3600 * 1000L)
+                    .build();
+
+            Message message = messageBuilder
+                    .setAndroidConfig(androidConfig)
+                    .build();
+
+            String response = firebaseMessaging.send(message);
+            logger.info("✅ FCM notification sent to token: {}", response);
+        } catch (FirebaseMessagingException e) {
+            logger.error("❌ Failed to send FCM notification to token: {}", e.getMessage());
+        }
+    }
 }

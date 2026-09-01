@@ -84,8 +84,9 @@ public class MenuItemService {
 
     public void deleteMenuItem(String id) {
         menuItemRepository.findById(id).ifPresent(item -> {
-            menuItemRepository.delete(item);
-            log.info("Menu item {} deleted successfully", item.getName());
+            item.setDeleted(true);
+            menuItemRepository.save(item);
+            log.info("Menu item {} marked as deleted", item.getName());
             auditService.logAction("MENU_ITEM_DELETED", "Deleted menu item: " + item.getName());
         });
     }

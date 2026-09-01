@@ -81,6 +81,11 @@ responses, not the API docs):
 - `HotelCode` is required in the `AddExtraCharge` `Authentication` block —
   this property's code is `57677`. Food Charge extra-charge item id:
   `5767700000000000003` (`EZEE_FOOD_CHARGE_ID`).
+- **No void API.** AddExtraCharge has no corresponding void/remove endpoint
+  (unlike POS2PMS's voidcharge). Chargepost voids are manual: staff must
+  remove the charge line from the guest's folio directly in eZee PMS. The
+  Order stays marked `QUEUED` after a void failure so the admin knows the
+  charge is still live (never claim a void that didn't happen).
 
 When touching `EzeeClient`/`EzeeChargePostService`, pull real raw responses
 from HF Space logs first (`hf spaces logs mosaichostels/cafe_backend -n

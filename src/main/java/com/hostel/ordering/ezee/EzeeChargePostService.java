@@ -16,10 +16,15 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 // Given an admin-picked eZee room number, resolves the live folio and posts
-// the order's charge. Mutates and returns the same Order with chargePost*
-// fields set; never throws — every failure path lands in
+// the order's charge via AddExtraCharge. Mutates and returns the same Order
+// with chargePost* fields set; never throws — every failure path lands in
 // chargePostStatus=FAILED so the caller's request never has to handle an
 // exception, only inspect the returned Order.
+//
+// LIMITATION: eZee's Kiosk Connectivity API (AddExtraCharge) has no void or
+// removal endpoint. Chargepost voids are manual: staff must remove the charge
+// line from the guest's folio in eZee PMS. The Order stays marked QUEUED so
+// the admin knows the charge is still live, even though auto-void failed.
 @Service
 public class EzeeChargePostService {
 
@@ -37,6 +42,67 @@ public class EzeeChargePostService {
         this.essentialChargeId = essentialChargeId;
     }
 
+    // Helper class to hold roomquery results
+    private static class RoomFolioResult {
+        final String folio;
+        final String resno;
+        final String error;
+
+        RoomFolioResult(String folio, String resno) {
+            this.folio = folio;
+            this.resno = resno;
+            this.error = null;
+        }
+
+        RoomFolioResult(String error) {
+            this.folio = null;
+            this.resno = null;
+            this.error = error;
+        }
+
+        boolean isSuccess() {
+            return error == null;
+        }
+    }
+
+    private RoomFolioResult queryRoomFolio(String room) {
+        try {
+            LinkedHashMap<String, String> roomqueryFields = new LinkedHashMap<>();
+            roomqueryFields.put("auth", ezeeClient.getAuthCode());
+            roomqueryFields.put("oprn", "roomquery");
+            roomqueryFields.put("room", room);
+            RoomQueryResult roomqueryResult = ezeeClient.postRoomQuery(roomqueryFields);
+            Map<String, String> roomqueryResponse = roomqueryResult.fields();
+
+            if (!"ok".equals(roomqueryResponse.get("status"))) {
+                return new RoomFolioResult(roomqueryResponse.getOrDefault("msg", "roomquery failed"));
+            }
+
+            List<Map<String, String>> occupants = roomqueryResult.rows();
+            if (occupants.isEmpty()) {
+                return new RoomFolioResult("No occupant found for room " + room);
+            }
+
+            Set<String> folios = occupants.stream()
+                    .map(row -> row.get("masterfolio"))
+                    .filter(f -> f != null)
+                    .collect(Collectors.toSet());
+            Set<String> resnos = occupants.stream()
+                    .map(row -> row.get("resno"))
+                    .filter(r -> r != null)
+                    .collect(Collectors.toSet());
+            if (folios.size() > 1 || resnos.size() > 1) {
+                return new RoomFolioResult("Room " + room + " has multiple occupants on different folios/reservations — cannot determine which guest to charge");
+            }
+            if (resnos.isEmpty()) {
+                return new RoomFolioResult("eZee did not return a reservation number for room " + room);
+            }
+            return new RoomFolioResult(folios.iterator().next(), resnos.iterator().next());
+        } catch (Exception e) {
+            return new RoomFolioResult("roomquery exception: " + e.getMessage());
+        }
+    }
+
     public Order post(Order order, String room) {
         if ("QUEUED".equals(order.getChargePostStatus())) {
             log.warn("post() called on order {} that already has a QUEUED chargepost — ignoring", order.getId());
@@ -50,41 +116,12 @@ public class EzeeChargePostService {
         }
 
         try {
-            LinkedHashMap<String, String> roomqueryFields = new LinkedHashMap<>();
-            roomqueryFields.put("auth", ezeeClient.getAuthCode());
-            roomqueryFields.put("oprn", "roomquery");
-            roomqueryFields.put("room", room);
-            RoomQueryResult roomqueryResult = ezeeClient.postRoomQuery(roomqueryFields);
-            Map<String, String> roomqueryResponse = roomqueryResult.fields();
-
-            if (!"ok".equals(roomqueryResponse.get("status"))) {
-                return markFailed(order, roomqueryResponse.getOrDefault("msg", "roomquery failed"));
+            RoomFolioResult folioResult = queryRoomFolio(room);
+            if (!folioResult.isSuccess()) {
+                return markFailed(order, folioResult.error);
             }
-
-            // roomquery is already scoped to `room` via the request field above —
-            // its roomrows carry no per-row "room" tag to filter on, unlike roomlist.
-            List<Map<String, String>> occupants = roomqueryResult.rows();
-
-            if (occupants.isEmpty()) {
-                return markFailed(order, "No occupant found for room " + room);
-            }
-
-            Set<String> folios = occupants.stream()
-                    .map(row -> row.get("masterfolio"))
-                    .filter(f -> f != null)
-                    .collect(Collectors.toSet());
-            Set<String> resnos = occupants.stream()
-                    .map(row -> row.get("resno"))
-                    .filter(r -> r != null)
-                    .collect(Collectors.toSet());
-            if (folios.size() > 1 || resnos.size() > 1) {
-                return markFailed(order, "Room " + room + " has multiple occupants on different folios/reservations — cannot determine which guest to charge");
-            }
-            if (resnos.isEmpty()) {
-                return markFailed(order, "eZee did not return a reservation number for room " + room);
-            }
-            String folio = folios.iterator().next();
-            String resno = resnos.iterator().next();
+            String folio = folioResult.folio;
+            String resno = folioResult.resno;
 
             order.setChargePostRoom(room);
             order.setChargePostFolio(folio);
@@ -94,6 +131,15 @@ public class EzeeChargePostService {
             // order needs one AddExtraCharge call per non-zero group.
             Map<String, List<OrderItem>> itemsByType = order.getItems().stream()
                     .collect(Collectors.groupingBy(item -> "ESSENTIAL".equals(item.getType()) ? "ESSENTIAL" : "MENU"));
+
+            // Ensure at least one group has a positive subtotal before attempting to post
+            boolean hasPositiveSubtotal = itemsByType.values().stream()
+                    .anyMatch(group -> group.stream()
+                            .mapToDouble(item -> item.getSubtotal() == null ? 0 : item.getSubtotal())
+                            .sum() > 0);
+            if (!hasPositiveSubtotal) {
+                return markFailed(order, "No items with positive subtotal to charge");
+            }
 
             // Retrying after a partial failure must not re-post a group that
             // already succeeded — AddExtraCharge has no rollback, so doing so
@@ -116,11 +162,36 @@ public class EzeeChargePostService {
                     continue;
                 }
                 String amount = String.format(Locale.US, "%.2f", subtotal);
-                Map<String, String> response = ezeeClient.postExtraCharge(resno, folio, chargeId, amount, "1", buildRemark(group.getValue(), order.getUpdatedBy()));
-                if ("ok".equals(response.get("status"))) {
-                    postedGroups.add(group.getKey());
+
+                // Retry logic: if postExtraCharge fails with folio/occupant/room error,
+                // re-query once and retry. Max 1 retry to avoid loops.
+                String currentFolio = folio;
+                String currentResno = resno;
+                Map<String, String> response = ezeeClient.postExtraCharge(currentResno, currentFolio, chargeId, amount, "1", buildRemark(group.getValue(), order.getUpdatedBy()));
+
+                if (!"ok".equals(response.get("status"))) {
+                    String errorMsg = response.getOrDefault("msg", "eZee returned an error");
+                    if (errorMsg.toLowerCase().contains("occupant") || errorMsg.toLowerCase().contains("folio") || errorMsg.toLowerCase().contains("room")) {
+                        log.warn("postExtraCharge failed with folio error for order {}, retrying with fresh roomquery", order.getId());
+                        RoomFolioResult retryFolioResult = queryRoomFolio(room);
+                        if (retryFolioResult.isSuccess()) {
+                            currentFolio = retryFolioResult.folio;
+                            currentResno = retryFolioResult.resno;
+                            order.setChargePostFolio(currentFolio);
+                            response = ezeeClient.postExtraCharge(currentResno, currentFolio, chargeId, amount, "1", buildRemark(group.getValue(), order.getUpdatedBy()));
+                            if ("ok".equals(response.get("status"))) {
+                                postedGroups.add(group.getKey());
+                            } else {
+                                errors.add(response.getOrDefault("msg", "eZee returned an error after retry"));
+                            }
+                        } else {
+                            errors.add("Failed to retry: " + retryFolioResult.error);
+                        }
+                    } else {
+                        errors.add(errorMsg);
+                    }
                 } else {
-                    errors.add(response.getOrDefault("msg", "eZee returned an error"));
+                    postedGroups.add(group.getKey());
                 }
             }
             order.setChargePostedGroups(postedGroups);
@@ -166,8 +237,10 @@ public class EzeeChargePostService {
     // chargePostStatus — the charge is still live in eZee, so the Order must
     // keep saying QUEUED rather than claiming a void that can't happen.
     public Order voidPost(Order order) {
-        order.setChargePostError("eZee has no API to void this charge — remove the \"Food Charge\" line for folio "
-                + order.getChargePostFolio() + " manually in eZee PMS");
+        String amount = order.getTotalAmount() != null ? String.format("%.2f", order.getTotalAmount()) : "unknown";
+        order.setChargePostError("eZee has no API to void this charge. Manual removal required: In eZee PMS, " +
+                "find folio " + order.getChargePostFolio() + " and remove the \"Food Charge\" line for amount " + amount + " " +
+                "(charge will remain live in guest account until manually removed)");
         log.warn("Chargepost cannot be auto-voided for order {}: no void API for AddExtraCharge", order.getId());
         return order;
     }

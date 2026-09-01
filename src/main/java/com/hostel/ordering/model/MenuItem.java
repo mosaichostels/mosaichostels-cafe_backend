@@ -13,6 +13,7 @@ public class MenuItem {
     private String category;
     private Boolean available;
     private Long createdAt;
+    private boolean deleted = false;
 
     public MenuItem() {}
 
@@ -36,4 +37,7 @@ public class MenuItem {
 
     public Long getCreatedAt() { return createdAt; }
     public void setCreatedAt(Long createdAt) { this.createdAt = createdAt; }
+
+    public boolean isDeleted() { return deleted; }
+    public void setDeleted(boolean deleted) { this.deleted = deleted; }
 }

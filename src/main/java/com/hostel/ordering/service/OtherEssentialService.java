@@ -81,8 +81,9 @@ public class OtherEssentialService {
 
     public void deleteOtherEssential(String id) {
         otherEssentialRepository.findById(id).ifPresent(item -> {
-            otherEssentialRepository.delete(item);
-            log.info("Essential item {} deleted successfully", item.getName());
+            item.setDeleted(true);
+            otherEssentialRepository.save(item);
+            log.info("Essential item {} marked as deleted", item.getName());
             auditService.logAction("ESSENTIAL_DELETED", "Deleted essential item: " + item.getName());
         });
     }

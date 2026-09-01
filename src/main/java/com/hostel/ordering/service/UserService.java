@@ -74,4 +74,13 @@ public class UserService {
         auditService.logAction("USER_UPDATED", "Updated user: " + saved.getUsername() + " with roles " + saved.getRoles());
         return saved;
     }
+
+    public User updateFcmToken(String id, String fcmToken) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("User not found!"));
+        user.setFcmToken(fcmToken);
+        User saved = userRepository.save(user);
+        log.info("FCM token updated for user: {}", saved.getUsername());
+        return saved;
+    }
 }

@@ -2,15 +2,26 @@ package com.hostel.ordering.model;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotEmpty;
 import java.util.Set;
 
 @Document(collection = "users")
 public class User {
     @Id
     private String id;
+
+    @NotBlank(message = "Username cannot be blank")
     private String username;
+
+    @NotNull(message = "Password cannot be null")
     private String password;
+
+    @NotEmpty(message = "Roles cannot be empty")
     private Set<String> roles;
+
+    private String fcmToken;
 
     public User() {}
 
@@ -31,4 +42,7 @@ public class User {
 
     public Set<String> getRoles() { return roles; }
     public void setRoles(Set<String> roles) { this.roles = roles; }
+
+    public String getFcmToken() { return fcmToken; }
+    public void setFcmToken(String fcmToken) { this.fcmToken = fcmToken; }
 }

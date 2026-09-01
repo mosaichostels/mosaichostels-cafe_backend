@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 @Service
 public class AuthService {
@@ -37,6 +38,13 @@ public class AuthService {
     AuditService auditService;
 
     public Map<String, Object> login(String username, String password) {
+        if (username == null || username.isBlank()) {
+            throw new IllegalArgumentException("Username cannot be empty");
+        }
+        if (password == null || password.isBlank()) {
+            throw new IllegalArgumentException("Password cannot be empty");
+        }
+
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(username, password));
 
@@ -56,6 +64,51 @@ public class AuthService {
         log.info("User {} logged in successfully", userDetails.getUsername());
         auditService.logAction("LOGIN_SUCCESS", "User logged in: " + userDetails.getUsername());
         return response;
+    }
+
+    public Map<String, Object> refreshToken(String token) {
+        // Try to validate token; if expired, extract username from expired claims
+        String username;
+        try {
+            username = jwtUtils.getUserNameFromExpiredToken(token);
+        } catch (Exception e) {
+            log.error("Failed to refresh token: {}", e.getMessage());
+            throw new IllegalArgumentException("Invalid token");
+        }
+
+        // Load user and generate new token
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        // Create authentication object for token generation
+        Set<org.springframework.security.core.GrantedAuthority> authorities = new java.util.HashSet<>();
+        user.getRoles().forEach(role -> authorities.add(new org.springframework.security.core.authority.SimpleGrantedAuthority(role)));
+
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                user.getUsername(), null, authorities);
+
+        String newToken = jwtUtils.generateJwtToken(authentication);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("token", newToken);
+        response.put("username", user.getUsername());
+        response.put("roles", new java.util.ArrayList<>(user.getRoles()));
+
+        log.info("Token refreshed for user {}", username);
+        auditService.logAction("TOKEN_REFRESH", "Token refreshed for user: " + username);
+        return response;
+    }
+
+    public void logout(String token) {
+        try {
+            String username = jwtUtils.getUserNameFromJwtToken(token);
+            jwtUtils.blacklistToken(token);
+            log.info("User {} logged out successfully", username);
+            auditService.logAction("LOGOUT_SUCCESS", "User logged out: " + username);
+        } catch (Exception e) {
+            log.error("Logout failed: {}", e.getMessage());
+            throw new IllegalArgumentException("Invalid token");
+        }
     }
 
     public void registerInitialAdmin(String username, String password) {

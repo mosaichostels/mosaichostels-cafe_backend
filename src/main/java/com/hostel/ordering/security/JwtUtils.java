@@ -10,6 +10,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import java.security.Key;
 import java.util.Date;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class JwtUtils {
     private static final Logger logger = LoggerFactory.getLogger(JwtUtils.class);
@@ -17,9 +19,12 @@ public class JwtUtils {
     @Value("${config.jwtSecret:}")
     private String jwtSecret;
 
-    // 7 days
-    @Value("${config.jwtExpirationMs:604800000}")
+    // 1 hour (3600000 ms) - reduced from 7 days
+    @Value("${config.jwtExpirationMs:3600000}")
     private long jwtExpirationMs;
+
+    // Token blacklist for logout - in-memory Set (could use Redis for multi-server)
+    private static final Set<String> tokenBlacklist = ConcurrentHashMap.newKeySet();
 
     @jakarta.annotation.PostConstruct
     void checkSecret() {
@@ -50,6 +55,12 @@ public class JwtUtils {
     }
 
     public boolean validateJwtToken(String authToken) {
+        // Check if token is blacklisted (logged out)
+        if (isTokenBlacklisted(authToken)) {
+            logger.error("JWT token is blacklisted (logged out)");
+            return false;
+        }
+
         try {
             Jwts.parserBuilder().setSigningKey(getSigningKey()).build().parseClaimsJws(authToken);
             return true;
@@ -65,5 +76,27 @@ public class JwtUtils {
             logger.error("JWT claims string is empty: {}", e.getMessage());
         }
         return false;
+    }
+
+    // Extract username from token even if expired (for refresh endpoint)
+    public String getUserNameFromExpiredToken(String token) throws ExpiredJwtException {
+        try {
+            return Jwts.parserBuilder().setSigningKey(getSigningKey()).build()
+                    .parseClaimsJws(token).getBody().getSubject();
+        } catch (ExpiredJwtException e) {
+            // If token is expired, try to extract claims anyway
+            return e.getClaims().getSubject();
+        }
+    }
+
+    // Add token to blacklist (for logout)
+    public void blacklistToken(String token) {
+        tokenBlacklist.add(token);
+        logger.info("Token added to blacklist");
+    }
+
+    // Check if token is blacklisted
+    public boolean isTokenBlacklisted(String token) {
+        return tokenBlacklist.contains(token);
     }
 }

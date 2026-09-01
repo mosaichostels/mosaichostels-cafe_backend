@@ -1,6 +1,7 @@
 package com.hostel.ordering.model;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.mapping.Document;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -27,6 +28,8 @@ public class Order {
     private String updatedBy;
     private Long createdAt;
     private Long updatedAt;
+    @Version
+    private Long version;
 
     public Order() {}
 
@@ -59,6 +62,9 @@ public class Order {
 
     public Long getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Long updatedAt) { this.updatedAt = updatedAt; }
+
+    public Long getVersion() { return version; }
+    public void setVersion(Long version) { this.version = version; }
 
     // eZee chargepost outcome — set only when an admin posts via
     // POST /orders/{id}/chargepost, reversed to VOIDED on cancel.

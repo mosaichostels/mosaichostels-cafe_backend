@@ -1,11 +1,28 @@
 package com.hostel.ordering.model;
 
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
 public class OrderItem {
+    @NotBlank(message = "Menu item ID cannot be blank")
     private String menuItemId;
+
+    @NotBlank(message = "Menu item name cannot be blank")
     private String menuItemName;
+
+    @Min(value = 1, message = "Quantity must be at least 1")
+    @Max(value = 50, message = "Quantity must not exceed 50")
     private Integer quantity;
+
+    @NotNull(message = "Price cannot be null")
+    @Min(value = 0, message = "Price cannot be negative")
     private Double price;
+
     private Double subtotal;
+
+    @NotBlank(message = "Type cannot be blank")
     private String type;
 
     public OrderItem() {}

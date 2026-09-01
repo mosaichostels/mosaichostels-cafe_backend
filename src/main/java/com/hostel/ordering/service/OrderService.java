@@ -11,7 +11,10 @@ import com.hostel.ordering.ezee.EzeeChargePostService;
 import com.hostel.ordering.ezee.EzeeClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -34,6 +37,7 @@ public class OrderService {
     private final OtherEssentialRepository otherEssentialRepository;
     private final EzeeChargePostService ezeeChargePostService;
     private final EzeeClient ezeeClient;
+    private final com.hostel.ordering.repository.UserRepository userRepository;
 
     public OrderService(OrderRepository orderRepository,
                         FCMNotificationService fcmNotificationService,
@@ -42,7 +46,8 @@ public class OrderService {
                         MenuItemRepository menuItemRepository,
                         OtherEssentialRepository otherEssentialRepository,
                         EzeeChargePostService ezeeChargePostService,
-                        EzeeClient ezeeClient) {
+                        EzeeClient ezeeClient,
+                        com.hostel.ordering.repository.UserRepository userRepository) {
         this.orderRepository = orderRepository;
         this.fcmNotificationService = fcmNotificationService;
         this.auditService = auditService;
@@ -51,6 +56,7 @@ public class OrderService {
         this.otherEssentialRepository = otherEssentialRepository;
         this.ezeeChargePostService = ezeeChargePostService;
         this.ezeeClient = ezeeClient;
+        this.userRepository = userRepository;
     }
 
     public Order createOrder(Order order) {
@@ -85,8 +91,10 @@ public class OrderService {
                 throw new IllegalArgumentException("Invalid quantity for item: " + item.getMenuItemName());
             }
             Double price = menuItemRepository.findById(item.getMenuItemId())
+                    .filter(m -> !m.isDeleted())
                     .map(m -> { item.setType("MENU"); return m.getPrice(); })
                     .orElseGet(() -> otherEssentialRepository.findById(item.getMenuItemId())
+                            .filter(e -> !e.isDeleted())
                             .map(e -> { item.setType("ESSENTIAL"); return e.getPrice(); })
                             .orElse(null));
             if (price == null) {
@@ -159,6 +167,8 @@ public class OrderService {
                                         "Failed to void eZee charge for " + updated.getBookingName() + ": " + voided.getChargePostError());
                             }
                         }
+                    } else if ("DELIVERED".equalsIgnoreCase(status)) {
+                        sendDeliveredNotificationToAdmins(updated);
                     }
 
                     return updated;
@@ -174,6 +184,28 @@ public class OrderService {
         });
     }
 
+    private void sendDeliveredNotificationToAdmins(Order order) {
+        try {
+            java.util.List<com.hostel.ordering.model.User> admins = userRepository.findByRolesContaining("ROLE_ADMIN");
+            for (com.hostel.ordering.model.User admin : admins) {
+                String fcmToken = admin.getFcmToken();
+                if (fcmToken != null && !fcmToken.isBlank()) {
+                    java.util.Map<String, String> data = new java.util.HashMap<>();
+                    data.put("action", "postCharge");
+                    data.put("orderId", order.getId() != null ? order.getId() : "");
+                    fcmNotificationService.sendNotificationToToken(
+                            fcmToken,
+                            "Order Ready to Post",
+                            "Order for " + order.getBookingName() + " marked delivered - post charge now?",
+                            data
+                    );
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error sending delivered notification to admins: {}", e.getMessage());
+        }
+    }
+
     public void deleteAllOrders() {
         orderRepository.deleteAll();
         log.warn("All orders cleared from the system!");
@@ -186,6 +218,7 @@ public class OrderService {
         auditService.logAction("ORDERS_FILTERED_DELETED", "Deleted " + orders.size() + " filtered orders");
     }
 
+    @Transactional
     public Order postChargeForOrder(String orderId, String room, String updatedBy) {
         Order order = orderRepository.findById(orderId).orElse(null);
         if (order == null) {
@@ -200,7 +233,25 @@ public class OrderService {
         if (updatedBy != null) {
             order.setUpdatedBy(updatedBy);
         }
-        Order result = ezeeChargePostService.post(order, room);
+
+        Order result;
+        try {
+            result = ezeeChargePostService.post(order, room);
+        } catch (OptimisticLockingFailureException e) {
+            log.warn("Chargepost failed for order {} due to concurrent update", orderId);
+            // On optimistic lock failure, reload and fail gracefully
+            order = orderRepository.findById(orderId).orElse(order);
+            order.setChargePostStatus("FAILED");
+            order.setChargePostError("Order was updated concurrently; please retry");
+            result = order;
+        } catch (Exception e) {
+            log.error("Chargepost threw exception for order {}, clearing partial state", orderId, e);
+            // On exception, clear any partial state and mark as failed for rollback
+            order.setChargePostedGroups(new ArrayList<>());
+            order.setChargePostStatus("FAILED");
+            order.setChargePostError("Chargepost exception: " + e.getMessage());
+            result = order;
+        }
 
         // Combine status changes before save for atomicity
         if ("QUEUED".equals(result.getChargePostStatus())) {

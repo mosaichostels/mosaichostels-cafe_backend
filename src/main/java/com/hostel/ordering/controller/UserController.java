@@ -11,7 +11,6 @@ import java.util.Set;
 import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/users")
-@PreAuthorize("hasRole('ADMIN')")
 public class UserController {
 
     @Autowired
@@ -21,11 +20,13 @@ public class UserController {
     com.hostel.ordering.service.AuditService auditService;
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public List<User> getAllUsers() {
         return userService.getAllUsers();
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> createUser(@RequestBody Map<String, Object> userRequest) {
         String username = (String) userRequest.get("username");
         String password = (String) userRequest.get("password");
@@ -41,6 +42,7 @@ public class UserController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> deleteUser(@PathVariable String id) {
         User user = userService.getUserById(id);
         String username = (user != null) ? user.getUsername() : id;
@@ -53,6 +55,7 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> updateUser(@PathVariable String id, @RequestBody Map<String, Object> userRequest) {
         String username = (String) userRequest.get("username");
         String password = (String) userRequest.get("password");
@@ -65,6 +68,21 @@ public class UserController {
             auditService.logAction("MODIFIED_USER", "Updated credentials for user: " + username);
 
             return ResponseEntity.ok(user);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/{id}/register-fcm")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> registerFcmToken(@PathVariable String id, @RequestBody Map<String, String> request) {
+        String fcmToken = request.get("fcmToken");
+        if (fcmToken == null || fcmToken.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "FCM token is required"));
+        }
+        try {
+            User user = userService.updateFcmToken(id, fcmToken);
+            return ResponseEntity.ok(Map.of("message", "FCM token registered successfully", "userId", user.getId()));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }

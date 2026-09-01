@@ -7,26 +7,26 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
-    @Value("${cors.allowed-origins:*}")
+    @Value("${cors.allowed-origins:http://localhost:3000}")
     private String corsOrigins;
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
-        if ("*".equals(corsOrigins)) {
-            registry.addMapping("/**")
-                    .allowedOriginPatterns("*")
-                    .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                    .allowedHeaders("*")
-                    .allowCredentials(false);
-        } else {
-            String[] allowedOrigins = corsOrigins.isBlank()
-                    ? new String[] { "*" }
-                    : corsOrigins.split(",");
-            registry.addMapping("/**")
-                    .allowedOrigins(allowedOrigins)
-                    .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                    .allowedHeaders("*")
-                    .allowCredentials(false);
-        }
+        String[] allowedOrigins = corsOrigins.isBlank()
+                ? new String[] { "http://localhost:3000" }
+                : corsOrigins.split(",");
+
+        String[] allowedHeaders = {
+            "Content-Type",
+            "Authorization",
+            "X-CSRF-Token"
+        };
+
+        registry.addMapping("/**")
+                .allowedOrigins(allowedOrigins)
+                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                .allowedHeaders(allowedHeaders)
+                .allowCredentials(true)
+                .maxAge(3600);
     }
 }
