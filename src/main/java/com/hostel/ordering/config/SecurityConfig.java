@@ -3,7 +3,6 @@ package com.hostel.ordering.config;
 import com.hostel.ordering.security.AuthTokenFilter;
 import com.hostel.ordering.security.UserDetailsServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -35,6 +34,7 @@ public class SecurityConfig {
         return new AuthTokenFilter();
     }
 
+    @Bean
     public DaoAuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
         authProvider.setUserDetailsService(userDetailsService);
