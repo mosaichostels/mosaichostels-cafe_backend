@@ -55,18 +55,16 @@ public class OrderController {
             throw new IllegalArgumentException("Status parameter cannot be null or empty");
         }
 
-        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-            Order cached = (Order) orderService.getIdempotencyResult(idempotencyKey);
-            if (cached != null) {
-                return ResponseEntity.ok(cached);
-            }
+        Object cached = checkIdempotencyCache(idempotencyKey);
+        if (cached != null) {
+            return ResponseEntity.ok((Order) cached);
         }
 
-        String updatedBy = authentication != null && authentication.isAuthenticated() ? authentication.getName() : "UNKNOWN";
+        String updatedBy = getAuthenticatedUser(authentication);
         Order updated = orderService.updateOrderStatus(id, status, updatedBy);
 
-        if (updated != null && idempotencyKey != null && !idempotencyKey.isBlank()) {
-            orderService.cacheIdempotencyResult(idempotencyKey, updated);
+        if (updated != null) {
+            cacheIdempotencyIfPresent(idempotencyKey, updated);
         }
 
         return updated != null ? ResponseEntity.ok(updated) : ResponseEntity.notFound().build();
@@ -76,18 +74,12 @@ public class OrderController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> deleteOrder(@PathVariable String id,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
-        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-            Object cached = orderService.getIdempotencyResult(idempotencyKey);
-            if (cached != null) {
-                return ResponseEntity.ok("Order deleted successfully");
-            }
+        if (checkIdempotencyCache(idempotencyKey) != null) {
+            return ResponseEntity.ok("Order deleted successfully");
         }
 
         orderService.deleteOrder(id);
-
-        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-            orderService.cacheIdempotencyResult(idempotencyKey, "deleted");
-        }
+        cacheIdempotencyIfPresent(idempotencyKey, "deleted");
 
         return ResponseEntity.ok("Order deleted successfully");
     }
@@ -109,11 +101,9 @@ public class OrderController {
             throw new IllegalArgumentException("Must specify at least one filter or set all=true");
         }
 
-        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-            Object cached = orderService.getIdempotencyResult(idempotencyKey);
-            if (cached != null) {
-                return ResponseEntity.ok(cached.toString());
-            }
+        Object cached = checkIdempotencyCache(idempotencyKey);
+        if (cached != null) {
+            return ResponseEntity.ok((String) cached);
         }
 
         String result;
@@ -141,7 +131,7 @@ public class OrderController {
                 throw new IllegalArgumentException("Invalid confirmation token format");
             }
 
-            String auditedBy = authentication != null && authentication.isAuthenticated() ? authentication.getName() : "UNKNOWN";
+            String auditedBy = getAuthenticatedUser(authentication);
             orderService.deleteAllOrders();
 
             // Add audit trail
@@ -154,10 +144,7 @@ public class OrderController {
             result = "Filtered orders deleted successfully";
         }
 
-        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-            orderService.cacheIdempotencyResult(idempotencyKey, result);
-        }
-
+        cacheIdempotencyIfPresent(idempotencyKey, result);
         return ResponseEntity.ok(result);
     }
 
@@ -172,18 +159,16 @@ public class OrderController {
             throw new IllegalArgumentException("Room parameter cannot be null or empty");
         }
 
-        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-            Order cached = (Order) orderService.getIdempotencyResult(idempotencyKey);
-            if (cached != null) {
-                return ResponseEntity.ok(cached);
-            }
+        Object cached = checkIdempotencyCache(idempotencyKey);
+        if (cached != null) {
+            return ResponseEntity.ok((Order) cached);
         }
 
-        String updatedBy = authentication != null && authentication.isAuthenticated() ? authentication.getName() : "UNKNOWN";
+        String updatedBy = getAuthenticatedUser(authentication);
         Order result = orderService.postChargeForOrder(id, room, updatedBy);
 
-        if (result != null && idempotencyKey != null && !idempotencyKey.isBlank()) {
-            orderService.cacheIdempotencyResult(idempotencyKey, result);
+        if (result != null) {
+            cacheIdempotencyIfPresent(idempotencyKey, result);
         }
 
         return result != null ? ResponseEntity.ok(result) : ResponseEntity.notFound().build();
@@ -195,5 +180,24 @@ public class OrderController {
             @PathVariable String id,
             @RequestParam(required = false) String name) {
         return ResponseEntity.ok(orderService.searchEzeeCandidates(name));
+    }
+
+    private Object checkIdempotencyCache(String idempotencyKey) {
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            return orderService.getIdempotencyResult(idempotencyKey);
+        }
+        return null;
+    }
+
+    private void cacheIdempotencyIfPresent(String idempotencyKey, Object result) {
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            orderService.cacheIdempotencyResult(idempotencyKey, result);
+        }
+    }
+
+    private String getAuthenticatedUser(Authentication authentication) {
+        return authentication != null && authentication.isAuthenticated()
+                ? authentication.getName()
+                : "UNKNOWN";
     }
 }
