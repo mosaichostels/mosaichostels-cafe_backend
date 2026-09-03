@@ -11,13 +11,14 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
 
     // ponytail: global lock, per-account locks if throughput matters
-    // ponytail: forwarded headers are spoofable; per-IP limit evaded by rotating header values. Close via trusted-proxy allowlist.
     private static final ConcurrentHashMap<String, RateLimit> limits = new ConcurrentHashMap<>();
     private static final long WINDOW_MS = 60000;
     private static final int MAX_TRACKED = 10000;
@@ -65,12 +66,50 @@ public class RateLimitFilter extends OncePerRequestFilter {
         return getClientIp(request);
     }
 
-    private String getClientIp(HttpServletRequest request) {
-        // Forwarded headers (CF-Connecting-IP, X-Forwarded-For) are spoofable by any client.
-        // Only use request.getRemoteAddr() which comes from the TCP connection layer.
-        // If a trusted proxy (like Cloudflare) is deployed in front, add an allowlist of
-        // trusted proxy IPs and conditionally trust forwarded headers only from those IPs.
-        return request.getRemoteAddr();
+    String getClientIp(HttpServletRequest request) {
+        // Trust X-Forwarded-For header ONLY when the direct peer is a private/loopback address
+        // (indicating a trusted proxy). If remoteAddr is public, it's a direct peer and the
+        // header is untrustworthy. Walk X-Forwarded-For right-to-left to find the first public
+        // IP (rightmost entries appended by trusted infrastructure, leftmost entries client-sent).
+        String remoteAddr = request.getRemoteAddr();
+
+        // If direct peer is public, there is no trusted proxy in front; return it unchanged.
+        if (!isPrivateOrLoopback(remoteAddr)) {
+            return remoteAddr;
+        }
+
+        // Direct peer is private/loopback (trusted proxy). Read X-Forwarded-For.
+        String xff = request.getHeader("X-Forwarded-For");
+        if (xff == null || xff.trim().isEmpty()) {
+            return remoteAddr;
+        }
+
+        // Split on "," and walk right-to-left for first non-private public IP.
+        String[] entries = xff.split(",");
+        for (int i = entries.length - 1; i >= 0; i--) {
+            String ip = entries[i].trim();
+            if (!ip.isEmpty() && !isPrivateOrLoopback(ip)) {
+                return ip;
+            }
+        }
+
+        // All entries are private/unparseable; return the direct peer.
+        return remoteAddr;
+    }
+
+    private boolean isPrivateOrLoopback(String ip) {
+        // Guard against DNS lookups on attacker input: only allow hex digits, dots, colons.
+        if (!ip.matches("^[0-9a-fA-F:.]+$")) {
+            return true; // Treat unparseable input as untrusted-for-use.
+        }
+
+        try {
+            InetAddress addr = InetAddress.getByName(ip);
+            return addr.isLoopbackAddress() || addr.isSiteLocalAddress() ||
+                   addr.isLinkLocalAddress() || addr.isAnyLocalAddress();
+        } catch (UnknownHostException e) {
+            return true; // Treat unparseable input as untrusted-for-use.
+        }
     }
 
     private static class RateLimit {

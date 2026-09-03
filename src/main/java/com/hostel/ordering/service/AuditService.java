@@ -41,4 +41,8 @@ public class AuditService {
     public List<AuditLog> getAllLogs() {
         return auditRepository.findAll(Sort.by(Sort.Direction.DESC, "timestamp"));
     }
+
+    public void deleteAllLogs() {
+        auditRepository.deleteAll();
+    }
 }
