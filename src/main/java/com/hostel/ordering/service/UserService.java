@@ -75,8 +75,8 @@ public class UserService {
         return saved;
     }
 
-    public User updateFcmToken(String id, String fcmToken) {
-        User user = userRepository.findById(id)
+    public User updateFcmTokenByUsername(String username, String fcmToken) {
+        User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("User not found!"));
         user.setFcmToken(fcmToken);
         User saved = userRepository.save(user);

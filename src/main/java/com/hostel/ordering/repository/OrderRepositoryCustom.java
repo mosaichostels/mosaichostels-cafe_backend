@@ -14,4 +14,11 @@ public interface OrderRepositoryCustom {
             Long dateTo,
             Long date) {
     }
+    /**
+     * Atomically claim an order for chargepost by setting chargePostStatus to "IN_PROGRESS".
+     * Returns the order if claim succeeded (chargePostStatus was null/not set before).
+     * Returns null if another thread already claimed it.
+     */
+    Order claimForChargePost(String orderId);
+
 }

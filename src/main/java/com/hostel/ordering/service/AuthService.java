@@ -67,6 +67,11 @@ public class AuthService {
     }
 
     public Map<String, Object> refreshToken(String token) {
+        // Check if token can be refreshed (not blacklisted, not too stale)
+        if (!jwtUtils.isRefreshable(token)) {
+            throw new IllegalArgumentException("Token cannot be refreshed");
+        }
+
         // Try to validate token; if expired, extract username from expired claims
         String username;
         try {
@@ -89,6 +94,9 @@ public class AuthService {
 
         String newToken = jwtUtils.generateJwtToken(authentication);
 
+        // Blacklist the old token to prevent replay on refresh
+        jwtUtils.blacklistToken(token);
+
         Map<String, Object> response = new HashMap<>();
         response.put("token", newToken);
         response.put("username", user.getUsername());
@@ -101,7 +109,7 @@ public class AuthService {
 
     public void logout(String token) {
         try {
-            String username = jwtUtils.getUserNameFromJwtToken(token);
+            String username = jwtUtils.getUserNameFromExpiredToken(token);
             jwtUtils.blacklistToken(token);
             log.info("User {} logged out successfully", username);
             auditService.logAction("LOGOUT_SUCCESS", "User logged out: " + username);

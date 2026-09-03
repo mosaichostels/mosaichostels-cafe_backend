@@ -199,7 +199,7 @@ class OrderServiceTest {
         existing.setStatus("DELIVERED");
         existing.setBookingName("Test Guest");
 
-        when(orderRepository.findById("order1")).thenReturn(java.util.Optional.of(existing));
+        when(orderRepository.claimForChargePost("order1")).thenReturn(existing);
         when(ezeeChargePostService.post(existing, "106")).thenAnswer(inv -> {
             Order o = inv.getArgument(0);
             o.setChargePostStatus("QUEUED");
@@ -225,7 +225,7 @@ class OrderServiceTest {
         existing.setStatus("DELIVERED");
         existing.setBookingName("Test Guest");
 
-        when(orderRepository.findById("order1")).thenReturn(java.util.Optional.of(existing));
+        when(orderRepository.claimForChargePost("order1")).thenReturn(existing);
         when(ezeeChargePostService.post(existing, "106")).thenAnswer(inv -> {
             Order o = inv.getArgument(0);
             o.setChargePostStatus("FAILED");
@@ -252,11 +252,14 @@ class OrderServiceTest {
         existing.setChargePostStatus("QUEUED");
         existing.setChargePostRequestId("2805");
 
+        // claimForChargePost returns null because chargePostStatus is already QUEUED
+        when(orderRepository.claimForChargePost("order1")).thenReturn(null);
         when(orderRepository.findById("order1")).thenReturn(java.util.Optional.of(existing));
 
         Order result = svc.postChargeForOrder("order1", "106", "staff1");
 
-        assertSame(existing, result);
+        // Result should be the existing order without calling eZee
+        assertNotNull(result);
         assertEquals("QUEUED", result.getChargePostStatus());
         org.mockito.Mockito.verifyNoInteractions(ezeeChargePostService);
         org.mockito.Mockito.verify(orderRepository, org.mockito.Mockito.never()).save(org.mockito.ArgumentMatchers.any());

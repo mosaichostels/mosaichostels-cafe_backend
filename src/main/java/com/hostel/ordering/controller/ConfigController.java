@@ -7,6 +7,7 @@ import com.hostel.ordering.service.CategoryService;
 import com.hostel.ordering.service.DormitoryService;
 import com.hostel.ordering.service.OrderStatusService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,31 +49,37 @@ public class ConfigController {
     }
 
     @PostMapping("/categories")
+    @PreAuthorize("hasRole('ADMIN')")
     public Category addCategory(@RequestBody Category category) {
         return categoryService.createCategory(category);
     }
 
     @PutMapping("/categories/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public Category updateCategory(@PathVariable String id, @RequestBody Category category) {
         return categoryService.updateCategory(id, category);
     }
 
     @DeleteMapping("/categories/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public void deleteCategory(@PathVariable String id) {
         categoryService.deleteCategory(id);
     }
 
     @PostMapping("/dormitories")
+    @PreAuthorize("hasRole('ADMIN')")
     public Dormitory addDormitory(@RequestBody Dormitory dormitory) {
         return dormitoryService.addDormitory(dormitory);
     }
 
     @PutMapping("/dormitories/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public Dormitory updateDormitory(@PathVariable String id, @RequestBody Dormitory dormitory) {
         return dormitoryService.updateDormitory(id, dormitory);
     }
 
     @DeleteMapping("/dormitories/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public void deleteDormitory(@PathVariable String id) {
         dormitoryService.deleteDormitory(id);
     }
@@ -83,11 +90,13 @@ public class ConfigController {
     }
 
     @PostMapping("/statuses")
+    @PreAuthorize("hasRole('ADMIN')")
     public OrderStatusConfig addStatus(@RequestBody OrderStatusConfig status) {
         return orderStatusService.addStatus(status);
     }
 
     @DeleteMapping("/statuses/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public void deleteStatus(@PathVariable String id) {
         orderStatusService.deleteStatus(id);
     }

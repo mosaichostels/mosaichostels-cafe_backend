@@ -5,8 +5,11 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Repository;
 import java.util.ArrayList;
+import java.util.regex.Pattern;
 import java.util.List;
 @Repository
 public class OrderRepositoryImpl implements OrderRepositoryCustom {
@@ -49,7 +52,7 @@ public class OrderRepositoryImpl implements OrderRepositoryCustom {
         }
 
         if (criteria.search() != null && !criteria.search().isBlank()) {
-            criteriaList.add(Criteria.where("bookingName").regex(criteria.search().trim(), "i"));
+            criteriaList.add(Criteria.where("bookingName").regex(Pattern.quote(criteria.search().trim()), "i"));
         }
 
         Query query = new Query();
@@ -57,5 +60,17 @@ public class OrderRepositoryImpl implements OrderRepositoryCustom {
             query.addCriteria(new Criteria().andOperator(criteriaList.toArray(new Criteria[0])));
         }
         return query;
+    }
+
+    @Override
+    public Order claimForChargePost(String orderId) {
+        Criteria criteria = Criteria.where("_id").is(orderId).and("chargePostStatus").is(null);
+        Update update = new Update().set("chargePostStatus", "IN_PROGRESS");
+        return mongoTemplate.findAndModify(
+                new Query(criteria),
+                update,
+                FindAndModifyOptions.options().returnNew(true),
+                Order.class
+        );
     }
 }

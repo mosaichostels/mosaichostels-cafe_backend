@@ -37,6 +37,11 @@ public class IdempotencyService {
         }
         return null;
     }
+
+    public <T> T getIfPresent(String idempotencyKey, Class<T> type) {
+        Object cached = getIfPresent(idempotencyKey);
+        return type.isInstance(cached) ? type.cast(cached) : null;
+    }
     
     public void put(String idempotencyKey, Object result) {
         if (cache.size() >= MAX_CACHE_SIZE) {

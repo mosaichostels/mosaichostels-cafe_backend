@@ -1,5 +1,6 @@
 package com.hostel.ordering.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import jakarta.validation.constraints.NotBlank;
@@ -16,6 +17,7 @@ public class User {
     private String username;
 
     @NotNull(message = "Password cannot be null")
+    @JsonIgnore
     private String password;
 
     @NotEmpty(message = "Roles cannot be empty")

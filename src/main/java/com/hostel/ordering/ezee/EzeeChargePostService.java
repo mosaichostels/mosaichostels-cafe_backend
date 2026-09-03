@@ -115,6 +115,13 @@ public class EzeeChargePostService {
             return markFailed(order, "Order has no total amount");
         }
 
+        // Retrying after a partial failure must not re-post an item that
+        // already succeeded — AddExtraCharge has no rollback, so doing so
+        // would double-charge the guest for that item.
+        List<String> postedItems = order.getChargePostedItems() != null
+                ? new ArrayList<>(order.getChargePostedItems())
+                : new ArrayList<>();
+
         try {
             RoomFolioResult folioResult = queryRoomFolio(room);
             if (!folioResult.isSuccess()) {
@@ -129,6 +136,13 @@ public class EzeeChargePostService {
             // Guest cart mixes menu items and essentials in one order — each type
             // posts to its own pre-configured eZee extra-charge item. Post each
             // OrderItem individually with its actual quantity to eZee.
+            // Build a map of item->index before grouping so we can uniquely identify
+            // items by position (defect 8: handle duplicate menuItemIds and null ids).
+            Map<OrderItem, Integer> itemIndexMap = new LinkedHashMap<>();
+            for (int i = 0; i < order.getItems().size(); i++) {
+                itemIndexMap.put(order.getItems().get(i), i);
+            }
+
             Map<String, List<OrderItem>> itemsByType = order.getItems().stream()
                     .collect(Collectors.groupingBy(item -> "ESSENTIAL".equals(item.getType()) ? "ESSENTIAL" : "MENU"));
 
@@ -140,13 +154,6 @@ public class EzeeChargePostService {
                 return markFailed(order, "No items with positive subtotal to charge");
             }
 
-            // Retrying after a partial failure must not re-post an item that
-            // already succeeded — AddExtraCharge has no rollback, so doing so
-            // would double-charge the guest for that item.
-            List<String> postedItems = order.getChargePostedItems() != null
-                    ? new ArrayList<>(order.getChargePostedItems())
-                    : new ArrayList<>();
-
             List<String> errors = new ArrayList<>();
             for (Map.Entry<String, List<OrderItem>> typeGroup : itemsByType.entrySet()) {
                 String chargeId = "ESSENTIAL".equals(typeGroup.getKey()) ? essentialChargeId : foodChargeId;
@@ -157,7 +164,10 @@ public class EzeeChargePostService {
 
                 // Post each item in this type group individually
                 for (OrderItem item : typeGroup.getValue()) {
-                    String itemId = item.getMenuItemId();
+                    // Use positional index for unique dedup key (defect 8: handles duplicate menuItemIds and null ids)
+                    Integer itemIndex = itemIndexMap.get(item);
+                    String menuItemId = item.getMenuItemId() != null ? item.getMenuItemId() : "unknown";
+                    String itemId = menuItemId + "#" + (itemIndex != null ? itemIndex : -1);
 
                     // Skip if already posted
                     if (postedItems.contains(itemId)) continue;
@@ -166,6 +176,10 @@ public class EzeeChargePostService {
                     if (item.getSubtotal() == null || item.getSubtotal() <= 0) continue;
                     if (item.getQuantity() == null || item.getQuantity() < 1) {
                         errors.add(item.getMenuItemName() + ": invalid quantity");
+                        continue;
+                    }
+                    if (item.getPrice() == null) {
+                        errors.add(item.getMenuItemName() + ": invalid price");
                         continue;
                     }
 
@@ -222,6 +236,7 @@ public class EzeeChargePostService {
             return markFailed(order, String.join("; ", errors));
         } catch (Exception e) {
             log.error("Chargepost threw for order {}", order.getId(), e);
+            order.setChargePostedItems(postedItems);
             return markFailed(order, "Unexpected error: " + e.getMessage());
         }
     }

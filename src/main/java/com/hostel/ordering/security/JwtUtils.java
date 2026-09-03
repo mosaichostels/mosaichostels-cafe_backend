@@ -26,6 +26,9 @@ public class JwtUtils {
     // Token blacklist for logout - in-memory Set (could use Redis for multi-server)
     private static final Set<String> tokenBlacklist = ConcurrentHashMap.newKeySet();
 
+    // Maximum staleness allowed for token refresh (24 hours in milliseconds)
+    private static final long REFRESH_GRACE_MS = 24 * 60 * 60 * 1000L;
+
     @jakarta.annotation.PostConstruct
     void checkSecret() {
         if (jwtSecret == null || jwtSecret.getBytes().length < 32) {
@@ -89,10 +92,62 @@ public class JwtUtils {
         }
     }
 
+    // Get expiration time from token (works for both valid and expired tokens)
+    public long getExpirationMillisFromToken(String token) {
+        try {
+            return Jwts.parserBuilder().setSigningKey(getSigningKey()).build()
+                    .parseClaimsJws(token).getBody().getExpiration().getTime();
+        } catch (ExpiredJwtException e) {
+            // If token is expired, extract expiration from claims anyway
+            return e.getClaims().getExpiration().getTime();
+        }
+    }
+
+    // Check if token can be refreshed (not blacklisted, not too stale)
+    public boolean isRefreshable(String token) {
+        try {
+            // Check if token is blacklisted
+            if (isTokenBlacklisted(token)) {
+                return false;
+            }
+
+            // Get expiration time and check staleness
+            long expirationMs = getExpirationMillisFromToken(token);
+            long timeSinceExpiration = System.currentTimeMillis() - expirationMs;
+
+            // Token can be refreshed if it has not been expired for more than grace period
+            // A still-valid (unexpired) token yields negative difference, which is refreshable
+            return timeSinceExpiration <= REFRESH_GRACE_MS;
+        } catch (Exception e) {
+            // Any parse or signature failure means token is not refreshable
+            return false;
+        }
+    }
+
+    // Remove expired tokens from blacklist to prevent unbounded growth
+    private void pruneBlacklist() {
+        long now = System.currentTimeMillis();
+        tokenBlacklist.removeIf(token -> {
+            try {
+                long expirationMs = getExpirationMillisFromToken(token);
+                // Remove if token expired more than grace period ago
+                return (expirationMs + REFRESH_GRACE_MS) < now;
+            } catch (Exception e) {
+                // Remove tokens that fail to parse
+                return true;
+            }
+        });
+    }
+
     // Add token to blacklist (for logout)
     public void blacklistToken(String token) {
         tokenBlacklist.add(token);
         logger.info("Token added to blacklist");
+
+        // Prune expired entries when blacklist grows too large
+        if (tokenBlacklist.size() > 1000) {
+            pruneBlacklist();
+        }
     }
 
     // Check if token is blacklisted

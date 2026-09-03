@@ -17,8 +17,10 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RateLimitFilter extends OncePerRequestFilter {
 
     // ponytail: global lock, per-account locks if throughput matters
+    // ponytail: forwarded headers are spoofable; per-IP limit evaded by rotating header values. Close via trusted-proxy allowlist.
     private static final ConcurrentHashMap<String, RateLimit> limits = new ConcurrentHashMap<>();
     private static final long WINDOW_MS = 60000;
+    private static final int MAX_TRACKED = 10000;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -36,6 +38,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if (limit > 0) {
             String limitKey = getRateLimitKey(request, method, path);
             String key = method + ":" + path + ":" + limitKey;
+
+            // Lazy eviction: purge stale buckets when map grows too large
+            if (limits.size() > MAX_TRACKED) {
+                limits.values().removeIf(rl -> rl.isStale(WINDOW_MS));
+            }
 
             RateLimit rl = limits.computeIfAbsent(key, k -> new RateLimit());
             if (!rl.allowRequest(limit, WINDOW_MS)) {
@@ -59,18 +66,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private String getClientIp(HttpServletRequest request) {
-        // Hugging Face Spaces proxy: X-Forwarded-For may not be reliable
-        // Prefer Cloudflare header if available, otherwise use remote address
-        String cfIP = request.getHeader("CF-Connecting-IP");
-        if (cfIP != null && !cfIP.isEmpty()) {
-            return cfIP.trim();
-        }
-
-        String xff = request.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isEmpty()) {
-            return xff.split(",")[0].trim();
-        }
-
+        // Forwarded headers (CF-Connecting-IP, X-Forwarded-For) are spoofable by any client.
+        // Only use request.getRemoteAddr() which comes from the TCP connection layer.
+        // If a trusted proxy (like Cloudflare) is deployed in front, add an allowlist of
+        // trusted proxy IPs and conditionally trust forwarded headers only from those IPs.
         return request.getRemoteAddr();
     }
 
@@ -95,6 +94,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 return true;
             }
             return false;
+        }
+
+        synchronized boolean isStale(long windowMs) {
+            return firstRequestTime != 0 && System.currentTimeMillis() - firstRequestTime > windowMs;
         }
     }
 }

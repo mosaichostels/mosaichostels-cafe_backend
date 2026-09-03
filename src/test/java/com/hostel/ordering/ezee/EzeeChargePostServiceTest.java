@@ -77,8 +77,8 @@ class EzeeChargePostServiceTest {
         assertEquals("8", result.getChargePostFolio());
         assertNull(result.getChargePostError());
         assertNotNull(result.getChargePostAt());
-        // Should have posted the item (tracked by menuItemId)
-        assertTrue(result.getChargePostedItems().contains("item-aloo-paratha"));
+        // Should have posted the item (tracked by menuItemId + cart position)
+        assertTrue(result.getChargePostedItems().contains("item-aloo-paratha#0"));
     }
 
     @Test
@@ -116,7 +116,7 @@ class EzeeChargePostServiceTest {
         assertEquals("QUEUED", result.getChargePostStatus());
         assertNull(result.getChargePostError());
         // Both items should be tracked in postedItems
-        assertTrue(result.getChargePostedItems().containsAll(List.of("item-aloo-paratha", "item-toothbrush")));
+        assertTrue(result.getChargePostedItems().containsAll(List.of("item-aloo-paratha#0", "item-toothbrush#1")));
     }
 
     @Test
@@ -261,7 +261,7 @@ class EzeeChargePostServiceTest {
         // Simulate a prior attempt where the menu item already posted
         // successfully and the essential item failed.
         order.setChargePostStatus("FAILED");
-        order.setChargePostedItems(new java.util.ArrayList<>(List.of("item-aloo-paratha")));
+        order.setChargePostedItems(new java.util.ArrayList<>(List.of("item-aloo-paratha#0")));
 
         Map<String, String> roomqueryResponse = new LinkedHashMap<>();
         roomqueryResponse.put("status", "ok");
@@ -276,7 +276,7 @@ class EzeeChargePostServiceTest {
         Order result = service.post(order, "106");
 
         assertEquals("QUEUED", result.getChargePostStatus());
-        assertTrue(result.getChargePostedItems().containsAll(List.of("item-aloo-paratha", "item-toothbrush")));
+        assertTrue(result.getChargePostedItems().containsAll(List.of("item-aloo-paratha#0", "item-toothbrush#1")));
         // item-aloo-paratha already succeeded on the prior attempt — must not be posted again.
         org.mockito.Mockito.verify(ezeeClient, org.mockito.Mockito.never())
                 .postExtraCharge(any(), any(), eq("FOOD1"), eq("80.00"), eq("2"), any());

@@ -5,6 +5,7 @@ import com.hostel.ordering.service.MenuItemService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import java.util.List;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/menu-items")
@@ -17,6 +18,7 @@ public class MenuItemController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<MenuItem> createMenuItem(@RequestBody MenuItem menuItem) {
         return ResponseEntity.status(HttpStatus.CREATED).body(menuItemService.createMenuItem(menuItem));
     }
@@ -47,12 +49,14 @@ public class MenuItemController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<MenuItem> updateMenuItem(@PathVariable String id, @RequestBody MenuItem menuItem) {
         MenuItem updated = menuItemService.updateMenuItem(id, menuItem);
         return updated != null ? ResponseEntity.ok(updated) : ResponseEntity.notFound().build();
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> deleteMenuItem(@PathVariable String id) {
         menuItemService.deleteMenuItem(id);
         return ResponseEntity.ok("Menu item deleted successfully");

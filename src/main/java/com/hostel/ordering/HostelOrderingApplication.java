@@ -19,7 +19,7 @@ public class HostelOrderingApplication {
     @Value("${config.admin.username:admin}")
     private String adminUsername;
 
-    @Value("${config.admin.password:}")
+    @Value("${config.admin.password:#{null}}")
     private String adminPassword;
 
     public static void main(String[] args) {
@@ -29,14 +29,15 @@ public class HostelOrderingApplication {
     @Bean
     CommandLineRunner init(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         return args -> {
-            String passwordToUse = (adminPassword != null && !adminPassword.isBlank())
-                ? adminPassword
-                : "admin123";
+            if (adminPassword == null || adminPassword.isBlank()) {
+                System.out.println("[BOOTSTRAP] WARN: config.admin.password is not set; skipping default admin creation");
+                return;
+            }
             System.out.println("[BOOTSTRAP] Initializing admin user: " + adminUsername);
             try {
                 var existing = userRepository.findByUsername(adminUsername);
                 if (existing.isEmpty()) {
-                    User user = new User(adminUsername, passwordEncoder.encode(passwordToUse), java.util.Set.of("ROLE_ADMIN"));
+                    User user = new User(adminUsername, passwordEncoder.encode(adminPassword), java.util.Set.of("ROLE_ADMIN"));
                     userRepository.save(user);
                     System.out.println("[BOOTSTRAP] Created admin user");
                 } else {

@@ -1,5 +1,6 @@
 package com.hostel.ordering.service;
 
+import com.hostel.ordering.dto.CreateOrderRequest;
 import com.hostel.ordering.model.Order;
 import com.hostel.ordering.model.OrderItem;
 import com.hostel.ordering.model.OrderStatusConfig;
@@ -62,17 +63,21 @@ public class OrderService {
         this.idempotencyService = idempotencyService;
     }
 
-    public Order createOrder(Order order) {
+    public Order createOrder(CreateOrderRequest request, String createdBy) {
+        Order order = new Order();
+        order.setBookingName(request.getBookingName());
+        order.setDormitory(request.getDormitory());
+        order.setItems(request.getItems());
+        order.setTotalAmount(request.getTotalAmount());
+
         repriceOrder(order);
         order.setCreatedAt(System.currentTimeMillis());
         order.setUpdatedAt(System.currentTimeMillis());
-        if (order.getCreatedBy() == null || order.getCreatedBy().isEmpty()) {
-            order.setCreatedBy("Guest");
-        }
-        order.setUpdatedBy(order.getCreatedBy());
-        if (order.getStatus() == null || order.getStatus().isEmpty()) {
-            order.setStatus("ORDERED");
-        }
+        String byUser = (createdBy != null && !createdBy.isEmpty()) ? createdBy : "Guest";
+        order.setCreatedBy(byUser);
+        order.setUpdatedBy(byUser);
+        order.setStatus("ORDERED");
+
         Order saved = orderRepository.save(order);
         log.info("New order created for {} in {}", saved.getBookingName(), saved.getDormitory());
         fcmNotificationService.sendNewOrderNotification(saved);
@@ -194,8 +199,10 @@ public class OrderService {
                 String fcmToken = admin.getFcmToken();
                 if (fcmToken != null && !fcmToken.isBlank()) {
                     java.util.Map<String, String> data = new java.util.HashMap<>();
+                    data.put("type", "DELIVERED");
                     data.put("action", "postCharge");
                     data.put("orderId", order.getId() != null ? order.getId() : "");
+                    data.put("bookingName", order.getBookingName() != null ? order.getBookingName() : "Order");
                     fcmNotificationService.sendNotificationToToken(
                             fcmToken,
                             "Order Ready to Post",
@@ -223,14 +230,23 @@ public class OrderService {
 
     @Transactional
     public Order postChargeForOrder(String orderId, String room, String updatedBy) {
-        Order order = orderRepository.findById(orderId).orElse(null);
+        // Atomically claim the order for chargepost before calling eZee.
+        // Known ceiling: if JVM dies between claiming and saving, order is stranded in IN_PROGRESS
+        // state with no automatic recovery — this is safe (no double charge) but needs manual reset.
+        Order order = orderRepository.claimForChargePost(orderId);
         if (order == null) {
+            // Another thread already claimed it or order not found
+            Order conflict = orderRepository.findById(orderId).orElse(null);
+            if (conflict != null) {
+                if ("IN_PROGRESS".equals(conflict.getChargePostStatus())) {
+                    log.warn("Chargepost already in progress for order {}", orderId);
+                    conflict.setChargePostError("Chargepost is already being posted by another request");
+                } else if ("QUEUED".equals(conflict.getChargePostStatus())) {
+                    log.warn("Chargepost already queued for order {}, ignoring duplicate post request", orderId);
+                }
+                return conflict;
+            }
             return null;
-        }
-
-        if ("QUEUED".equals(order.getChargePostStatus())) {
-            log.warn("Chargepost already queued for order {}, ignoring duplicate post request", orderId);
-            return order;
         }
 
         if (updatedBy != null) {
@@ -240,18 +256,11 @@ public class OrderService {
         Order result;
         try {
             result = ezeeChargePostService.post(order, room);
-        } catch (OptimisticLockingFailureException e) {
-            log.warn("Chargepost failed for order {} due to concurrent update", orderId);
-            // On optimistic lock failure, reload and fail gracefully
-            order = orderRepository.findById(orderId).orElse(order);
-            order.setChargePostStatus("FAILED");
-            order.setChargePostError("Order was updated concurrently; please retry");
-            result = order;
         } catch (Exception e) {
-            log.error("Chargepost threw exception for order {}, clearing partial state", orderId, e);
-            // On exception, clear any partial state and mark as failed for rollback
+            log.error("Chargepost threw exception for order {}", orderId, e);
+            // On exception, reset the IN_PROGRESS claim so it can be retried
             order.setChargePostedItems(new ArrayList<>());
-            order.setChargePostStatus("FAILED");
+            order.setChargePostStatus(null);
             order.setChargePostError("Chargepost exception: " + e.getMessage());
             result = order;
         }
@@ -262,13 +271,20 @@ public class OrderService {
             result.setUpdatedAt(System.currentTimeMillis());
         }
 
-        Order saved = orderRepository.save(result);
+        Order saved;
+        try {
+            saved = orderRepository.save(result);
+        } catch (OptimisticLockingFailureException e) {
+            log.warn("Chargepost save failed for order {} due to concurrent update", orderId);
+            // Reload and return the current state rather than failing the request
+            saved = orderRepository.findById(orderId).orElse(result);
+        }
 
         if ("QUEUED".equals(saved.getChargePostStatus())) {
             log.info("Order for {} posted to eZee and marked CHECKED", saved.getBookingName());
             auditService.logAction("ORDER_CHECKED", "Order for " + saved.getBookingName() + " posted to eZee room " + room + " and marked CHECKED");
         } else {
-            log.warn("Chargepost failed for order {}, status unchanged: {}", saved.getId(), saved.getChargePostError());
+            log.warn("Chargepost failed for order {}, status: {}", saved.getId(), saved.getChargePostError());
             auditService.logAction("ORDER_CHARGEPOST_FAILED", "Chargepost failed for " + saved.getBookingName() + ": " + saved.getChargePostError());
         }
 
@@ -298,6 +314,10 @@ public class OrderService {
 
     public Object getIdempotencyResult(String idempotencyKey) {
         return idempotencyService.getIfPresent(idempotencyKey);
+    }
+
+    public <T> T getIdempotencyResult(String idempotencyKey, Class<T> type) {
+        return idempotencyService.getIfPresent(idempotencyKey, type);
     }
 
     public void cacheIdempotencyResult(String idempotencyKey, Object result) {

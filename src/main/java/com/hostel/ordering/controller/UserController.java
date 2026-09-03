@@ -5,6 +5,7 @@ import com.hostel.ordering.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -73,15 +74,17 @@ public class UserController {
         }
     }
 
-    @PostMapping("/{id}/register-fcm")
+
+    @PostMapping("/me/register-fcm")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<?> registerFcmToken(@PathVariable String id, @RequestBody Map<String, String> request) {
+    public ResponseEntity<?> registerFcmTokenForCurrentUser(@RequestBody Map<String, String> request, Authentication authentication) {
         String fcmToken = request.get("fcmToken");
         if (fcmToken == null || fcmToken.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("message", "FCM token is required"));
         }
         try {
-            User user = userService.updateFcmToken(id, fcmToken);
+            String username = authentication.getName();
+            User user = userService.updateFcmTokenByUsername(username, fcmToken);
             return ResponseEntity.ok(Map.of("message", "FCM token registered successfully", "userId", user.getId()));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));

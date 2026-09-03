@@ -91,7 +91,8 @@ public class EzeeClient {
                     .POST(HttpRequest.BodyPublishers.ofString(json))
                     .build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            log.info("eZee AddExtraCharge raw response: {}", response.body());
+            log.debug("eZee AddExtraCharge raw response: {}", response.body());
+            log.info("eZee AddExtraCharge request completed");
             return parseExtraChargeResponse(response.body());
         } catch (IOException | InterruptedException e) {
             if (e instanceof InterruptedException) Thread.currentThread().interrupt();
@@ -152,8 +153,9 @@ public class EzeeClient {
             return EzeeMockResponses.roomRowsForOprn(fields.get("oprn"));
         }
         String body = send(fields);
-        log.info("eZee raw response for oprn={}: {}", fields.get("oprn"),
+        log.debug("eZee raw response for oprn={}: {}", fields.get("oprn"),
                 body.length() > 1000 ? body.substring(0, 1000) + "...(truncated)" : body);
+        log.info("eZee postForRoomRows completed for oprn={}", fields.get("oprn"));
         return EzeeXmlUtil.parseRoomRows(body);
     }
 
@@ -164,8 +166,9 @@ public class EzeeClient {
                     EzeeMockResponses.roomRowsForOprn(fields.get("oprn")));
         }
         String body = send(fields);
-        log.info("eZee raw response for oprn={} room={}: {}", fields.get("oprn"), fields.get("room"),
+        log.debug("eZee raw response for oprn={} room={}: {}", fields.get("oprn"), fields.get("room"),
                 body.length() > 1000 ? body.substring(0, 1000) + "...(truncated)" : body);
+        log.info("eZee postRoomQuery completed for oprn={} room={}", fields.get("oprn"), fields.get("room"));
         return new RoomQueryResult(EzeeXmlUtil.parseFlatResponse(body), EzeeXmlUtil.parseRoomRows(body));
     }
 }
