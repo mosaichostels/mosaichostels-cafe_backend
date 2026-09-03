@@ -85,6 +85,13 @@ public class AuthService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
+        // A logout raises this watermark, revoking every token issued before it. The
+        // in-memory blacklist alone would not survive a backend restart.
+        if (user.getTokensValidFrom() != null
+                && jwtUtils.getIssuedAtMillisFromToken(token) < user.getTokensValidFrom()) {
+            throw new IllegalArgumentException("Token was revoked by logout");
+        }
+
         // Create authentication object for token generation
         Set<org.springframework.security.core.GrantedAuthority> authorities = new java.util.HashSet<>();
         user.getRoles().forEach(role -> authorities.add(new org.springframework.security.core.authority.SimpleGrantedAuthority(role)));
@@ -111,6 +118,10 @@ public class AuthService {
         try {
             String username = jwtUtils.getUserNameFromExpiredToken(token);
             jwtUtils.blacklistToken(token);
+            userRepository.findByUsername(username).ifPresent(user -> {
+                user.setTokensValidFrom(System.currentTimeMillis());
+                userRepository.save(user);
+            });
             log.info("User {} logged out successfully", username);
             auditService.logAction("LOGOUT_SUCCESS", "User logged out: " + username);
         } catch (Exception e) {

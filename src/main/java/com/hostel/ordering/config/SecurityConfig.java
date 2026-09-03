@@ -16,8 +16,13 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.http.MediaType;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -64,10 +69,38 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/other-essentials/**").permitAll()
                         .anyRequest().authenticated());
 
+        // Without this, Spring Security 6 falls back to Http403ForbiddenEntryPoint and
+        // answers every unauthenticated request with 403, which clients cannot tell apart
+        // from a genuine "wrong role" denial.
+        http.exceptionHandling(ex -> ex
+                .authenticationEntryPoint(unauthorizedEntryPoint())
+                .accessDeniedHandler(accessDeniedHandler()));
+
         http.authenticationProvider(authenticationProvider());
         http.addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class);
         http.addFilterBefore(authenticationJwtTokenFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    // Missing, expired or otherwise unusable credentials -> 401 so the client can refresh.
+    @Bean
+    public AuthenticationEntryPoint unauthorizedEntryPoint() {
+        return (request, response, authException) -> writeError(response,
+                HttpServletResponse.SC_UNAUTHORIZED, "Authentication required or session expired");
+    }
+
+    // Authenticated but lacking the required role -> 403, which is not a session problem.
+    @Bean
+    public AccessDeniedHandler accessDeniedHandler() {
+        return (request, response, accessDeniedException) -> writeError(response,
+                HttpServletResponse.SC_FORBIDDEN, "You do not have permission to perform this action");
+    }
+
+    private static void writeError(HttpServletResponse response, int status, String message)
+            throws IOException {
+        response.setStatus(status);
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.getWriter().write("{\"message\":\"" + message + "\"}");
     }
 }

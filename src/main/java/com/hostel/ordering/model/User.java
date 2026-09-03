@@ -25,6 +25,10 @@ public class User {
 
     private String fcmToken;
 
+    // Epoch millis. Tokens issued before this instant are revoked (set on explicit logout).
+    // Survives a restart, unlike the in-memory token blacklist.
+    private Long tokensValidFrom;
+
     public User() {}
 
     public User(String username, String password, Set<String> roles) {
@@ -47,4 +51,7 @@ public class User {
 
     public String getFcmToken() { return fcmToken; }
     public void setFcmToken(String fcmToken) { this.fcmToken = fcmToken; }
+
+    public Long getTokensValidFrom() { return tokensValidFrom; }
+    public void setTokensValidFrom(Long tokensValidFrom) { this.tokensValidFrom = tokensValidFrom; }
 }

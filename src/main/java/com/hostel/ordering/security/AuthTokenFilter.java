@@ -34,6 +34,16 @@ public class AuthTokenFilter extends OncePerRequestFilter {
                 String username = jwtUtils.getUserNameFromJwtToken(jwt);
 
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+
+                // The blacklist is in-memory and does not survive a restart, so an explicit
+                // logout also raises a persisted watermark. Honour it here or a token that was
+                // logged out would work again until it expired.
+                if (isRevokedByLogout(userDetails, jwt)) {
+                    logger.warn("Rejected token revoked by logout for user {}", username);
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                         userDetails, null, userDetails.getAuthorities());
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
@@ -45,6 +55,14 @@ public class AuthTokenFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isRevokedByLogout(UserDetails userDetails, String jwt) {
+        if (!(userDetails instanceof AuthUserDetails)) {
+            return false;
+        }
+        Long validFrom = ((AuthUserDetails) userDetails).getTokensValidFrom();
+        return validFrom != null && jwtUtils.getIssuedAtMillisFromToken(jwt) < validFrom;
     }
 
     private String parseJwt(HttpServletRequest request) {

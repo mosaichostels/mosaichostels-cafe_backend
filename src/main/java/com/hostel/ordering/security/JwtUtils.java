@@ -26,8 +26,11 @@ public class JwtUtils {
     // Token blacklist for logout - in-memory Set (could use Redis for multi-server)
     private static final Set<String> tokenBlacklist = ConcurrentHashMap.newKeySet();
 
-    // Maximum staleness allowed for token refresh (24 hours in milliseconds)
-    private static final long REFRESH_GRACE_MS = 24 * 60 * 60 * 1000L;
+    // Maximum staleness allowed for token refresh. Defaults to 365 days so a staff or
+    // admin session survives until they explicitly log out; logout revokes it immediately
+    // via the blacklist and the per-user tokensValidFrom watermark.
+    @Value("${config.jwtRefreshGraceMs:31536000000}")
+    private long refreshGraceMs;
 
     @jakarta.annotation.PostConstruct
     void checkSecret() {
@@ -92,6 +95,16 @@ public class JwtUtils {
         }
     }
 
+    // Get issued-at time from token (works for both valid and expired tokens)
+    public long getIssuedAtMillisFromToken(String token) {
+        try {
+            return Jwts.parserBuilder().setSigningKey(getSigningKey()).build()
+                    .parseClaimsJws(token).getBody().getIssuedAt().getTime();
+        } catch (ExpiredJwtException e) {
+            return e.getClaims().getIssuedAt().getTime();
+        }
+    }
+
     // Get expiration time from token (works for both valid and expired tokens)
     public long getExpirationMillisFromToken(String token) {
         try {
@@ -117,7 +130,7 @@ public class JwtUtils {
 
             // Token can be refreshed if it has not been expired for more than grace period
             // A still-valid (unexpired) token yields negative difference, which is refreshable
-            return timeSinceExpiration <= REFRESH_GRACE_MS;
+            return timeSinceExpiration <= refreshGraceMs;
         } catch (Exception e) {
             // Any parse or signature failure means token is not refreshable
             return false;
@@ -131,7 +144,7 @@ public class JwtUtils {
             try {
                 long expirationMs = getExpirationMillisFromToken(token);
                 // Remove if token expired more than grace period ago
-                return (expirationMs + REFRESH_GRACE_MS) < now;
+                return (expirationMs + refreshGraceMs) < now;
             } catch (Exception e) {
                 // Remove tokens that fail to parse
                 return true;
