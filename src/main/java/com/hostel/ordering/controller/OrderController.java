@@ -63,7 +63,9 @@ public class OrderController {
     }
 
     @PutMapping("/{id}/status")
-    @PreAuthorize("hasRole('ADMIN')")
+    // Staff serve the orders, so they mark them delivered or cancelled. Deleting
+    // orders and posting charges stay admin-only below.
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
     public ResponseEntity<Order> updateOrderStatus(@PathVariable String id,
             @RequestBody Map<String, String> payload,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
