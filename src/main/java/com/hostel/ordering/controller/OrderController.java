@@ -218,9 +218,11 @@ public class OrderController {
         }
     }
 
-    private String getAuthenticatedUser(Authentication authentication) {
-        return authentication != null && authentication.isAuthenticated()
-                ? authentication.getName()
-                : "UNKNOWN";
+    String getAuthenticatedUser(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return "GUEST";
+        }
+        String name = authentication.getName();
+        return "anonymousUser".equals(name) ? "GUEST" : name;
     }
 }
