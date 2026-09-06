@@ -46,6 +46,19 @@ public class UserService {
 
     public void deleteUser(String id) {
         userRepository.findById(id).ifPresent(user -> {
+            // Refuse to remove the last administrator. Every admin-only endpoint would become
+            // unreachable, including user management itself, so there would be no way back in
+            // short of editing the database by hand.
+            if (user.getRoles() != null && user.getRoles().contains("ROLE_ADMIN")) {
+                long remainingAdmins = userRepository.findAll().stream()
+                        .filter(u -> !u.getId().equals(user.getId()))
+                        .filter(u -> u.getRoles() != null && u.getRoles().contains("ROLE_ADMIN"))
+                        .count();
+                if (remainingAdmins == 0) {
+                    throw new IllegalArgumentException(
+                            "Cannot delete the last administrator. Create another admin first.");
+                }
+            }
             userRepository.delete(user);
             log.info("User {} deleted successfully", user.getUsername());
             auditService.logAction("USER_DELETED", "Deleted user: " + user.getUsername());

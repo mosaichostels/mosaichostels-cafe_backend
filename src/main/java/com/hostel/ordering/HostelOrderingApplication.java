@@ -26,8 +26,17 @@ public class HostelOrderingApplication {
         SpringApplication.run(HostelOrderingApplication.class, args);
     }
 
+    /**
+     * Delegates to {@link AuthService#registerInitialAdmin}, which treats config.admin.password
+     * as the source of truth and re-encodes it when the stored hash no longer matches.
+     *
+     * <p>This used to be a create-only copy of that logic inlined here, which meant changing
+     * CONFIG_ADMIN_PASSWORD had no effect on an existing account: the runner logged "already
+     * exists" and left the old hash in place, so the only way back in was to delete the user
+     * row by hand and restart.
+     */
     @Bean
-    CommandLineRunner init(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    CommandLineRunner init(AuthService authService) {
         return args -> {
             if (adminPassword == null || adminPassword.isBlank()) {
                 System.out.println("[BOOTSTRAP] WARN: config.admin.password is not set; skipping default admin creation");
@@ -35,14 +44,8 @@ public class HostelOrderingApplication {
             }
             System.out.println("[BOOTSTRAP] Initializing admin user: " + adminUsername);
             try {
-                var existing = userRepository.findByUsername(adminUsername);
-                if (existing.isEmpty()) {
-                    User user = new User(adminUsername, passwordEncoder.encode(adminPassword), java.util.Set.of("ROLE_ADMIN"));
-                    userRepository.save(user);
-                    System.out.println("[BOOTSTRAP] Created admin user");
-                } else {
-                    System.out.println("[BOOTSTRAP] Admin user already exists");
-                }
+                authService.registerInitialAdmin(adminUsername, adminPassword);
+                System.out.println("[BOOTSTRAP] Admin user ensured: " + adminUsername);
             } catch (Exception e) {
                 System.out.println("[BOOTSTRAP] Error: " + e.getMessage());
             }
