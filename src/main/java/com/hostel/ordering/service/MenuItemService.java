@@ -33,7 +33,12 @@ public class MenuItemService {
     }
 
     public List<MenuItem> getAllMenuItems() {
-        return menuItemRepository.findAll();
+        // Soft-deleted rows must not leak: this endpoint is permitAll, and the admin list calls
+        // it, so a deleted item would both stay publicly readable and reappear in the panel that
+        // deleted it. search() already filters them via 'deleted': { $ne: true }.
+        return menuItemRepository.findAll().stream()
+                .filter(item -> !item.isDeleted())
+                .collect(java.util.stream.Collectors.toList());
     }
 
     public List<MenuItem> getAvailableMenuItems(String category, String sort) {

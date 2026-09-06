@@ -31,7 +31,12 @@ public class OtherEssentialService {
     }
 
     public List<OtherEssential> getAllOtherEssentials() {
-        return otherEssentialRepository.findAll();
+        // Soft-deleted rows must not leak: this endpoint is permitAll, and the admin list calls
+        // it, so a deleted item would both stay publicly readable and reappear in the panel that
+        // deleted it. search() already filters them via 'deleted': { $ne: true }.
+        return otherEssentialRepository.findAll().stream()
+                .filter(item -> !item.isDeleted())
+                .collect(java.util.stream.Collectors.toList());
     }
 
     public List<OtherEssential> getAvailableOtherEssentials(String category, String sort) {
