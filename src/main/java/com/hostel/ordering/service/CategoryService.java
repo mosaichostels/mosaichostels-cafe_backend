@@ -119,6 +119,23 @@ public class CategoryService {
     @Transactional
     public void deleteCategory(String id) {
         categoryRepository.findById(id).ifPresent(category -> {
+            // Items reference their category by name, so deleting one in use leaves those items
+            // pointing at a category that no longer exists. They still render, but drop out of
+            // the configured ordering into an alphabetical fallback, silently.
+            long inUse = mongoTemplate.count(
+                    org.springframework.data.mongodb.core.query.Query.query(
+                            org.springframework.data.mongodb.core.query.Criteria
+                                    .where("category").is(category.getName())
+                                    .and("deleted").ne(true)),
+                    Category.TYPE_ESSENTIAL.equals(category.getType())
+                            ? "other_essentials"
+                            : "menu_items");
+            if (inUse > 0) {
+                throw new IllegalArgumentException(
+                        "Cannot delete \"" + category.getName() + "\": " + inUse
+                                + " item(s) still use it. Move or delete those items first.");
+            }
+
             int deletedOrder = category.getShowOrder();
             String type = category.getType();
             categoryRepository.delete(category);

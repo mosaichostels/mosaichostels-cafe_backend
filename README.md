@@ -16,7 +16,9 @@ This is the high-performance backend for the Mosaic Hostels cafe ordering system
 - **SDK**: Docker
 - **RAM**: 16 GB (CPU Basic)
 - **Port**: 7860
-- **Keep-Alive**: Configured to stay awake with heartbeats.
+- **Sleep**: the Space sleeps without inbound traffic. The internal heartbeat and the
+  Docker HEALTHCHECK are liveness markers only - neither keeps it awake. Use an external
+  uptime pinger against the public URL if 24/7 warmth is needed.
 
 ## 🔗 How to Use
 

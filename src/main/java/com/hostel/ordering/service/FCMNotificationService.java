@@ -105,41 +105,18 @@ public class FCMNotificationService {
         }
     }
 
-    @Async
-    public void sendAppUpdateNotification(String versionName, String downloadUrl, String releaseNotes) {
-        try {
-            String title = "🔄 App Update Required";
-            String body = "Version " + versionName + " is now required. Tap to update.";
 
-            AndroidConfig androidConfig = AndroidConfig.builder()
-                    .setPriority(AndroidConfig.Priority.HIGH)
-                    .setTtl(3600 * 1000L)
-                    .build();
-
-            Message message = Message.builder()
-                    .setTopic(ORDERS_TOPIC)
-                    .setAndroidConfig(androidConfig)
-                    .putData("type", "APP_UPDATE")
-                    .putData("versionName", versionName)
-                    .putData("downloadUrl", downloadUrl)
-                    .putData("releaseNotes", releaseNotes != null ? releaseNotes : "")
-                    .putData("title", title)
-                    .putData("body", body)
-                    .build();
-
-            String response = firebaseMessaging.send(message);
-            logger.info("✅ FCM app-update notification sent: {}", response);
-
-        } catch (Exception e) {
-            logger.error("❌ Failed to send FCM app-update notification", e);
-        }
+    /** Enough of the token to correlate log lines, without putting the credential in the log. */
+    private static String maskToken(String token) {
+        if (token == null || token.length() < 12) return "<redacted>";
+        return token.substring(0, 6) + "…" + token.substring(token.length() - 4);
     }
 
     public void subscribeToTopic(String token) {
         try {
             TopicManagementResponse response = firebaseMessaging.subscribeToTopic(
                     java.util.Collections.singletonList(token), ORDERS_TOPIC);
-            logger.info("✅ Token subscribed to topic: {} -> {} successes", token, response.getSuccessCount());
+            logger.info("✅ Token subscribed to topic: {} -> {} successes", maskToken(token), response.getSuccessCount());
         } catch (FirebaseMessagingException e) {
             logger.error("❌ Failed to subscribe token to topic", e);
         }
@@ -149,7 +126,7 @@ public class FCMNotificationService {
         try {
             TopicManagementResponse response = firebaseMessaging.unsubscribeFromTopic(
                     java.util.Collections.singletonList(token), ORDERS_TOPIC);
-            logger.info("✅ Token unsubscribed from topic: {} -> {} successes", token, response.getSuccessCount());
+            logger.info("✅ Token unsubscribed from topic: {} -> {} successes", maskToken(token), response.getSuccessCount());
         } catch (FirebaseMessagingException e) {
             logger.error("❌ Failed to unsubscribe token from topic", e);
         }
