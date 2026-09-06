@@ -253,8 +253,7 @@ public class EzeeChargePostService {
         String name = item.getMenuItemName() != null && !item.getMenuItemName().isBlank()
                 ? item.getMenuItemName()
                 : "Item";
-        String posuser = updatedBy == null ? "system" : updatedBy;
-        return name + " x" + item.getQuantity() + " (posted by " + posuser + ")";
+        return name + " x" + item.getQuantity();
     }
 
     // eZee's Kiosk Connectivity API (AddExtraCharge) has no void/remove
