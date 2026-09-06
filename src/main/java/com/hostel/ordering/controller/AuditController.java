@@ -23,8 +23,15 @@ public class AuditController {
     AuditService auditService;
 
     @GetMapping
-    public List<AuditLog> getAuditLogs() {
-        return auditService.getAllLogs();
+    public List<AuditLog> getAuditLogs(
+            @RequestParam(required = false) String action,
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) Long dateFrom,
+            @RequestParam(required = false) Long dateTo) {
+        if (action == null && username == null && dateFrom == null && dateTo == null) {
+            return auditService.getAllLogs();
+        }
+        return auditService.getFilteredLogs(action, username, dateFrom, dateTo);
     }
 
     @DeleteMapping

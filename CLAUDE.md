@@ -38,10 +38,26 @@ JWT (jjwt 0.11.5), Lombok, Firebase Admin SDK (FCM push). Maven build
 MongoDB (Spring Data MongoDB / `MongoRepository` + `MongoTemplate` for
 custom queries). No SQL.
 
-## Auth
+## Auth & Authorization
 
 JWT-based, `Bearer` token, filter chain in `security/SecurityConfig.java` +
 `AuthTokenFilter`. `AuthController` issues tokens, `AuthService` validates.
+
+**Public endpoints** (no auth required):
+- `/auth/**` (login, refresh, logout)
+- `/health`
+- `POST /orders` (guests create orders unauthenticated)
+- `GET /config`, `GET /menu-items/**`, `GET /other-essentials/**` (guest data fetch)
+
+**Authenticated endpoints** (require valid JWT + role):
+- `GET /orders`, `GET /orders/{id}`, `PUT /orders/{id}/status` — require ADMIN or STAFF
+- `DELETE /orders/{id}`, `DELETE /orders`, `POST /orders/{id}/chargepost`, `GET /orders/{id}/ezee-candidates` — require ADMIN only
+- All other endpoints protected via `@PreAuthorize` annotations
+
+**Order creation (POST /orders):** Permitted unauthenticated; prices re-fetched from
+DB (never client-supplied) to prevent tampering. Guest orders get `createdBy="Guest"`
+in audit log. Staff/admin can also create orders (authenticated path with same price
+validation).
 
 ## eZee PMS integration
 
@@ -60,13 +76,26 @@ order clicks "Post & Check", searches eZee's live occupant data via
 `POST /orders/{id}/chargepost {room}` then re-resolves the live folio via
 `roomquery(room)` (never cached from the search step), posts via
 `chargepost`, and on success sets `order.status = "CHECKED"`.
-`chargePostStatus` is `null` (never posted) | `QUEUED` (eZee accepted) |
-`FAILED` (eZee rejected or no live folio) | `VOIDED` (order cancelled after
+
+**Double-charge prevention:** `orderRepository.claimForChargePost(orderId)`
+atomically claims order in `IN_PROGRESS` state. If already claimed by another
+request, returns null (prevents concurrent posts). Idempotency-Key header
+deduplicates retries. On exception, resets claim so order can be retried.
+
+`chargePostStatus` is `null` (never posted) | `IN_PROGRESS` (claim held,
+posting active) | `QUEUED` (eZee accepted) | `VOIDED` (order cancelled after
 posting — `updateOrderStatus()` calls `EzeeChargePostService.voidPost(order)`
 on transition to `CANCELLED` when status was `QUEUED`; on void failure the
-status stays `QUEUED`, never claim a void that didn't happen).
+status stays `QUEUED`, never claim a void that didn't happen). On error,
+stays null or QUEUED (failed/transient) with `chargePostError` explaining why.
 `createOrder()` makes no eZee call. Scope is backend + frontend only — no
 `mosaichostels-cafe_android` changes, ever, for this feature.
+
+**Audit trail:** Every order mutation logged to `AuditLog` with `createdBy`/
+`updatedBy` user, timestamp, action (ORDER_CREATED, ORDER_STATUS_UPDATED,
+ORDER_CHECKED, ORDER_CHARGEPOST_FAILED, etc.). DELETE /audit endpoint with
+confirmation token generates self-audit record (preserves trail that audit
+was wiped).
 
 **AddExtraCharge API quirks** (undocumented, found from raw production
 responses, not the API docs):
@@ -97,6 +126,22 @@ to the HF Space via `.github/workflows/sync_to_hf.yml`.
 Firebase Admin SDK → FCM push via `FCMNotificationService` /
 `NotificationController`.
 
+## Known Issues
+
+**No validation of 400 vs 401 vs 403 distinction in error responses (LOW)**
+- Auth errors (401) and permission errors (403) return same generic message structure
+- Frontend could provide better UX by distinguishing credential failure from insufficient role
+- Fix: Add error detail in response body, frontend reads and acts on it
+
+**Rate limiting not implemented (LOW)**
+- Unauthenticated endpoints (/auth/login, POST /orders) subject to brute-force attacks
+- Fix: Add rate-limit middleware on /auth/login (e.g., 5 attempts per minute per IP)
+
+**App version check infrastructure removed (COMPLETED Sep 3, 2026)**
+- Forced app update feature was scaffolded Aug 21-31, then removed after audit
+- Status: All code, endpoints, Android UI, backend controllers deleted
+- Note for future: Do not resurrect without explicit requirement
+
 ## Tooling in this repo
 
 - `.claude/agents/security-reviewer.md` — auth/JWT/security review
@@ -110,3 +155,4 @@ Firebase Admin SDK → FCM push via `FCMNotificationService` /
   `../mosaichostels-cafe_android` (staff Android app) — both consume this
   API; check `ApiService.java` (Android) or `js/api.js` (frontend) against
   the matching controller before changing a response shape.
+  API contract checker agent: `.claude/agents/api-contract-checker.md`

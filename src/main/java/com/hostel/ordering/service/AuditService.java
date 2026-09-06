@@ -42,6 +42,25 @@ public class AuditService {
         return auditRepository.findAll(Sort.by(Sort.Direction.DESC, "timestamp"));
     }
 
+    public List<AuditLog> getFilteredLogs(String action, String username, Long dateFrom, Long dateTo) {
+        List<AuditLog> logs = getAllLogs();
+
+        if (action != null && !action.isBlank()) {
+            logs = logs.stream().filter(l -> l.getAction().contains(action)).toList();
+        }
+        if (username != null && !username.isBlank()) {
+            logs = logs.stream().filter(l -> l.getUsername().contains(username)).toList();
+        }
+        if (dateFrom != null) {
+            logs = logs.stream().filter(l -> l.getTimestamp() >= dateFrom).toList();
+        }
+        if (dateTo != null) {
+            logs = logs.stream().filter(l -> l.getTimestamp() <= dateTo).toList();
+        }
+
+        return logs;
+    }
+
     public void deleteAllLogs() {
         auditRepository.deleteAll();
     }

@@ -33,7 +33,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if ("POST".equals(method) && path.equals("/orders")) {
             limit = 5;
         } else if ("POST".equals(method) && path.equals("/auth/login")) {
-            limit = 10;
+            limit = 5;
         }
 
         if (limit > 0) {
@@ -48,7 +48,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
             RateLimit rl = limits.computeIfAbsent(key, k -> new RateLimit());
             if (!rl.allowRequest(limit, WINDOW_MS)) {
                 response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-                response.getWriter().write("Rate limit exceeded");
+                response.setContentType("application/json");
+                response.getWriter().write("{\"errorCode\":\"RATE_LIMIT_EXCEEDED\",\"message\":\"Too many requests. Try again in 1 minute.\"}");
                 return;
             }
         }
