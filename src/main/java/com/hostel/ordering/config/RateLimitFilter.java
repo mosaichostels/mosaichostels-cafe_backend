@@ -1,5 +1,6 @@
 package com.hostel.ordering.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -13,6 +14,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
@@ -49,7 +52,15 @@ public class RateLimitFilter extends OncePerRequestFilter {
             if (!rl.allowRequest(limit, WINDOW_MS)) {
                 response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
                 response.setContentType("application/json");
-                response.getWriter().write("{\"errorCode\":\"RATE_LIMIT_EXCEEDED\",\"message\":\"Too many requests. Try again in 1 minute.\"}");
+                try {
+                    Map<String, String> errorResponse = new HashMap<>();
+                    errorResponse.put("errorCode", "RATE_LIMIT_EXCEEDED");
+                    errorResponse.put("message", "Too many requests. Try again in 1 minute.");
+                    ObjectMapper mapper = new ObjectMapper();
+                    response.getWriter().write(mapper.writeValueAsString(errorResponse));
+                } catch (Exception e) {
+                    response.getWriter().write("{\"errorCode\":\"RATE_LIMIT_EXCEEDED\",\"message\":\"Too many requests\"}");
+                }
                 return;
             }
         }

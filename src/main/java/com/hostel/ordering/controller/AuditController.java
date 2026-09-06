@@ -27,11 +27,13 @@ public class AuditController {
             @RequestParam(required = false) String action,
             @RequestParam(required = false) String username,
             @RequestParam(required = false) Long dateFrom,
-            @RequestParam(required = false) Long dateTo) {
+            @RequestParam(required = false) Long dateTo,
+            @RequestParam(required = false) Integer limit,
+            @RequestParam(required = false) Integer offset) {
         if (action == null && username == null && dateFrom == null && dateTo == null) {
-            return auditService.getAllLogs();
+            return auditService.getFilteredLogs(null, null, null, null, limit, offset);
         }
-        return auditService.getFilteredLogs(action, username, dateFrom, dateTo);
+        return auditService.getFilteredLogs(action, username, dateFrom, dateTo, limit, offset);
     }
 
     @DeleteMapping
