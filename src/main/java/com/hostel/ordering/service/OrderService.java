@@ -282,7 +282,16 @@ public class OrderService {
 
         if ("QUEUED".equals(saved.getChargePostStatus())) {
             log.info("Order for {} posted to eZee and marked CHECKED", saved.getBookingName());
-            auditService.logAction("ORDER_CHECKED", "Order for " + saved.getBookingName() + " posted to eZee room " + room + " and marked CHECKED");
+            // bookingName is typed by the guest on the public order page and is not verified,
+            // so the audit trail has to record both what the guest claimed and which folio the
+            // charge actually reached. Without the folio and the dormitory a mis-post cannot be
+            // reconstructed after the fact.
+            auditService.logAction("ORDER_CHECKED",
+                    "Order for \"" + saved.getBookingName() + "\" (dormitory: "
+                            + (saved.getDormitory() != null ? saved.getDormitory() : "-")
+                            + ") posted to eZee room " + room
+                            + " folio " + (saved.getChargePostFolio() != null ? saved.getChargePostFolio() : "-")
+                            + " and marked CHECKED");
         } else {
             log.warn("Chargepost failed for order {}, status: {}", saved.getId(), saved.getChargePostError());
             auditService.logAction("ORDER_CHARGEPOST_FAILED", "Chargepost failed for " + saved.getBookingName() + ": " + saved.getChargePostError());
