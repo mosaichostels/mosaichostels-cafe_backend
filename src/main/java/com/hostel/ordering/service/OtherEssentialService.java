@@ -56,10 +56,15 @@ public class OtherEssentialService {
     }
 
     public List<OtherEssential> searchOtherEssentials(String query, boolean availableOnly) {
+        // The repository interpolates this straight into a $regex, and the search endpoint is
+        // unauthenticated, so an unescaped query is a regex anyone on the internet can run -
+        // including a catastrophically backtracking one. Pattern.quote makes it a literal,
+        // matching what OrderRepositoryImpl already does for the order search.
+        String literal = java.util.regex.Pattern.quote(query == null ? "" : query);
         if (availableOnly) {
-            return otherEssentialRepository.findByNameContainingIgnoreCaseAndAvailableTrueOrderByNameAsc(query);
+            return otherEssentialRepository.findByNameContainingIgnoreCaseAndAvailableTrueOrderByNameAsc(literal);
         }
-        return otherEssentialRepository.findByNameContainingIgnoreCaseOrderByNameAsc(query);
+        return otherEssentialRepository.findByNameContainingIgnoreCaseOrderByNameAsc(literal);
     }
 
     public OtherEssential updateOtherEssential(String id, OtherEssential otherEssential) {

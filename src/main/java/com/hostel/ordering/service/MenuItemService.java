@@ -59,10 +59,15 @@ public class MenuItemService {
     }
 
     public List<MenuItem> searchMenuItems(String query, boolean availableOnly) {
+        // The repository interpolates this straight into a $regex, and the search endpoint is
+        // unauthenticated, so an unescaped query is a regex anyone on the internet can run -
+        // including a catastrophically backtracking one. Pattern.quote makes it a literal,
+        // matching what OrderRepositoryImpl already does for the order search.
+        String literal = java.util.regex.Pattern.quote(query == null ? "" : query);
         if (availableOnly) {
-            return menuItemRepository.findByNameContainingIgnoreCaseAndAvailableTrueOrderByNameAsc(query);
+            return menuItemRepository.findByNameContainingIgnoreCaseAndAvailableTrueOrderByNameAsc(literal);
         }
-        return menuItemRepository.findByNameContainingIgnoreCaseOrderByNameAsc(query);
+        return menuItemRepository.findByNameContainingIgnoreCaseOrderByNameAsc(literal);
     }
 
     public MenuItem updateMenuItem(String id, MenuItem menuItem) {
