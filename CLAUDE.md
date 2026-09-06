@@ -38,10 +38,57 @@ JWT (jjwt 0.11.5), Lombok, Firebase Admin SDK (FCM push). Maven build
 MongoDB (Spring Data MongoDB / `MongoRepository` + `MongoTemplate` for
 custom queries). No SQL.
 
+**`auto-index-creation: true`.** It was false, which made every `@Indexed` /
+`@CompoundIndex` on the models inert — the live database had nothing but `_id_`
+on every collection. Declare indexes on the model; they build at startup.
+`User.username` is unique, `Order` carries `status_createdAt`.
+
+**Soft delete.** `MenuItem` and `OtherEssential` carry a `deleted` flag and the
+repositories filter `'deleted': { $ne: true }` — which also matches documents
+that predate the field. `getAll*` filters too: those endpoints are `permitAll`,
+and the admin panel reads them, so an unfiltered list both leaks removed items
+and resurrects them in the UI that deleted them. Dormitories hard-delete on
+purpose: orders store the dormitory as a string snapshot, so removing one cannot
+corrupt history.
+
+**Never interpolate user input into a `$regex`.** `/menu-items/search` and
+`/other-essentials/search` are unauthenticated; an unescaped term runs as a
+regex for anyone on the internet, and a catastrophically backtracking one pins
+the query thread. Wrap it in `Pattern.quote`, as `OrderRepositoryImpl` does.
+
+**Idempotency records live in Mongo** (`IdempotencyRecord`, TTL index on
+`createdAt`). They used to be a process-local map, which a restart erased — and
+this backend runs on a Space that sleeps and redeploys, so the retry after an
+interrupted request was exactly the one treated as a first attempt.
+
 ## Auth & Authorization
 
 JWT-based, `Bearer` token, filter chain in `security/SecurityConfig.java` +
 `AuthTokenFilter`. `AuthController` issues tokens, `AuthService` validates.
+
+**`config.admin.password` is the source of truth for the admin account.** The
+startup runner delegates to `AuthService.registerInitialAdmin`, which re-encodes
+the password when the stored hash no longer matches. It previously carried its
+own create-only copy of that logic, so changing `CONFIG_ADMIN_PASSWORD` did
+nothing to an existing account and the only way back in was deleting the user row
+by hand.
+
+**Logout is durable.** The in-memory blacklist does not survive a restart, so
+logout also raises a persisted `tokensValidFrom` watermark that
+`AuthTokenFilter` honours on every request. `config.jwtRefreshGraceMs` defaults
+to 365 days, so a session lasts until an explicit logout — there is no way to
+revoke one leaked token without revoking all of that user's.
+
+**The last administrator cannot be deleted** (`UserService.deleteUser`).
+Removing them would make every admin-only endpoint unreachable, user management
+included.
+
+**Errors never carry internal detail.** `GlobalExceptionHandler`'s catch-all
+returns a short reference and logs the stack; a Mongo failure once served the
+database username and auth mechanism from an unauthenticated `GET /health`.
+`IllegalArgumentException` still passes its message through — that is how
+"Username is already taken!" and the delete guards reach the UI — so use it for
+anything a caller should read.
 
 **Public endpoints** (no auth required):
 - `/auth/**` (login, refresh, logout)
@@ -97,6 +144,12 @@ ORDER_CHECKED, ORDER_CHARGEPOST_FAILED, etc.). DELETE /audit endpoint with
 confirmation token generates self-audit record (preserves trail that audit
 was wiped).
 
+**Retention is 90 days** (`audit.retention-days`, pruned nightly by
+`AuditCleanupTask`). It was 7, which is shorter than most charge disputes. The
+chargepost entry records the guest-supplied booking name, the dormitory, the eZee
+room and the folio, so a mis-post can be reconstructed — `bookingName` is free
+text typed on the public order page and is not verified.
+
 **AddExtraCharge API quirks** (undocumented, found from raw production
 responses, not the API docs):
 - Success responses use `"Errors"` (plural, `ErrorCode: "0"`); rejections
@@ -124,7 +177,16 @@ to the HF Space via `.github/workflows/sync_to_hf.yml`.
 ## Notifications
 
 Firebase Admin SDK → FCM push via `FCMNotificationService` /
-`NotificationController`.
+`NotificationController`. Registration tokens are masked in logs — they address
+a specific device.
+
+`FirebaseConfig` throws when credentials are missing, so the whole application
+fails to start without `FIREBASE_SERVICE_ACCOUNT_JSON`, not just notifications.
+
+**Nothing here keeps the Space awake.** `HeartbeatTask` and the Dockerfile
+`HEALTHCHECK` are liveness markers only; a Hugging Face Space sleeps on absence
+of *inbound* traffic, which neither an internal log line nor a localhost curl can
+supply. A sleeping Space also means the nightly audit cron may not fire.
 
 ## Known Issues
 
