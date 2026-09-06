@@ -2,6 +2,7 @@ package com.hostel.ordering.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -13,6 +14,9 @@ public class User {
     @Id
     private String id;
 
+    // Unique because authentication resolves an account by username alone: two rows with the
+    // same name would make findByUsername return an arbitrary one of them.
+    @Indexed(unique = true)
     @NotBlank(message = "Username cannot be blank")
     private String username;
 

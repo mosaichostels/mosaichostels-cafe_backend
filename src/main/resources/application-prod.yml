@@ -16,7 +16,9 @@ spring:
   data:
     mongodb:
       uri: ${MONGODB_URI}
-      auto-index-creation: false
+      # On so the @Indexed/@CompoundIndex declarations on the models are actually applied.
+      # With it off they were inert and the only index in the database was _id.
+      auto-index-creation: true
 
 logging:
   level:

@@ -2,6 +2,7 @@ package com.hostel.ordering.model;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Version;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -9,6 +10,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Document(collection = "orders")
+// Every list view queries by status and shows newest first; without this the lookup is a
+// collection scan that degrades as orders accumulate.
+@CompoundIndex(name = "status_createdAt", def = "{'status': 1, 'createdAt': -1}")
 public class Order {
     @Id
     private String id;
