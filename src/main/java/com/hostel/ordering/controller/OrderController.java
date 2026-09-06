@@ -25,6 +25,7 @@ public class OrderController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
     public ResponseEntity<Order> createOrder(@Valid @RequestBody CreateOrderRequest request,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             Authentication authentication) {
@@ -44,12 +45,14 @@ public class OrderController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
     public ResponseEntity<Order> getOrder(@PathVariable String id) {
         Order order = orderService.getOrder(id);
         return order != null ? ResponseEntity.ok(order) : ResponseEntity.notFound().build();
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
     public ResponseEntity<List<Order>> getAllOrders(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String dormitory,
