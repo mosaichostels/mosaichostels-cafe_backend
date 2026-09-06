@@ -128,14 +128,27 @@ Firebase Admin SDK → FCM push via `FCMNotificationService` /
 
 ## Known Issues
 
-**No validation of 400 vs 401 vs 403 distinction in error responses (LOW)**
-- Auth errors (401) and permission errors (403) return same generic message structure
-- Frontend could provide better UX by distinguishing credential failure from insufficient role
-- Fix: Add error detail in response body, frontend reads and acts on it
+**Guest order authorization (CRITICAL - FIXED Sep 6, 2026)**
+- Issue: `@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")` on POST /orders blocked unauthenticated guests
+- Cause: Method-level security overrides HTTP-level `permitAll()` in SecurityConfig
+- Fix: Changed to `@PreAuthorize("hasAnyRole('ADMIN', 'STAFF') or isAnonymous()")`
+- Status: Guest orders now work correctly; commit 6f15b20
 
-**Rate limiting not implemented (LOW)**
-- Unauthenticated endpoints (/auth/login, POST /orders) subject to brute-force attacks
-- Fix: Add rate-limit middleware on /auth/login (e.g., 5 attempts per minute per IP)
+**Auth error codes with errorCode field (COMPLETED Sep 6, 2026)**
+- Added `errorCode` field to all auth endpoints (INVALID_REQUEST, INVALID_CREDENTIALS, etc.)
+- Frontend can now distinguish rate-limited from invalid-creds from server errors
+- Commit 4a66e70
+
+**Rate limiting on /auth/login and POST /orders (COMPLETED Sep 6, 2026)**
+- Tightened to 5/min per IP/username to prevent brute-force attacks
+- JSON response via ObjectMapper with fallback serialization
+- Commit 5af368f
+
+**Audit log filtering and pagination (COMPLETED Sep 6, 2026)**
+- Added case-insensitive filtering on action, username
+- Added limit/offset pagination (default 100, max 1000)
+- Prevents memory spike on large audit datasets
+- Commit 5af368f
 
 **App version check infrastructure removed (COMPLETED Sep 3, 2026)**
 - Forced app update feature was scaffolded Aug 21-31, then removed after audit
