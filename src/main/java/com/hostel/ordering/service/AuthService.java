@@ -101,8 +101,13 @@ public class AuthService {
 
         String newToken = jwtUtils.generateJwtToken(authentication);
 
-        // Blacklist the old token to prevent replay on refresh
-        jwtUtils.blacklistToken(token);
+        // The old token is deliberately NOT blacklisted here. A refresh is not reliably
+        // acknowledged: when the client times out or the Space drops the response after this
+        // method has run, blacklisting leaves the client holding a token the server has already
+        // rejected, so every later refresh 401s - one lost response, a permanently dead session.
+        // It also makes a client-side retry of a refresh fail by construction. The old token
+        // expires on its own (config.jwtExpirationMs, 1h); real revocation is the persisted
+        // tokensValidFrom watermark raised by logout(), which a restart cannot wipe.
 
         Map<String, Object> response = new HashMap<>();
         response.put("token", newToken);
