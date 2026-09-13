@@ -185,7 +185,11 @@ public class EzeeChargePostService {
 
                     String amount = String.format(Locale.US, "%.2f", item.getPrice());
                     String qty = item.getQuantity().toString();
-                    String comment = buildCommentForItem(item, order.getUpdatedBy());
+                    // Name only: eZee renders the folio line as "<Comment> [Qty N]" from the
+                    // Qty field below, so a quantity in the comment prints it twice.
+                    String comment = item.getMenuItemName() != null && !item.getMenuItemName().isBlank()
+                            ? item.getMenuItemName()
+                            : "Item";
 
                     // Retry logic: if postExtraCharge fails with folio/occupant/room error,
                     // re-query once and retry. Max 1 retry to avoid loops.
@@ -247,13 +251,6 @@ public class EzeeChargePostService {
         order.setChargePostRequestId(null);
         log.warn("Chargepost failed for order {}: {}", order.getId(), reason);
         return order;
-    }
-
-    private String buildCommentForItem(OrderItem item, String updatedBy) {
-        String name = item.getMenuItemName() != null && !item.getMenuItemName().isBlank()
-                ? item.getMenuItemName()
-                : "Item";
-        return name + " x" + item.getQuantity();
     }
 
     // eZee's Kiosk Connectivity API (AddExtraCharge) has no void/remove
