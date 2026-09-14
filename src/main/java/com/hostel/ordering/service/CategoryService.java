@@ -72,8 +72,17 @@ public class CategoryService {
                     int oldOrder = existing.getShowOrder();
                     int newOrder = category.getShowOrder();
 
-                    if (category.getName() != null) {
+                    if (category.getName() != null && !category.getName().equals(oldName)) {
                         existing.setName(category.getName());
+                        // Items reference their category by name, so a rename that stops here
+                        // leaves every item pointing at the old one: it keeps rendering under the
+                        // old heading and drops out of the configured ordering, in both clients.
+                        mongoTemplate.updateMulti(
+                                Query.query(Criteria.where("category").is(oldName)),
+                                new Update().set("category", category.getName()),
+                                Category.TYPE_ESSENTIAL.equals(existing.getType())
+                                        ? "other_essentials"
+                                        : "menu_items");
                     }
 
                     if (newOrder > 0 && newOrder != oldOrder) {
