@@ -1,5 +1,6 @@
 package com.hostel.ordering.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 @Document(collection = "dormitories")
@@ -8,6 +9,8 @@ public class Dormitory {
     @Id
     private String id;
     private String name;
+    @JsonProperty("showOrder")
+    private int showOrder;
 
     public Dormitory() {
     }
@@ -30,5 +33,13 @@ public class Dormitory {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public int getShowOrder() {
+        return showOrder;
+    }
+
+    public void setShowOrder(int showOrder) {
+        this.showOrder = showOrder;
     }
 }
