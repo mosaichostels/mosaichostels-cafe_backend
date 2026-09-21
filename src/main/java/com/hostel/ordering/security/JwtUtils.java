@@ -105,6 +105,10 @@ public class JwtUtils {
         }
     }
 
+    public boolean isIssuedBeforeValidFrom(String token, Long validFrom) {
+        return validFrom != null && getIssuedAtMillisFromToken(token) < validFrom;
+    }
+
     // Get expiration time from token (works for both valid and expired tokens)
     public long getExpirationMillisFromToken(String token) {
         try {

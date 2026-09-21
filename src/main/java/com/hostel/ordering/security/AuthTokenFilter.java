@@ -62,7 +62,7 @@ public class AuthTokenFilter extends OncePerRequestFilter {
             return false;
         }
         Long validFrom = ((AuthUserDetails) userDetails).getTokensValidFrom();
-        return validFrom != null && jwtUtils.getIssuedAtMillisFromToken(jwt) < validFrom;
+        return jwtUtils.isIssuedBeforeValidFrom(jwt, validFrom);
     }
 
     private String parseJwt(HttpServletRequest request) {

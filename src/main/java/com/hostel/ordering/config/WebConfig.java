@@ -12,9 +12,13 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
-        String[] allowedOrigins = corsOrigins.isBlank()
-                ? new String[] { "http://localhost:3000" }
-                : corsOrigins.split(",");
+        String[] allowedOrigins = java.util.Arrays.stream(corsOrigins.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty())
+                .toArray(String[]::new);
+        if (allowedOrigins.length == 0) {
+            allowedOrigins = new String[] { "http://localhost:3000" };
+        }
 
         String[] allowedHeaders = {
             "Content-Type",

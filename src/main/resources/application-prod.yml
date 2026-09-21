@@ -38,7 +38,9 @@ management:
       show-details: never
 
 cors:
-  allowed-origins: ${CORS_ALLOWED_ORIGINS:*}
+  # Production must set this to the deployed frontend origin(s), comma-separated.
+  # No wildcard here: credentials are allowed, so an open origin list is unsafe.
+  allowed-origins: ${CORS_ALLOWED_ORIGINS}
 
 ezee:
   mock: false

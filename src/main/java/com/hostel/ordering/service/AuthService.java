@@ -87,8 +87,7 @@ public class AuthService {
 
         // A logout raises this watermark, revoking every token issued before it. The
         // in-memory blacklist alone would not survive a backend restart.
-        if (user.getTokensValidFrom() != null
-                && jwtUtils.getIssuedAtMillisFromToken(token) < user.getTokensValidFrom()) {
+        if (jwtUtils.isIssuedBeforeValidFrom(token, user.getTokensValidFrom())) {
             throw new IllegalArgumentException("Token was revoked by logout");
         }
 
@@ -96,8 +95,12 @@ public class AuthService {
         Set<org.springframework.security.core.GrantedAuthority> authorities = new java.util.HashSet<>();
         user.getRoles().forEach(role -> authorities.add(new org.springframework.security.core.authority.SimpleGrantedAuthority(role)));
 
+        // generateJwtToken() reads the username off a UserDetails principal, not a raw
+        // String - passing the String directly threw ClassCastException on every refresh.
+        org.springframework.security.core.userdetails.User principal =
+                new org.springframework.security.core.userdetails.User(user.getUsername(), user.getPassword(), authorities);
         Authentication authentication = new UsernamePasswordAuthenticationToken(
-                user.getUsername(), null, authorities);
+                principal, null, authorities);
 
         String newToken = jwtUtils.generateJwtToken(authentication);
 
