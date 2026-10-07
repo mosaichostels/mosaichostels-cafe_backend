@@ -26,7 +26,8 @@ public class FCMNotificationService {
             Double totalAmount = order.getTotalAmount() != null ? order.getTotalAmount() : 0.0;
 
             String title = "🍽 New Order Received";
-            String body = bookingName + " placed an order ";
+            String dorm = order.getDormitory() != null && !order.getDormitory().isBlank() ? order.getDormitory() : "-";
+            String body = bookingName + " · " + dorm + " · ₹" + String.format(java.util.Locale.US, "%.2f", totalAmount);
 
             AndroidConfig androidConfig = AndroidConfig.builder()
                     .setPriority(AndroidConfig.Priority.HIGH)
@@ -67,11 +68,8 @@ public class FCMNotificationService {
             String orderId = order.getId() != null ? order.getId() : "UNKNOWN";
             String bookingName = order.getBookingName() != null ? order.getBookingName() : "Guest";
 
-            String title = "❌ Order Cancelled!";
-            String body = String.format(
-                    "Order #%s for %s has been cancelled.",
-                    orderId.length() >= 8 ? orderId.substring(0, 8) : orderId,
-                    bookingName);
+            String title = "❌ Order Cancelled";
+            String body = "Order " + shortId(orderId) + " for " + bookingName + " was cancelled";
 
             AndroidConfig androidConfig = AndroidConfig.builder()
                     .setPriority(AndroidConfig.Priority.HIGH)
@@ -105,6 +103,12 @@ public class FCMNotificationService {
         }
     }
 
+
+    /** Same short id every client shows: the last 6 characters, which are the part of an ObjectId that differs between orders placed close together. */
+    static String shortId(String id) {
+        if (id == null) return "#?";
+        return "#" + (id.length() > 6 ? id.substring(id.length() - 6) : id).toUpperCase(java.util.Locale.ROOT);
+    }
 
     /** Enough of the token to correlate log lines, without putting the credential in the log. */
     private static String maskToken(String token) {
