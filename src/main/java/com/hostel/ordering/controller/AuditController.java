@@ -22,6 +22,9 @@ public class AuditController {
     @Autowired
     AuditService auditService;
 
+    @Autowired
+    com.hostel.ordering.service.ConfirmTokenService confirmTokenService;
+
     @GetMapping
     public List<AuditLog> getAuditLogs(
             @RequestParam(required = false) String action,
@@ -40,29 +43,20 @@ public class AuditController {
     public ResponseEntity<?> deleteAllAuditLogs(
             @RequestParam(required = false) String confirmToken,
             Authentication authentication) {
+        String auditedBy = authentication != null ? authentication.getName() : "UNKNOWN";
+        String scope = "delete-all-audit:" + auditedBy;
         if (confirmToken == null || confirmToken.isEmpty()) {
-            // Return instruction to get token first
-            long tokenExpiry = System.currentTimeMillis() + 30000; // 30 second window
             Map<String, Object> response = new HashMap<>();
             response.put("error", "Confirmation required for delete-all");
             response.put("requiresConfirmation", true);
-            response.put("tokenExpiry", tokenExpiry);
+            response.put("confirmToken", confirmTokenService.issue(scope));
+            response.put("tokenExpiry", System.currentTimeMillis() + confirmTokenService.ttlMs());
             return ResponseEntity.status(400).body(response);
         }
-
-        // Verify token (in production, validate against server-side generated token)
-        // This is a simplified check; ideally use a proper token store
-        try {
-            long tokenTimestamp = Long.parseLong(confirmToken);
-            long now = System.currentTimeMillis();
-            if (now - tokenTimestamp > 30000 || tokenTimestamp > now) {
-                throw new IllegalArgumentException("Confirmation token expired or invalid");
-            }
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Invalid confirmation token format");
+        if (!confirmTokenService.consume(scope, confirmToken)) {
+            throw new IllegalArgumentException("Confirmation token expired or invalid");
         }
 
-        String auditedBy = authentication != null ? authentication.getName() : "UNKNOWN";
         auditService.deleteAllLogs();
 
         // Add audit trail

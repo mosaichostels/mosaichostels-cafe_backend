@@ -23,6 +23,7 @@ public class WebConfig implements WebMvcConfigurer {
         String[] allowedHeaders = {
             "Content-Type",
             "Authorization",
+            "Idempotency-Key",
             "X-CSRF-Token"
         };
 

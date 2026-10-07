@@ -35,7 +35,7 @@ public class UserController {
         List<String> roles = (List<String>) userRequest.get("roles");
 
         try {
-            User user = userService.createUser(username, password, Set.copyOf(roles));
+            User user = userService.createUser(username, password, (roles == null ? Set.<String>of() : Set.copyOf(roles)));
             return ResponseEntity.ok(user);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
@@ -64,7 +64,7 @@ public class UserController {
         List<String> roles = (List<String>) userRequest.get("roles");
 
         try {
-            User user = userService.updateUser(id, username, password, Set.copyOf(roles));
+            User user = userService.updateUser(id, username, password, (roles == null ? Set.<String>of() : Set.copyOf(roles)));
 
             auditService.logAction("MODIFIED_USER", "Updated credentials for user: " + username);
 

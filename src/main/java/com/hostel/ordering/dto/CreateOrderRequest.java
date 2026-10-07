@@ -4,17 +4,20 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.hostel.ordering.model.OrderItem;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
 import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class CreateOrderRequest {
     @NotBlank(message = "Booking name is required")
+    @Size(max = 100, message = "Booking name is too long (max 100 characters)")
     private String bookingName;
 
     @NotBlank(message = "Dormitory is required")
     private String dormitory;
 
     @NotEmpty(message = "Items list cannot be empty")
+    @Size(max = 50, message = "Too many items in order (max 50)")
     private List<OrderItem> items;
 
     private Double totalAmount;

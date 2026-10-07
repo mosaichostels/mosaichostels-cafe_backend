@@ -3,6 +3,7 @@ package com.hostel.ordering.controller;
 import com.hostel.ordering.dto.CreateOrderRequest;
 import com.hostel.ordering.model.Order;
 import com.hostel.ordering.service.AuditService;
+import com.hostel.ordering.service.ConfirmTokenService;
 import com.hostel.ordering.service.OrderService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,10 +19,13 @@ public class OrderController {
 
     private final OrderService orderService;
     private final AuditService auditService;
+    private final ConfirmTokenService confirmTokenService;
 
-    public OrderController(OrderService orderService, AuditService auditService) {
+    public OrderController(OrderService orderService, AuditService auditService,
+            ConfirmTokenService confirmTokenService) {
         this.orderService = orderService;
         this.auditService = auditService;
+        this.confirmTokenService = confirmTokenService;
     }
 
     @PostMapping
@@ -121,8 +125,15 @@ public class OrderController {
             @RequestParam(required = false) String confirmToken,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             Authentication authentication) {
-        if (!all && status == null && dormitory == null && search == null && dateFrom == null && dateTo == null && date == null) {
+        // A blank value is not a filter: it matches every order, so "?status=" used to slip past
+        // this guard and wipe the table without the delete-all confirmation.
+        boolean hasFilter = hasText(status) || hasText(dormitory) || hasText(search)
+                || dateFrom != null || dateTo != null || date != null;
+        if (!all && !hasFilter) {
             throw new IllegalArgumentException("Must specify at least one filter or set all=true");
+        }
+        if (all && hasFilter) {
+            throw new IllegalArgumentException("all=true cannot be combined with filters");
         }
 
         String cached = checkIdempotencyCache(idempotencyKey, String.class);
@@ -130,50 +141,41 @@ public class OrderController {
             return ResponseEntity.ok(cached);
         }
 
+        String auditedBy = getAuthenticatedUser(authentication);
         String result;
         if (all) {
-            // Delete-all requires explicit confirmation token for safety
+            String scope = "delete-all-orders:" + auditedBy;
             if (confirmToken == null || confirmToken.isEmpty()) {
-                // Return instruction to get token first
-                long tokenExpiry = System.currentTimeMillis() + 30000; // 30 second window
+                // First call: hand out a single-use token the client must send back.
                 Map<String, Object> response = new java.util.HashMap<>();
                 response.put("error", "Confirmation required for delete-all");
                 response.put("requiresConfirmation", true);
-                response.put("tokenExpiry", tokenExpiry);
+                response.put("confirmToken", confirmTokenService.issue(scope));
+                response.put("tokenExpiry", System.currentTimeMillis() + confirmTokenService.ttlMs());
                 return ResponseEntity.status(400).body(response);
             }
-
-            // Verify token (in production, validate against server-side generated token)
-            // This is a simplified check; ideally use a proper token store
-            try {
-                long tokenTimestamp = Long.parseLong(confirmToken);
-                long now = System.currentTimeMillis();
-                if (now - tokenTimestamp > 30000 || tokenTimestamp > now) {
-                    throw new IllegalArgumentException("Confirmation token expired or invalid");
-                }
-            } catch (NumberFormatException e) {
-                throw new IllegalArgumentException("Invalid confirmation token format");
+            if (!confirmTokenService.consume(scope, confirmToken)) {
+                throw new IllegalArgumentException("Confirmation token expired or invalid");
             }
 
-            String auditedBy = getAuthenticatedUser(authentication);
-            orderService.deleteAllOrders();
-
-            // Add audit trail
-            String message = "Admin deleted ALL orders - User: " + auditedBy + ", Timestamp: " + System.currentTimeMillis();
-            auditService.logAction("DELETE_ALL_ORDERS", message);
-
-            result = "All orders deleted successfully (admin: " + auditedBy + ")";
+            int deleted = orderService.deleteAllOrders();
+            auditService.logAction("DELETE_ALL_ORDERS",
+                    "Admin cleared orders - User: " + auditedBy + ", deleted: " + deleted);
+            result = "Deleted " + deleted + " orders (pending and charged orders are kept)";
         } else {
-            String auditedBy = getAuthenticatedUser(authentication);
-            orderService.deleteFilteredOrders(status, dormitory, search, dateFrom, dateTo, date);
-            String filterDetails = String.format("Deleted filtered orders - User: %s, Filters: status=%s, dormitory=%s, search=%s, dateFrom=%s, dateTo=%s, date=%s",
-                    auditedBy, status, dormitory, search, dateFrom, dateTo, date);
+            int deleted = orderService.deleteFilteredOrders(status, dormitory, search, dateFrom, dateTo, date);
+            String filterDetails = String.format("Deleted %d filtered orders - User: %s, Filters: status=%s, dormitory=%s, search=%s, dateFrom=%s, dateTo=%s, date=%s",
+                    deleted, auditedBy, status, dormitory, search, dateFrom, dateTo, date);
             auditService.logAction("ORDERS_FILTERED_DELETED", filterDetails);
-            result = "Filtered orders deleted successfully";
+            result = "Deleted " + deleted + " orders (pending and charged orders are kept)";
         }
 
         cacheIdempotencyIfPresent(idempotencyKey, result);
         return ResponseEntity.ok(result);
+    }
+
+    private static boolean hasText(String s) {
+        return s != null && !s.isBlank();
     }
 
     @PostMapping("/{id}/chargepost")

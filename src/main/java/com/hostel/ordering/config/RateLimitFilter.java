@@ -32,12 +32,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         String method = request.getMethod();
 
-        int limit = -1;
-        if ("POST".equals(method) && path.equals("/orders")) {
-            limit = 5;
-        } else if ("POST".equals(method) && path.equals("/auth/login")) {
-            limit = 5;
-        }
+        int limit = limitFor(method, path);
 
         if (limit > 0) {
             String limitKey = getRateLimitKey(request, method, path);
@@ -66,6 +61,15 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    // Generous on purpose: the whole hostel shares one IP behind the wifi, so a per-IP cap of 5
+    // locked out guests after a handful of orders. Per-account login guessing is stopped by
+    // LoginThrottle instead.
+    static int limitFor(String method, String path) {
+        if ("POST".equals(method) && path.equals("/orders")) return 30;
+        if ("POST".equals(method) && path.equals("/auth/login")) return 10;
+        return -1;
     }
 
     private String getRateLimitKey(HttpServletRequest request, String method, String path) {

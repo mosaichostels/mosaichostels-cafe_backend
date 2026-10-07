@@ -28,7 +28,7 @@ class OrderControllerTest {
     Authentication authentication;
 
     private OrderController createController() {
-        return new OrderController(orderService, auditService);
+        return new OrderController(orderService, auditService, new com.hostel.ordering.service.ConfirmTokenService());
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.hostel.ordering.controller;
 
 import com.hostel.ordering.service.FCMNotificationService;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
@@ -15,6 +16,7 @@ public class NotificationController {
     }
 
     @PostMapping("/subscribe")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
     public void subscribe(@RequestBody Map<String, String> payload) {
         String token = payload.get("token");
         if (token != null) {
@@ -23,6 +25,7 @@ public class NotificationController {
     }
 
     @PostMapping("/unsubscribe")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
     public void unsubscribe(@RequestBody Map<String, String> payload) {
         String token = payload.get("token");
         if (token != null) {

@@ -12,6 +12,9 @@ public class AuthController {
     @Autowired
     AuthService authService;
 
+    @Autowired
+    com.hostel.ordering.security.LoginThrottle loginThrottle;
+
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@RequestBody Map<String, String> loginRequest) {
         String username = loginRequest.get("username");
@@ -24,15 +27,25 @@ public class AuthController {
             ));
         }
 
+        if (loginThrottle.isBlocked(username)) {
+            return ResponseEntity.status(429).body(Map.of(
+                "errorCode", "RATE_LIMIT_EXCEEDED",
+                "message", "Too many failed sign-in attempts. Try again in a minute."
+            ));
+        }
+
         try {
             Map<String, Object> response = authService.login(username, password);
+            loginThrottle.clear(username);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
+            loginThrottle.recordFailure(username);
             return ResponseEntity.status(401).body(Map.of(
                 "errorCode", "INVALID_CREDENTIALS",
                 "message", "Invalid username or password"
             ));
         } catch (Exception e) {
+            loginThrottle.recordFailure(username);
             return ResponseEntity.status(401).body(Map.of(
                 "errorCode", "AUTH_FAILED",
                 "message", "Authentication failed"

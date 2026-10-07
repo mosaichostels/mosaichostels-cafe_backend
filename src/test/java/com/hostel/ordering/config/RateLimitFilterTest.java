@@ -77,4 +77,11 @@ class RateLimitFilterTest {
 
         assertEquals("10.0.0.5", result);
     }
+
+    @Test
+    void limits_areSizedForAWifiSharedByTheWholeHostel() {
+        assertEquals(30, RateLimitFilter.limitFor("POST", "/orders"));
+        assertEquals(10, RateLimitFilter.limitFor("POST", "/auth/login"));
+        assertEquals(-1, RateLimitFilter.limitFor("GET", "/orders"));
+    }
 }

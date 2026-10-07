@@ -81,6 +81,8 @@ public class OtherEssentialService {
                     if (otherEssential.getPrice() != null) existing.setPrice(otherEssential.getPrice());
                     if (otherEssential.getCategory() != null) existing.setCategory(otherEssential.getCategory());
                     if (otherEssential.getAvailable() != null) existing.setAvailable(otherEssential.getAvailable());
+                    // Updating a removed item is how the panel's Undo restores it.
+                    existing.setDeleted(false);
                     OtherEssential updated = otherEssentialRepository.save(existing);
                     log.info("Essential item updated: {} -> {}", oldName, updated.getName());
                     auditService.logAction("ESSENTIAL_UPDATED", "Updated essential item: " + oldName + " -> " + updated.getName());

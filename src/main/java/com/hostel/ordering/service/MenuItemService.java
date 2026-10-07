@@ -84,6 +84,8 @@ public class MenuItemService {
                     if (menuItem.getPrice() != null) existing.setPrice(menuItem.getPrice());
                     if (menuItem.getCategory() != null) existing.setCategory(menuItem.getCategory());
                     if (menuItem.getAvailable() != null) existing.setAvailable(menuItem.getAvailable());
+                    // Updating a removed item is how the panel's Undo restores it.
+                    existing.setDeleted(false);
                     MenuItem updated = menuItemRepository.save(existing);
                     log.info("Menu item updated: {} -> {}", oldName, updated.getName());
                     auditService.logAction("MENU_ITEM_UPDATED", "Updated menu item: " + oldName + " -> " + updated.getName());
