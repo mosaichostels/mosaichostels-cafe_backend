@@ -10,3 +10,6 @@ target/
 
 # Claude Terminal tool state (local only)
 .claude-terminal
+
+# Codex per-machine hooks (absolute paths)
+.codex/
