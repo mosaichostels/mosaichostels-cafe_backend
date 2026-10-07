@@ -40,6 +40,7 @@ public class OrderService {
     private final EzeeClient ezeeClient;
     private final com.hostel.ordering.repository.UserRepository userRepository;
     private final IdempotencyService idempotencyService;
+    private final DormitoryService dormitoryService;
 
     public OrderService(OrderRepository orderRepository,
                         FCMNotificationService fcmNotificationService,
@@ -50,7 +51,8 @@ public class OrderService {
                         EzeeChargePostService ezeeChargePostService,
                         EzeeClient ezeeClient,
                         com.hostel.ordering.repository.UserRepository userRepository,
-                        IdempotencyService idempotencyService) {
+                        IdempotencyService idempotencyService,
+                        DormitoryService dormitoryService) {
         this.orderRepository = orderRepository;
         this.fcmNotificationService = fcmNotificationService;
         this.auditService = auditService;
@@ -61,9 +63,17 @@ public class OrderService {
         this.ezeeClient = ezeeClient;
         this.userRepository = userRepository;
         this.idempotencyService = idempotencyService;
+        this.dormitoryService = dormitoryService;
     }
 
     public Order createOrder(CreateOrderRequest request, String createdBy) {
+        // The dormitory list is admin-managed; a guest page that failed to load it must not be
+        // able to book against a name that does not exist.
+        boolean knownDormitory = dormitoryService.getAllDormitories().stream()
+                .anyMatch(d -> d.getName() != null && d.getName().equals(request.getDormitory()));
+        if (!knownDormitory) {
+            throw new IllegalArgumentException("Unknown dormitory: " + request.getDormitory());
+        }
         Order order = new Order();
         order.setBookingName(request.getBookingName());
         order.setDormitory(request.getDormitory());
@@ -98,12 +108,14 @@ public class OrderService {
             if (item.getQuantity() == null || item.getQuantity() < 1 || item.getQuantity() > MAX_QUANTITY) {
                 throw new IllegalArgumentException("Invalid quantity for item: " + item.getMenuItemName());
             }
+            // The name is overwritten too: it is printed on the guest's eZee folio, so a
+            // client-chosen name would let a cheap item be billed as something else.
             Double price = menuItemRepository.findById(item.getMenuItemId())
                     .filter(m -> !m.isDeleted())
-                    .map(m -> { item.setType("MENU"); return m.getPrice(); })
+                    .map(m -> { item.setType("MENU"); item.setMenuItemName(m.getName()); return m.getPrice(); })
                     .orElseGet(() -> otherEssentialRepository.findById(item.getMenuItemId())
                             .filter(e -> !e.isDeleted())
-                            .map(e -> { item.setType("ESSENTIAL"); return e.getPrice(); })
+                            .map(e -> { item.setType("ESSENTIAL"); item.setMenuItemName(e.getName()); return e.getPrice(); })
                             .orElse(null));
             if (price == null) {
                 throw new IllegalArgumentException("Unknown item: " + item.getMenuItemId());
@@ -184,8 +196,24 @@ public class OrderService {
                 .orElse(null);
     }
 
+    // A charge that reached eZee cannot be voided, and the order is the only local record of it.
+    private static boolean hasPostedCharge(Order o) {
+        return "QUEUED".equals(o.getChargePostStatus())
+                || "IN_PROGRESS".equals(o.getChargePostStatus())
+                || (o.getChargePostedItems() != null && !o.getChargePostedItems().isEmpty());
+    }
+
+    // Bulk clears are for history; they leave the live queue and charged orders alone.
+    private static boolean isProtectedFromBulkDelete(Order o) {
+        return hasPostedCharge(o) || "ORDERED".equals(o.getStatus());
+    }
+
     public void deleteOrder(String id) {
         orderRepository.findById(id).ifPresent(order -> {
+            if (hasPostedCharge(order)) {
+                throw new IllegalArgumentException(
+                        "This order has a charge posted to eZee and cannot be deleted.");
+            }
             orderRepository.delete(order);
             log.info("Order for {} deleted successfully", order.getBookingName());
             auditService.logAction("ORDER_DELETED", "Deleted order for " + order.getBookingName());
@@ -216,16 +244,25 @@ public class OrderService {
         }
     }
 
-    public void deleteAllOrders() {
-        orderRepository.deleteAll();
-        log.warn("All orders cleared from the system!");
-        auditService.logAction("ORDERS_BULK_DELETED", "All orders cleared");
+    /** Returns how many orders were deleted; pending and charged orders are skipped. */
+    public int deleteAllOrders() {
+        List<Order> deletable = orderRepository.findAll().stream()
+                .filter(o -> !isProtectedFromBulkDelete(o))
+                .toList();
+        orderRepository.deleteAll(deletable);
+        log.warn("{} orders cleared from the system", deletable.size());
+        auditService.logAction("ORDERS_BULK_DELETED", "Cleared " + deletable.size() + " orders");
+        return deletable.size();
     }
 
-    public void deleteFilteredOrders(String status, String dormitory, String search, Long dateFrom, Long dateTo, Long date) {
-        List<Order> orders = getFilteredOrders(status, dormitory, search, dateFrom, dateTo, date, null);
-        orderRepository.deleteAll(orders);
-        auditService.logAction("ORDERS_FILTERED_DELETED", "Deleted " + orders.size() + " filtered orders");
+    /** Returns how many orders were deleted; pending and charged orders are skipped. */
+    public int deleteFilteredOrders(String status, String dormitory, String search, Long dateFrom, Long dateTo, Long date) {
+        List<Order> deletable = getFilteredOrders(status, dormitory, search, dateFrom, dateTo, date, null).stream()
+                .filter(o -> !isProtectedFromBulkDelete(o))
+                .toList();
+        orderRepository.deleteAll(deletable);
+        auditService.logAction("ORDERS_FILTERED_DELETED", "Deleted " + deletable.size() + " filtered orders");
+        return deletable.size();
     }
 
     @Transactional
@@ -233,20 +270,28 @@ public class OrderService {
         // Atomically claim the order for chargepost before calling eZee.
         // Known ceiling: if JVM dies between claiming and saving, order is stranded in IN_PROGRESS
         // state with no automatic recovery — this is safe (no double charge) but needs manual reset.
-        Order order = orderRepository.claimForChargePost(orderId);
+        Order order = orderRepository.claimForChargePost(orderId, room);
         if (order == null) {
-            // Another thread already claimed it or order not found
             Order conflict = orderRepository.findById(orderId).orElse(null);
-            if (conflict != null) {
-                if ("IN_PROGRESS".equals(conflict.getChargePostStatus())) {
-                    log.warn("Chargepost already in progress for order {}", orderId);
-                    conflict.setChargePostError("Chargepost is already being posted by another request");
-                } else if ("QUEUED".equals(conflict.getChargePostStatus())) {
-                    log.warn("Chargepost already queued for order {}, ignoring duplicate post request", orderId);
-                }
+            if (conflict == null) {
+                return null;
+            }
+            String state = conflict.getChargePostStatus();
+            if ("IN_PROGRESS".equals(state)) {
+                log.warn("Chargepost already in progress for order {}", orderId);
+                conflict.setChargePostError("Chargepost is already being posted by another request");
                 return conflict;
             }
-            return null;
+            if ("QUEUED".equals(state)) {
+                log.warn("Chargepost already queued for order {}, ignoring duplicate post request", orderId);
+                return conflict;
+            }
+            if ("FAILED".equals(state)) {
+                throw new IllegalArgumentException("Part of this charge is already on room "
+                        + conflict.getChargePostRoom() + ". Retry in that room.");
+            }
+            throw new IllegalArgumentException(
+                    "Only DELIVERED orders can be posted to eZee (this one is " + conflict.getStatus() + ").");
         }
 
         if (updatedBy != null) {
@@ -258,10 +303,11 @@ public class OrderService {
             result = ezeeChargePostService.post(order, room);
         } catch (Exception e) {
             log.error("Chargepost threw exception for order {}", orderId, e);
-            // On exception, reset the IN_PROGRESS claim so it can be retried
-            order.setChargePostedItems(new ArrayList<>());
-            order.setChargePostStatus(null);
-            order.setChargePostError("Chargepost exception: " + e.getMessage());
+            // Whatever was already posted stays recorded: eZee cannot void it, so a retry has to
+            // know which items it must skip. FAILED (not null) keeps the retry pinned to that room.
+            order.setChargePostStatus("FAILED");
+            order.setChargePostError("Chargepost exception - check the guest's folio in eZee before retrying: "
+                    + e.getMessage());
             result = order;
         }
 
@@ -316,8 +362,9 @@ public class OrderService {
                     .filter(row -> row.get("guestname") != null && row.get("guestname").toLowerCase().contains(needle))
                     .toList();
         } catch (IllegalStateException e) {
+            // An outage must not look like "no such guest" - the admin would stop searching.
             log.warn("eZee search failed for name={}: {}", name, e.getMessage());
-            return List.of();
+            throw new com.hostel.ordering.ezee.EzeeUnavailableException("eZee search failed", e);
         }
     }
 

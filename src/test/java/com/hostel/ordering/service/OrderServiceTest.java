@@ -55,6 +55,9 @@ class OrderServiceTest {
     @Mock
     IdempotencyService idempotencyService;
 
+    @Mock
+    DormitoryService dormitoryService;
+
     @InjectMocks
     OrderService orderService;
 
@@ -64,7 +67,7 @@ class OrderServiceTest {
     void setUp() {
         order = new Order();
         order.setItems(new ArrayList<>());
-        orderService = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient, userRepository, idempotencyService);
+        orderService = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient, userRepository, idempotencyService, dormitoryService);
     }
 
     @Test
@@ -137,7 +140,7 @@ class OrderServiceTest {
 
     @Test
     void searchEzeeCandidates_byName_returnsMatchingRowsCaseInsensitive() {
-        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient, userRepository, idempotencyService);
+        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient, userRepository, idempotencyService, dormitoryService);
 
         LinkedHashMap<String, String> row1 = new LinkedHashMap<>();
         row1.put("guestname", "Mr. Joy");
@@ -161,7 +164,7 @@ class OrderServiceTest {
 
     @Test
     void searchEzeeCandidates_blankName_returnsWholeRoomlist() {
-        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient, userRepository, idempotencyService);
+        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient, userRepository, idempotencyService, dormitoryService);
 
         LinkedHashMap<String, String> row1 = new LinkedHashMap<>();
         row1.put("guestname", "Mr. Joy");
@@ -177,29 +180,27 @@ class OrderServiceTest {
     }
 
     @Test
-    void searchEzeeCandidates_ezeeThrows_returnsEmptyListInsteadOfPropagating() {
-        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient, userRepository, idempotencyService);
+    void searchEzeeCandidates_ezeeThrows_surfacesUnavailableInsteadOfEmptyList() {
+        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient, userRepository, idempotencyService, dormitoryService);
 
         when(ezeeClient.postForRoomRows(org.mockito.ArgumentMatchers.argThat(
                 m -> m != null && "roomlist".equals(m.get("oprn")))))
                 .thenThrow(new IllegalStateException("connection refused"));
 
-        List<Map<String, String>> result = svc.searchEzeeCandidates("joy");
-
-        assertTrue(result.isEmpty());
+        assertThrows(com.hostel.ordering.ezee.EzeeUnavailableException.class, () -> svc.searchEzeeCandidates("joy"));
     }
 
     @Test
     void postChargeForOrder_ezeeAccepts_savesQueuedAndSetsChecked() {
         OrderService svc = new OrderService(orderRepository, null, auditService, orderStatusService,
-                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository, idempotencyService);
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository, idempotencyService, dormitoryService);
 
         Order existing = new Order();
         existing.setId("order1");
         existing.setStatus("DELIVERED");
         existing.setBookingName("Test Guest");
 
-        when(orderRepository.claimForChargePost("order1")).thenReturn(existing);
+        when(orderRepository.claimForChargePost("order1", "106")).thenReturn(existing);
         when(ezeeChargePostService.post(existing, "106")).thenAnswer(inv -> {
             Order o = inv.getArgument(0);
             o.setChargePostStatus("QUEUED");
@@ -218,14 +219,14 @@ class OrderServiceTest {
     @Test
     void postChargeForOrder_ezeeRejects_savesFailedAndLeavesStatusUnchanged() {
         OrderService svc = new OrderService(orderRepository, null, auditService, orderStatusService,
-                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository, idempotencyService);
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository, idempotencyService, dormitoryService);
 
         Order existing = new Order();
         existing.setId("order1");
         existing.setStatus("DELIVERED");
         existing.setBookingName("Test Guest");
 
-        when(orderRepository.claimForChargePost("order1")).thenReturn(existing);
+        when(orderRepository.claimForChargePost("order1", "106")).thenReturn(existing);
         when(ezeeChargePostService.post(existing, "106")).thenAnswer(inv -> {
             Order o = inv.getArgument(0);
             o.setChargePostStatus("FAILED");
@@ -244,7 +245,7 @@ class OrderServiceTest {
     @Test
     void postChargeForOrder_alreadyQueued_returnsUnchangedWithoutCallingEzee() {
         OrderService svc = new OrderService(orderRepository, null, auditService, orderStatusService,
-                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository, idempotencyService);
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository, idempotencyService, dormitoryService);
 
         Order existing = new Order();
         existing.setId("order1");
@@ -253,7 +254,7 @@ class OrderServiceTest {
         existing.setChargePostRequestId("2805");
 
         // claimForChargePost returns null because chargePostStatus is already QUEUED
-        when(orderRepository.claimForChargePost("order1")).thenReturn(null);
+        when(orderRepository.claimForChargePost("order1", "106")).thenReturn(null);
         when(orderRepository.findById("order1")).thenReturn(java.util.Optional.of(existing));
 
         Order result = svc.postChargeForOrder("order1", "106", "staff1");
@@ -268,7 +269,7 @@ class OrderServiceTest {
     @Test
     void postChargeForOrder_unknownOrder_returnsNull() {
         OrderService svc = new OrderService(orderRepository, null, auditService, orderStatusService,
-                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository, idempotencyService);
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository, idempotencyService, dormitoryService);
 
         when(orderRepository.findById("missing")).thenReturn(java.util.Optional.empty());
 
@@ -280,7 +281,7 @@ class OrderServiceTest {
     @Test
     void updateOrderStatus_toCancelled_chargeQueued_voidsIt() {
         OrderService svc = new OrderService(orderRepository, fcmNotificationService, auditService, orderStatusService,
-                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository, idempotencyService);
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository, idempotencyService, dormitoryService);
 
         Order existing = new Order();
         existing.setId("order1");
@@ -309,7 +310,7 @@ class OrderServiceTest {
     @Test
     void updateOrderStatus_toCancelled_voidFails_logsAuditEntry() {
         OrderService svc = new OrderService(orderRepository, fcmNotificationService, auditService, orderStatusService,
-                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository, idempotencyService);
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository, idempotencyService, dormitoryService);
 
         Order existing = new Order();
         existing.setId("order1");
@@ -339,7 +340,7 @@ class OrderServiceTest {
     @Test
     void updateOrderStatus_toCancelled_chargeNotQueued_doesNotCallVoid() {
         OrderService svc = new OrderService(orderRepository, fcmNotificationService, auditService, orderStatusService,
-                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository, idempotencyService);
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository, idempotencyService, dormitoryService);
 
         Order existing = new Order();
         existing.setId("order1");
@@ -353,5 +354,109 @@ class OrderServiceTest {
         svc.updateOrderStatus("order1", "CANCELLED", "staff1");
 
         org.mockito.Mockito.verifyNoInteractions(ezeeChargePostService);
+    }
+
+    private OrderService chargeService() {
+        return new OrderService(orderRepository, fcmNotificationService, auditService, orderStatusService,
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository, idempotencyService, dormitoryService);
+    }
+
+    @Test
+    void postChargeForOrder_orderNotDelivered_isRejected() {
+        Order existing = new Order();
+        existing.setId("order1");
+        existing.setStatus("CANCELLED");
+        when(orderRepository.claimForChargePost("order1", "106")).thenReturn(null);
+        when(orderRepository.findById("order1")).thenReturn(Optional.of(existing));
+
+        assertThrows(IllegalArgumentException.class, () -> chargeService().postChargeForOrder("order1", "106", "admin"));
+        org.mockito.Mockito.verifyNoInteractions(ezeeChargePostService);
+    }
+
+    @Test
+    void postChargeForOrder_failedPartialCharge_retryInOtherRoomIsRejected() {
+        Order existing = new Order();
+        existing.setId("order1");
+        existing.setStatus("DELIVERED");
+        existing.setChargePostStatus("FAILED");
+        existing.setChargePostRoom("106");
+        existing.setChargePostedItems(new ArrayList<>(List.of("a#0")));
+        when(orderRepository.claimForChargePost("order1", "107")).thenReturn(null);
+        when(orderRepository.findById("order1")).thenReturn(Optional.of(existing));
+
+        assertThrows(IllegalArgumentException.class, () -> chargeService().postChargeForOrder("order1", "107", "admin"));
+        org.mockito.Mockito.verifyNoInteractions(ezeeChargePostService);
+    }
+
+    @Test
+    void postChargeForOrder_postThrows_marksFailedAndKeepsPostedItems() {
+        Order existing = new Order();
+        existing.setId("order1");
+        existing.setStatus("DELIVERED");
+        existing.setChargePostedItems(new ArrayList<>(List.of("a#0")));
+        when(orderRepository.claimForChargePost("order1", "106")).thenReturn(existing);
+        when(ezeeChargePostService.post(existing, "106")).thenThrow(new RuntimeException("boom"));
+        when(orderRepository.save(existing)).thenReturn(existing);
+
+        Order result = chargeService().postChargeForOrder("order1", "106", "admin");
+
+        assertEquals("FAILED", result.getChargePostStatus());
+        assertEquals(List.of("a#0"), result.getChargePostedItems());
+    }
+
+    @Test
+    void repriceOrder_overwritesClientSuppliedItemName() {
+        OrderItem item = new OrderItem();
+        item.setMenuItemId("item1");
+        item.setMenuItemName("Room upgrade");
+        item.setQuantity(1);
+        order.setItems(List.of(item));
+        com.hostel.ordering.model.MenuItem menuItem = new com.hostel.ordering.model.MenuItem();
+        menuItem.setName("Aloo Paratha");
+        menuItem.setPrice(80.0);
+        when(menuItemRepository.findById("item1")).thenReturn(Optional.of(menuItem));
+
+        orderService.repriceOrder(order);
+
+        assertEquals("Aloo Paratha", item.getMenuItemName());
+    }
+
+    @Test
+    void createOrder_unknownDormitory_isRejected() {
+        when(dormitoryService.getAllDormitories()).thenReturn(List.of(new com.hostel.ordering.model.Dormitory("8 - Bed Mixed Dorm")));
+        com.hostel.ordering.dto.CreateOrderRequest req = new com.hostel.ordering.dto.CreateOrderRequest();
+        req.setBookingName("Joy");
+        req.setDormitory("Dorm Z");
+        req.setItems(new ArrayList<>());
+
+        assertThrows(IllegalArgumentException.class, () -> chargeService().createOrder(req, "GUEST"));
+    }
+
+    private Order charged(String id, String status, String chargeStatus) {
+        Order o = new Order();
+        o.setId(id);
+        o.setStatus(status);
+        o.setChargePostStatus(chargeStatus);
+        return o;
+    }
+
+    @Test
+    void deleteOrder_withPostedCharge_isRejected() {
+        when(orderRepository.findById("o1")).thenReturn(Optional.of(charged("o1", "CHECKED", "QUEUED")));
+
+        assertThrows(IllegalArgumentException.class, () -> chargeService().deleteOrder("o1"));
+        org.mockito.Mockito.verify(orderRepository, org.mockito.Mockito.never()).delete(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void deleteAllOrders_skipsPendingAndChargedOrders() {
+        Order done = charged("done", "DELIVERED", null);
+        when(orderRepository.findAll()).thenReturn(List.of(
+                done, charged("pending", "ORDERED", null), charged("posted", "CHECKED", "QUEUED")));
+
+        int deleted = chargeService().deleteAllOrders();
+
+        assertEquals(1, deleted);
+        org.mockito.Mockito.verify(orderRepository).deleteAll(List.of(done));
     }
 }

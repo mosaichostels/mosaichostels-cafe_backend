@@ -66,6 +66,14 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(new ErrorResponse(ex.getMessage()), HttpStatus.BAD_REQUEST);
     }
 
+    @ExceptionHandler(com.hostel.ordering.ezee.EzeeUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleEzeeUnavailable(com.hostel.ordering.ezee.EzeeUnavailableException ex) {
+        log.warn("eZee unavailable: {}", ex.getMessage());
+        return new ResponseEntity<>(
+                new ErrorResponse("eZee is not reachable right now. Try again in a moment."),
+                HttpStatus.BAD_GATEWAY);
+    }
+
     /**
      * Anything unhandled. The message MUST NOT reach the client: it is written for developers and
      * routinely contains internal detail. A Mongo authentication failure here once served the

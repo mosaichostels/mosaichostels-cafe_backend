@@ -241,7 +241,8 @@ public class EzeeChargePostService {
         } catch (Exception e) {
             log.error("Chargepost threw for order {}", order.getId(), e);
             order.setChargePostedItems(postedItems);
-            return markFailed(order, "Unexpected error: " + e.getMessage());
+            return markFailed(order, "Could not confirm the result with eZee (" + e.getMessage()
+                    + "). Check the guest's folio in eZee before retrying.");
         }
     }
 
