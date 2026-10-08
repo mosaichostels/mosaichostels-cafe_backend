@@ -356,10 +356,12 @@ public class OrderService {
         return saved;
     }
 
-    private static final long STALE_CLAIM_MS = 10 * 60 * 1000;
+    // Longer than any post can run: EzeeChargePostService stops sending after 5 minutes, and its
+    // last in-flight calls are bounded by their own timeouts.
+    private static final long STALE_CLAIM_MS = 15 * 60 * 1000;
 
     /**
-     * A claim held for ten minutes belongs to a process that died mid-post (a post is at most a few
+     * A claim held for fifteen minutes belongs to a process that died mid-post (a post is at most a few
      * minutes of eZee calls). Items may or may not have reached eZee, so the order becomes an
      * unconfirmed FAILED one: an admin checks the folio, acknowledges, and can retry. Before this
      * it stayed IN_PROGRESS forever.
@@ -408,6 +410,14 @@ public class OrderService {
 
     public <T> T getIdempotencyResult(String idempotencyKey, Class<T> type) {
         return idempotencyService.getIfPresent(idempotencyKey, type);
+    }
+
+    public boolean reserveIdempotencyKey(String idempotencyKey) {
+        return idempotencyService.reserve(idempotencyKey);
+    }
+
+    public void releaseIdempotencyKey(String idempotencyKey) {
+        idempotencyService.release(idempotencyKey);
     }
 
     public void cacheIdempotencyResult(String idempotencyKey, Object result) {

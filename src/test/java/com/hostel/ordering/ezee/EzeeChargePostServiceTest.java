@@ -482,4 +482,51 @@ class EzeeChargePostServiceTest {
 
         assertEquals("1001", result.getChargePostReservation());
     }
+
+    @Test
+    void post_anyExceptionAfterTheSend_isTreatedAsUnconfirmed() {
+        service = new EzeeChargePostService(ezeeClient, "FOOD1", "ESSENTIAL1");
+        Order order = orderWithOneItem();
+        roomHas("8", "1001");
+        // e.g. a malformed reply blowing up in parsing - the charge may still have been recorded
+        when(ezeeClient.postExtraCharge(any(), any(), any(), any(), any(), any()))
+                .thenThrow(new NullPointerException("empty body"));
+
+        Order result = service.post(order, "106");
+
+        assertEquals("FAILED", result.getChargePostStatus());
+        assertTrue(result.getChargePostedItems().contains("UNCONFIRMED:aloo#0"), result.getChargePostedItems().toString());
+    }
+
+    @Test
+    void post_acknowledgedRetryThatFailsAgain_keepsTheUnconfirmedMarker() {
+        service = new EzeeChargePostService(ezeeClient, "FOOD1", "ESSENTIAL1");
+        Order order = orderWithOneItem();
+        order.setChargePostFolio("8");
+        order.setChargePostReservation("1001");
+        order.setChargePostedItems(new java.util.ArrayList<>(List.of("UNCONFIRMED:interrupted")));
+        roomHas("8", "1001");
+        when(ezeeClient.postExtraCharge(any(), any(), any(), any(), any(), any()))
+                .thenThrow(new RuntimeException("boom"));
+
+        Order result = service.post(order, "106");
+
+        assertTrue(result.getChargePostedItems().stream().anyMatch(i -> i.startsWith("UNCONFIRMED:")),
+                result.getChargePostedItems().toString());
+    }
+
+    @Test
+    void post_stopsSendingOnceItsTimeBudgetIsSpent_soRecoveryCannotRaceIt() {
+        service = new EzeeChargePostService(ezeeClient, "FOOD1", "ESSENTIAL1");
+        service.setPostBudgetMs(-1);
+        Order order = orderWithOneItem();
+        roomHas("8", "1001");
+
+        Order result = service.post(order, "106");
+
+        assertEquals("FAILED", result.getChargePostStatus());
+        assertTrue(result.getChargePostError().contains("time budget"), result.getChargePostError());
+        org.mockito.Mockito.verify(ezeeClient, org.mockito.Mockito.never())
+                .postExtraCharge(any(), any(), any(), any(), any(), any());
+    }
 }

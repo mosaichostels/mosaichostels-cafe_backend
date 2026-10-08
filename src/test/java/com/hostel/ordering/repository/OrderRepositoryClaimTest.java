@@ -28,8 +28,10 @@ class OrderRepositoryClaimTest {
 
     @Test
     void claimStampsTheTimeSoAStuckClaimCanBeFound() {
-        String update = OrderRepositoryImpl.claimUpdate().getUpdateObject().toJson();
+        String update = OrderRepositoryImpl.claimUpdate("106").getUpdateObject().toJson();
         assertTrue(update.contains("chargePostAt"), update);
+        // without the room, a claim interrupted before its final save can never be retried
+        assertTrue(update.contains("\"chargePostRoom\": \"106\""), update);
         assertTrue(update.contains("IN_PROGRESS"), update);
     }
 }

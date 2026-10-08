@@ -82,8 +82,12 @@ public class OrderRepositoryImpl implements OrderRepositoryCustom {
     }
 
     // chargePostAt is stamped at claim time so a claim whose process died can be found later.
-    static Update claimUpdate() {
-        return new Update().set("chargePostStatus", "IN_PROGRESS").set("chargePostAt", System.currentTimeMillis());
+    // The room is stored too: a claim interrupted before its final save would otherwise leave no
+    // room on record, and the same-room rule could never be satisfied again.
+    static Update claimUpdate(String room) {
+        return new Update().set("chargePostStatus", "IN_PROGRESS")
+                .set("chargePostAt", System.currentTimeMillis())
+                .set("chargePostRoom", room);
     }
 
     @Override
@@ -94,7 +98,7 @@ public class OrderRepositoryImpl implements OrderRepositoryCustom {
 
     @Override
     public Order claimForChargePost(String orderId, String room, boolean acknowledgeUnconfirmed) {
-        Update update = claimUpdate();
+        Update update = claimUpdate(room);
         return mongoTemplate.findAndModify(
                 new Query(claimCriteria(orderId, room, acknowledgeUnconfirmed)),
                 update,

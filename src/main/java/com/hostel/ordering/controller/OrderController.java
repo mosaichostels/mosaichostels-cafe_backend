@@ -38,8 +38,26 @@ public class OrderController {
             return ResponseEntity.status(HttpStatus.CREATED).body(cached);
         }
 
+        // Reserve the key before creating anything. Caching the result afterwards alone left a
+        // window: if the process died between saving the order and writing the record, a retry
+        // with the same key created a second order.
+        String reservation = null;
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            reservation = "order-create:" + idempotencyKey;
+            if (!orderService.reserveIdempotencyKey(reservation)) {
+                throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT,
+                        "This order is already being processed. Check with staff before ordering again.");
+            }
+        }
+
         String createdBy = getAuthenticatedUser(authentication);
-        Order created = orderService.createOrder(request, createdBy);
+        Order created;
+        try {
+            created = orderService.createOrder(request, createdBy);
+        } catch (RuntimeException e) {
+            if (reservation != null) orderService.releaseIdempotencyKey(reservation);
+            throw e;
+        }
 
         if (created != null) {
             cacheIdempotencyIfPresent("order-create", idempotencyKey, created);

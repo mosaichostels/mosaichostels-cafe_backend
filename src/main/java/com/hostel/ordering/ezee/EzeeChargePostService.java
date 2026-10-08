@@ -36,6 +36,16 @@ public class EzeeChargePostService {
      */
     public static final String UNCONFIRMED_PREFIX = "UNCONFIRMED:";
 
+    /**
+     * A post sends no new item after this long. OrderService only treats a claim as abandoned
+     * well after this (plus the last in-flight call), so recovery cannot race a live post.
+     */
+    private long postBudgetMs = 5 * 60 * 1000;
+
+    void setPostBudgetMs(long postBudgetMs) {
+        this.postBudgetMs = postBudgetMs;
+    }
+
     private final EzeeClient ezeeClient;
     private final String foodChargeId;
     private final String essentialChargeId;
@@ -115,7 +125,8 @@ public class EzeeChargePostService {
             return order;
         }
 
-        order.setChargePostAt(System.currentTimeMillis());
+        long startedAt = System.currentTimeMillis();
+        order.setChargePostAt(startedAt);
 
         if (order.getTotalAmount() == null) {
             return markFailed(order, "Order has no total amount");
@@ -208,6 +219,11 @@ public class EzeeChargePostService {
                         continue;
                     }
 
+                    if (System.currentTimeMillis() - startedAt > postBudgetMs) {
+                        errors.add("Ran out of the post's time budget before every item was sent - post again to continue");
+                        break outer;
+                    }
+
                     String amount = String.format(Locale.US, "%.2f", item.getPrice());
                     String qty = item.getQuantity().toString();
                     // Name only: eZee renders the folio line as "<Comment> [Qty N]" from the
@@ -287,6 +303,10 @@ public class EzeeChargePostService {
             return markFailed(order, String.join("; ", errors));
         } catch (Exception e) {
             log.error("Chargepost threw for order {}", order.getId(), e);
+            // Never lose an unconfirmed marker: it is what stops a retry without a folio check.
+            for (String entry : priorEntries) {
+                if (entry.startsWith(UNCONFIRMED_PREFIX) && !postedItems.contains(entry)) postedItems.add(entry);
+            }
             order.setChargePostedItems(postedItems);
             return markFailed(order, "Could not confirm the result with eZee (" + e.getMessage()
                     + "). Check the guest's folio in eZee before retrying.");
@@ -299,8 +319,10 @@ public class EzeeChargePostService {
             String amount, String qty, String comment) {
         try {
             return ezeeClient.postExtraCharge(resno, folio, chargeId, amount, qty, comment);
-        } catch (IllegalStateException e) {
-            log.warn("AddExtraCharge outcome unknown: {}", e.getMessage());
+        } catch (RuntimeException e) {
+            // Any failure after the request left (timeout, a reply that cannot be parsed) leaves it
+            // unknown whether eZee recorded the charge, so none of them may look like a plain error.
+            log.warn("AddExtraCharge outcome unknown: {}", e.toString());
             return null;
         }
     }
