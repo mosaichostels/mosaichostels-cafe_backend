@@ -121,4 +121,15 @@ class OrderControllerDeleteTest {
         verify(orderService, atLeast(2)).getIdempotencyResult(keys.capture(), eq(String.class));
         assertEquals(2, keys.getAllValues().stream().distinct().count(), keys.getAllValues().toString());
     }
+
+    @Test
+    void createOrderPassesTheClientKeyToTheService() {
+        when(orderService.createOrder(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.eq("k1"))).thenReturn(new com.hostel.ordering.model.Order());
+
+        assertEquals(201, controller.createOrder(new com.hostel.ordering.dto.CreateOrderRequest(), "k1", authentication)
+                .getStatusCode().value());
+        verify(orderService).createOrder(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.eq("k1"));
+    }
 }

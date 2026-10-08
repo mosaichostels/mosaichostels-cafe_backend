@@ -4,7 +4,6 @@ import com.hostel.ordering.model.IdempotencyRecord;
 import com.hostel.ordering.repository.IdempotencyRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 /**
@@ -59,34 +58,6 @@ public class IdempotencyService {
             // The operation itself already succeeded; failing to record it only costs
             // deduplication on a later retry.
             log.warn("Could not store idempotency result for key {}: {}", idempotencyKey, e.getMessage());
-        }
-    }
-
-    /**
-     * Claims a key before the work starts. The insert is atomic (the key is the document id), so of
-     * two requests carrying one key exactly one proceeds; the other must not repeat the work. A
-     * crash between reserving and caching therefore leaves the key spent, which costs the guest one
-     * extra tap on a fresh key - far better than a second order.
-     */
-    public boolean reserve(String idempotencyKey) {
-        try {
-            repository.insert(new IdempotencyRecord(idempotencyKey, null));
-            return true;
-        } catch (DuplicateKeyException e) {
-            return false;
-        } catch (Exception e) {
-            // Store unavailable: behave as before reservations existed rather than block orders.
-            log.warn("Could not reserve idempotency key {}: {}", idempotencyKey, e.getMessage());
-            return true;
-        }
-    }
-
-    /** Frees a reservation whose work failed, so the client's retry is not mistaken for a duplicate. */
-    public void release(String idempotencyKey) {
-        try {
-            repository.deleteById(idempotencyKey);
-        } catch (Exception e) {
-            log.warn("Could not release idempotency key {}: {}", idempotencyKey, e.getMessage());
         }
     }
 

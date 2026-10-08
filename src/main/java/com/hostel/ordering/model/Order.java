@@ -3,7 +3,9 @@ package com.hostel.ordering.model;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import java.util.ArrayList;
@@ -34,6 +36,16 @@ public class Order {
     private Long updatedAt;
     @Version
     private Long version;
+
+    // The client's Idempotency-Key for the request that created this order. The unique index is
+    // what makes "create once" atomic: of two requests with one key, the database rejects the
+    // second save. Sparse, so orders without a key (and all older orders) are not constrained.
+    @Indexed(unique = true, sparse = true)
+    @JsonIgnore
+    private String idempotencyKey;
+
+    public String getIdempotencyKey() { return idempotencyKey; }
+    public void setIdempotencyKey(String idempotencyKey) { this.idempotencyKey = idempotencyKey; }
 
     public Order() {}
 

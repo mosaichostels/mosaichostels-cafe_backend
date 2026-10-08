@@ -20,6 +20,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -70,6 +71,24 @@ public class OrderService {
     }
 
     public Order createOrder(CreateOrderRequest request, String createdBy) {
+        return createOrder(request, createdBy, null);
+    }
+
+    /**
+     * Creates the order once per idempotencyKey. The key is stored on the order behind a unique
+     * index, so a retry - after a lost response, a crash after the save, or a race between two
+     * identical requests - gets the original order back instead of a second one. A crash before
+     * the save leaves nothing behind, so a retry simply creates it.
+     */
+    public Order createOrder(CreateOrderRequest request, String createdBy, String idempotencyKey) {
+        boolean keyed = idempotencyKey != null && !idempotencyKey.isBlank();
+        if (keyed) {
+            Optional<Order> existing = orderRepository.findByIdempotencyKey(idempotencyKey);
+            if (existing.isPresent()) {
+                return existing.get();
+            }
+        }
+
         // The dormitory list is admin-managed; a guest page that failed to load it must not be
         // able to book against a name that does not exist.
         boolean knownDormitory = dormitoryService.getAllDormitories().stream()
@@ -82,6 +101,9 @@ public class OrderService {
         order.setDormitory(request.getDormitory());
         order.setItems(request.getItems());
         order.setTotalAmount(request.getTotalAmount());
+        if (keyed) {
+            order.setIdempotencyKey(idempotencyKey);
+        }
 
         repriceOrder(order);
         order.setCreatedAt(System.currentTimeMillis());
@@ -91,10 +113,21 @@ public class OrderService {
         order.setUpdatedBy(byUser);
         order.setStatus("ORDERED");
 
-        Order saved = orderRepository.save(order);
+        Order saved;
+        try {
+            saved = orderRepository.save(order);
+        } catch (org.springframework.dao.DuplicateKeyException e) {
+            // Lost the race to an identical request: hand back the order it created.
+            return orderRepository.findByIdempotencyKey(idempotencyKey).orElseThrow(() -> e);
+        }
         log.info("New order created for {} in {}", saved.getBookingName(), saved.getDormitory());
         fcmNotificationService.sendNewOrderNotification(saved);
-        auditService.logAction("ORDER_CREATED", "Created order for " + saved.getBookingName() + " in " + saved.getDormitory());
+        try {
+            auditService.logAction("ORDER_CREATED", "Created order for " + saved.getBookingName() + " in " + saved.getDormitory());
+        } catch (RuntimeException e) {
+            // The order is saved. Failing the request here would invite a retry for work already done.
+            log.warn("Could not audit creation of order {}: {}", saved.getId(), e.getMessage());
+        }
         return saved;
     }
 
@@ -410,14 +443,6 @@ public class OrderService {
 
     public <T> T getIdempotencyResult(String idempotencyKey, Class<T> type) {
         return idempotencyService.getIfPresent(idempotencyKey, type);
-    }
-
-    public boolean reserveIdempotencyKey(String idempotencyKey) {
-        return idempotencyService.reserve(idempotencyKey);
-    }
-
-    public void releaseIdempotencyKey(String idempotencyKey) {
-        idempotencyService.release(idempotencyKey);
     }
 
     public void cacheIdempotencyResult(String idempotencyKey, Object result) {
