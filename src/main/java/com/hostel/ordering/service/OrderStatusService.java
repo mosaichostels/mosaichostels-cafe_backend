@@ -20,7 +20,18 @@ public class OrderStatusService {
     }
 
     public List<OrderStatusConfig> getAllStatuses() {
-        return repository.findAll();
+        List<OrderStatusConfig> all = repository.findAll();
+        if (all.isEmpty()) {
+            // mongodb-init.js is a manual script; without these every status change is rejected
+            // as "Invalid status" on a fresh database.
+            repository.saveAll(List.of(
+                    new OrderStatusConfig("ORDERED", "Ordered", "ordered", true),
+                    new OrderStatusConfig("DELIVERED", "Delivered", "delivered", true),
+                    new OrderStatusConfig("CANCELLED", "Cancelled", "cancelled", true),
+                    new OrderStatusConfig("CHECKED", "Checked", "checked", true)));
+            all = repository.findAll();
+        }
+        return all;
     }
 
     public OrderStatusConfig addStatus(OrderStatusConfig status) {

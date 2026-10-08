@@ -23,4 +23,7 @@ public interface OrderRepositoryCustom {
      */
     Order claimForChargePost(String orderId, String room, boolean acknowledgeUnconfirmed);
 
+    /** Orders whose claim has been held since before cutoffMs - the process that took it is gone. */
+    List<Order> findStaleChargePosts(long cutoffMs);
+
 }

@@ -24,6 +24,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
+// A scheduled method only runs once its bean exists; with lazy-initialization on, that would be
+// the first order request after a restart. Create it eagerly.
+@org.springframework.context.annotation.Lazy(false)
 public class OrderService {
     private static final Logger log = LoggerFactory.getLogger(OrderService.class);
 
@@ -351,6 +354,30 @@ public class OrderService {
         }
 
         return saved;
+    }
+
+    private static final long STALE_CLAIM_MS = 10 * 60 * 1000;
+
+    /**
+     * A claim held for ten minutes belongs to a process that died mid-post (a post is at most a few
+     * minutes of eZee calls). Items may or may not have reached eZee, so the order becomes an
+     * unconfirmed FAILED one: an admin checks the folio, acknowledges, and can retry. Before this
+     * it stayed IN_PROGRESS forever.
+     */
+    @org.springframework.scheduling.annotation.Scheduled(initialDelay = 60_000, fixedDelay = 60_000)
+    public void recoverStaleChargePosts() {
+        for (Order order : orderRepository.findStaleChargePosts(System.currentTimeMillis() - STALE_CLAIM_MS)) {
+            List<String> items = order.getChargePostedItems() != null
+                    ? new ArrayList<>(order.getChargePostedItems()) : new ArrayList<>();
+            items.add(EzeeChargePostService.UNCONFIRMED_PREFIX + "interrupted");
+            order.setChargePostedItems(items);
+            order.setChargePostStatus("FAILED");
+            order.setChargePostError("The posting was interrupted before it finished. Check the guest's folio in eZee"
+                    + " before posting again.");
+            orderRepository.save(order);
+            auditService.logAction("ORDER_CHARGEPOST_INTERRUPTED", "Charge post for order " + order.getId()
+                    + " was interrupted; marked FAILED pending a folio check");
+        }
     }
 
     public List<Map<String, String>> searchEzeeCandidates(String name) {

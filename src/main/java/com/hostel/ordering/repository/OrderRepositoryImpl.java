@@ -81,9 +81,20 @@ public class OrderRepositoryImpl implements OrderRepositoryCustom {
                         new Criteria().andOperator(failedRetry.toArray(new Criteria[0])));
     }
 
+    // chargePostAt is stamped at claim time so a claim whose process died can be found later.
+    static Update claimUpdate() {
+        return new Update().set("chargePostStatus", "IN_PROGRESS").set("chargePostAt", System.currentTimeMillis());
+    }
+
+    @Override
+    public List<Order> findStaleChargePosts(long cutoffMs) {
+        return mongoTemplate.find(new Query(Criteria.where("chargePostStatus").is("IN_PROGRESS")
+                .and("chargePostAt").lt(cutoffMs)), Order.class);
+    }
+
     @Override
     public Order claimForChargePost(String orderId, String room, boolean acknowledgeUnconfirmed) {
-        Update update = new Update().set("chargePostStatus", "IN_PROGRESS");
+        Update update = claimUpdate();
         return mongoTemplate.findAndModify(
                 new Query(claimCriteria(orderId, room, acknowledgeUnconfirmed)),
                 update,

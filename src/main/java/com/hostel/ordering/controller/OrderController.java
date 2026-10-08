@@ -33,7 +33,7 @@ public class OrderController {
     public ResponseEntity<Order> createOrder(@Valid @RequestBody CreateOrderRequest request,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             Authentication authentication) {
-        Order cached = checkIdempotencyCache(idempotencyKey, Order.class);
+        Order cached = checkIdempotencyCache("order-create", idempotencyKey, Order.class);
         if (cached != null) {
             return ResponseEntity.status(HttpStatus.CREATED).body(cached);
         }
@@ -42,7 +42,7 @@ public class OrderController {
         Order created = orderService.createOrder(request, createdBy);
 
         if (created != null) {
-            cacheIdempotencyIfPresent(idempotencyKey, created);
+            cacheIdempotencyIfPresent("order-create", idempotencyKey, created);
         }
 
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
@@ -82,7 +82,7 @@ public class OrderController {
             throw new IllegalArgumentException("Status parameter cannot be null or empty");
         }
 
-        Order cached = checkIdempotencyCache(idempotencyKey, Order.class);
+        Order cached = checkIdempotencyCache("order-status:" + id, idempotencyKey, Order.class);
         if (cached != null) {
             return ResponseEntity.ok(cached);
         }
@@ -91,7 +91,7 @@ public class OrderController {
         Order updated = orderService.updateOrderStatus(id, status, updatedBy);
 
         if (updated != null) {
-            cacheIdempotencyIfPresent(idempotencyKey, updated);
+            cacheIdempotencyIfPresent("order-status:" + id, idempotencyKey, updated);
         }
 
         return updated != null ? ResponseEntity.ok(updated) : ResponseEntity.notFound().build();
@@ -101,13 +101,13 @@ public class OrderController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> deleteOrder(@PathVariable String id,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
-        String cached = checkIdempotencyCache(idempotencyKey, String.class);
+        String cached = checkIdempotencyCache("order-delete:" + id, idempotencyKey, String.class);
         if (cached != null) {
             return ResponseEntity.ok(cached);
         }
 
         orderService.deleteOrder(id);
-        cacheIdempotencyIfPresent(idempotencyKey, "Order deleted successfully");
+        cacheIdempotencyIfPresent("order-delete:" + id, idempotencyKey, "Order deleted successfully");
 
         return ResponseEntity.ok("Order deleted successfully");
     }
@@ -136,7 +136,7 @@ public class OrderController {
             throw new IllegalArgumentException("all=true cannot be combined with filters");
         }
 
-        String cached = checkIdempotencyCache(idempotencyKey, String.class);
+        String cached = checkIdempotencyCache("orders-bulk", idempotencyKey, String.class);
         if (cached != null) {
             return ResponseEntity.ok(cached);
         }
@@ -171,7 +171,7 @@ public class OrderController {
             result = "Deleted " + deleted + " orders (pending and charged orders are kept)";
         }
 
-        cacheIdempotencyIfPresent(idempotencyKey, result);
+        cacheIdempotencyIfPresent("orders-bulk", idempotencyKey, result);
         return ResponseEntity.ok(result);
     }
 
@@ -190,7 +190,7 @@ public class OrderController {
             throw new IllegalArgumentException("Room parameter cannot be null or empty");
         }
 
-        Order cached = checkIdempotencyCache(idempotencyKey, Order.class);
+        Order cached = checkIdempotencyCache("chargepost:" + id, idempotencyKey, Order.class);
         if (cached != null) {
             return ResponseEntity.ok(cached);
         }
@@ -200,7 +200,7 @@ public class OrderController {
         Order result = orderService.postChargeForOrder(id, room, updatedBy, acknowledged);
 
         if (result != null) {
-            cacheIdempotencyIfPresent(idempotencyKey, result);
+            cacheIdempotencyIfPresent("chargepost:" + id, idempotencyKey, result);
         }
 
         return result != null ? ResponseEntity.ok(result) : ResponseEntity.notFound().build();
@@ -214,16 +214,18 @@ public class OrderController {
         return ResponseEntity.ok(orderService.searchEzeeCandidates(name));
     }
 
-    private <T> T checkIdempotencyCache(String idempotencyKey, Class<T> type) {
+    // The client's key is namespaced by operation (and target id): one key reused across two
+    // different calls must never replay the first call's result as the second's.
+    private <T> T checkIdempotencyCache(String operation, String idempotencyKey, Class<T> type) {
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-            return orderService.getIdempotencyResult(idempotencyKey, type);
+            return orderService.getIdempotencyResult(operation + ":" + idempotencyKey, type);
         }
         return null;
     }
 
-    private void cacheIdempotencyIfPresent(String idempotencyKey, Object result) {
+    private void cacheIdempotencyIfPresent(String operation, String idempotencyKey, Object result) {
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-            orderService.cacheIdempotencyResult(idempotencyKey, result);
+            orderService.cacheIdempotencyResult(operation + ":" + idempotencyKey, result);
         }
     }
 

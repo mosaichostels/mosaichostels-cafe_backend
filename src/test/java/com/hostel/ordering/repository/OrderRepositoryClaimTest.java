@@ -25,4 +25,11 @@ class OrderRepositoryClaimTest {
         assertTrue(strict.contains("UNCONFIRMED"), strict);
         assertFalse(acknowledged.contains("UNCONFIRMED"), acknowledged);
     }
+
+    @Test
+    void claimStampsTheTimeSoAStuckClaimCanBeFound() {
+        String update = OrderRepositoryImpl.claimUpdate().getUpdateObject().toJson();
+        assertTrue(update.contains("chargePostAt"), update);
+        assertTrue(update.contains("IN_PROGRESS"), update);
+    }
 }

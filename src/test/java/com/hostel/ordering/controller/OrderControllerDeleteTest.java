@@ -110,4 +110,15 @@ class OrderControllerDeleteTest {
 
         verify(orderService).postChargeForOrder("o1", "106", "admin", true);
     }
+
+    @Test
+    void idempotencyKeysAreScopedPerOperation() {
+        // The same client key sent to two different operations must not replay one's result in the other
+        controller.deleteOrder("o1", "same-key");
+        controller.deleteOrders("DELIVERED", null, null, null, null, null, false, null, "same-key", authentication);
+
+        org.mockito.ArgumentCaptor<String> keys = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(orderService, atLeast(2)).getIdempotencyResult(keys.capture(), eq(String.class));
+        assertEquals(2, keys.getAllValues().stream().distinct().count(), keys.getAllValues().toString());
+    }
 }
