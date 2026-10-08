@@ -43,9 +43,13 @@ public class JwtUtils {
     public String generateJwtToken(Authentication authentication) {
         UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
 
+        Date issuedAt = new Date();
         return Jwts.builder()
                 .setSubject((userPrincipal.getUsername()))
-                .setIssuedAt(new Date())
+                .setIssuedAt(issuedAt)
+                // "iat" is whole seconds; revocation compares against a millisecond watermark, so
+                // a token issued just after a password change would otherwise look older than it.
+                .claim("iatMs", issuedAt.getTime())
                 .setExpiration(new Date((new Date()).getTime() + jwtExpirationMs))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
@@ -95,14 +99,18 @@ public class JwtUtils {
         }
     }
 
-    // Get issued-at time from token (works for both valid and expired tokens)
+    // Get issued-at time from token (works for both valid and expired tokens). Millisecond
+    // precision when the token carries "iatMs"; older tokens fall back to whole-second "iat".
     public long getIssuedAtMillisFromToken(String token) {
+        Claims claims;
         try {
-            return Jwts.parserBuilder().setSigningKey(getSigningKey()).build()
-                    .parseClaimsJws(token).getBody().getIssuedAt().getTime();
+            claims = Jwts.parserBuilder().setSigningKey(getSigningKey()).build()
+                    .parseClaimsJws(token).getBody();
         } catch (ExpiredJwtException e) {
-            return e.getClaims().getIssuedAt().getTime();
+            claims = e.getClaims();
         }
+        Long precise = claims.get("iatMs", Long.class);
+        return precise != null ? precise : claims.getIssuedAt().getTime();
     }
 
     public boolean isIssuedBeforeValidFrom(String token, Long validFrom) {

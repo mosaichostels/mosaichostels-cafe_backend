@@ -77,4 +77,37 @@ class OrderControllerDeleteTest {
         verify(orderService).deleteAllOrders();
         assertThrows(IllegalArgumentException.class, () -> delete(null, true, token));
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void broadFilteredDeleteNeedsTheSameServerToken() {
+        // dateFrom=0 matches every order: a filter in name only
+        ResponseEntity<?> first = controller.deleteOrders(null, null, null, 0L, null, null, false, null, null, authentication);
+
+        assertEquals(400, first.getStatusCode().value());
+        String token = (String) ((Map<String, Object>) first.getBody()).get("confirmToken");
+        assertNotNull(token);
+        verifyNoInteractions(orderService);
+
+        when(orderService.deleteFilteredOrders(null, null, null, 0L, null, null)).thenReturn(5);
+        assertEquals(200, controller.deleteOrders(null, null, null, 0L, null, null, false, token, null, authentication)
+                .getStatusCode().value());
+        verify(orderService).deleteFilteredOrders(null, null, null, 0L, null, null);
+    }
+
+    @Test
+    void filteredDeleteRejectsAMadeUpToken() {
+        assertThrows(IllegalArgumentException.class, () -> controller.deleteOrders(
+                "DELIVERED", null, null, null, null, null, false, "12345", null, authentication));
+        verifyNoInteractions(orderService);
+    }
+
+    @Test
+    void chargepost_passesTheAcknowledgementFlagToTheService() {
+        when(orderService.postChargeForOrder("o1", "106", "admin", true)).thenReturn(new com.hostel.ordering.model.Order());
+
+        controller.postCharge("o1", Map.of("room", "106", "acknowledgeUnconfirmed", "true"), null, authentication);
+
+        verify(orderService).postChargeForOrder("o1", "106", "admin", true);
+    }
 }

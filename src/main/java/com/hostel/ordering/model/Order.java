@@ -81,6 +81,8 @@ public class Order {
     private String chargePostError;
     private String chargePostRoom;
     private String chargePostFolio;
+    // The eZee reservation the folio belongs to; a retry must resolve to the same one.
+    private String chargePostReservation;
     private Long chargePostAt;
 
     // OrderItem menuItemIds that have already been posted to eZee.
@@ -100,6 +102,9 @@ public class Order {
 
     public String getChargePostRoom() { return chargePostRoom; }
     public void setChargePostRoom(String chargePostRoom) { this.chargePostRoom = chargePostRoom; }
+
+    public String getChargePostReservation() { return chargePostReservation; }
+    public void setChargePostReservation(String chargePostReservation) { this.chargePostReservation = chargePostReservation; }
 
     public String getChargePostFolio() { return chargePostFolio; }
     public void setChargePostFolio(String chargePostFolio) { this.chargePostFolio = chargePostFolio; }

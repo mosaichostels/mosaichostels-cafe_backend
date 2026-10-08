@@ -86,7 +86,10 @@ public class UserService {
         return saved;
     }
 
-    public void deleteUser(String id) {
+    // One lock around every change that can remove an administrator: without it two admins
+    // demoting each other both pass the "another admin exists" check. Single backend instance;
+    // use a database-enforced guard if that ever changes.
+    public synchronized void deleteUser(String id) {
         userRepository.findById(id).ifPresent(user -> {
             // Refuse to remove the last administrator. Every admin-only endpoint would become
             // unreachable, including user management itself, so there would be no way back in
@@ -100,7 +103,7 @@ public class UserService {
         });
     }
 
-    public User updateUser(String id, String newUsername, String newPassword, Set<String> roles) {
+    public synchronized User updateUser(String id, String newUsername, String newPassword, Set<String> roles) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("User not found!"));
 

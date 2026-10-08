@@ -30,6 +30,12 @@ public class EzeeChargePostService {
 
     private static final Logger log = LoggerFactory.getLogger(EzeeChargePostService.class);
 
+    /**
+     * Prefix on a chargePostedItems entry whose AddExtraCharge call got no reply: eZee may or may
+     * not have recorded it, and it cannot be voided, so a person must check the folio.
+     */
+    public static final String UNCONFIRMED_PREFIX = "UNCONFIRMED:";
+
     private final EzeeClient ezeeClient;
     private final String foodChargeId;
     private final String essentialChargeId;
@@ -121,6 +127,11 @@ public class EzeeChargePostService {
         List<String> postedItems = order.getChargePostedItems() != null
                 ? new ArrayList<>(order.getChargePostedItems())
                 : new ArrayList<>();
+        // The claim only lets an order carrying UNCONFIRMED entries through when the admin has
+        // acknowledged them, so by the time we are here they are cleared to be retried.
+        List<String> priorEntries = new ArrayList<>(postedItems);
+        boolean priorAttempt = !priorEntries.isEmpty();
+        postedItems.removeIf(i -> i.startsWith(UNCONFIRMED_PREFIX));
 
         try {
             RoomFolioResult folioResult = queryRoomFolio(room);
@@ -130,8 +141,20 @@ public class EzeeChargePostService {
             String folio = folioResult.folio;
             String resno = folioResult.resno;
 
+            // A room number is not a guest: if the occupant changed since the first attempt, the
+            // earlier items sit on one folio and the rest would land on a stranger's.
+            if (priorAttempt && order.getChargePostFolio() != null
+                    && (!folio.equals(order.getChargePostFolio())
+                    || (order.getChargePostReservation() != null && !resno.equals(order.getChargePostReservation())))) {
+                order.setChargePostedItems(priorEntries);
+                return markFailed(order, "Room " + room + " now belongs to a different reservation than the earlier "
+                        + "attempt (folio " + order.getChargePostFolio() + "). Part of this charge is already on "
+                        + "that folio - settle it manually in eZee.");
+            }
+
             order.setChargePostRoom(room);
             order.setChargePostFolio(folio);
+            order.setChargePostReservation(resno);
 
             // Guest cart mixes menu items and essentials in one order — each type
             // posts to its own pre-configured eZee extra-charge item. Post each
@@ -155,6 +178,8 @@ public class EzeeChargePostService {
             }
 
             List<String> errors = new ArrayList<>();
+            boolean unconfirmed = false;
+            outer:
             for (Map.Entry<String, List<OrderItem>> typeGroup : itemsByType.entrySet()) {
                 String chargeId = "ESSENTIAL".equals(typeGroup.getKey()) ? essentialChargeId : foodChargeId;
                 if (chargeId == null || chargeId.isBlank()) {
@@ -195,18 +220,36 @@ public class EzeeChargePostService {
                     // re-query once and retry. Max 1 retry to avoid loops.
                     String currentFolio = folio;
                     String currentResno = resno;
-                    Map<String, String> response = ezeeClient.postExtraCharge(currentResno, currentFolio, chargeId, amount, qty, comment);
+                    Map<String, String> response = sendCharge(currentResno, currentFolio, chargeId, amount, qty, comment);
+                    if (response == null) {
+                        postedItems.add(UNCONFIRMED_PREFIX + itemId);
+                        errors.add(item.getMenuItemName() + ": no reply from eZee - it may already be on the folio");
+                        unconfirmed = true;
+                        break outer;
+                    }
 
                     if (!"ok".equals(response.get("status"))) {
                         String errorMsg = response.getOrDefault("msg", "eZee returned an error");
                         if (errorMsg.toLowerCase().contains("occupant") || errorMsg.toLowerCase().contains("folio") || errorMsg.toLowerCase().contains("room")) {
                             log.warn("postExtraCharge failed with folio error for order {} item {}, retrying with fresh roomquery", order.getId(), itemId);
                             RoomFolioResult retryFolioResult = queryRoomFolio(room);
-                            if (retryFolioResult.isSuccess()) {
+                            if (retryFolioResult.isSuccess()
+                                    && !postedItems.isEmpty()
+                                    && (!retryFolioResult.folio.equals(folio) || !retryFolioResult.resno.equals(resno))) {
+                                // Part of the order is already on the first folio; do not split it.
+                                errors.add(item.getMenuItemName() + ": the room's reservation changed mid-post - settle manually in eZee");
+                            } else if (retryFolioResult.isSuccess()) {
                                 currentFolio = retryFolioResult.folio;
                                 currentResno = retryFolioResult.resno;
                                 order.setChargePostFolio(currentFolio);
-                                response = ezeeClient.postExtraCharge(currentResno, currentFolio, chargeId, amount, qty, comment);
+                                order.setChargePostReservation(currentResno);
+                                response = sendCharge(currentResno, currentFolio, chargeId, amount, qty, comment);
+                                if (response == null) {
+                                    postedItems.add(UNCONFIRMED_PREFIX + itemId);
+                                    errors.add(item.getMenuItemName() + ": no reply from eZee - it may already be on the folio");
+                                    unconfirmed = true;
+                                    break outer;
+                                }
                                 if ("ok".equals(response.get("status"))) {
                                     postedItems.add(itemId);
                                 } else {
@@ -232,6 +275,10 @@ public class EzeeChargePostService {
                 return order;
             }
 
+            if (unconfirmed) {
+                errors.add("Check the guest's folio in eZee before posting again");
+            }
+
             // ponytail: no cross-call rollback — if item1 posts and item2 then fails,
             // item1's charge is already live in eZee and chargePostedItems above stops
             // a retry from posting it again. Upgrade path: void the succeeded items
@@ -243,6 +290,18 @@ public class EzeeChargePostService {
             order.setChargePostedItems(postedItems);
             return markFailed(order, "Could not confirm the result with eZee (" + e.getMessage()
                     + "). Check the guest's folio in eZee before retrying.");
+        }
+    }
+
+    // null = the request got no usable reply (timeout, dropped connection): the charge may or may
+    // not have been recorded, which is different from eZee saying no.
+    private Map<String, String> sendCharge(String resno, String folio, String chargeId,
+            String amount, String qty, String comment) {
+        try {
+            return ezeeClient.postExtraCharge(resno, folio, chargeId, amount, qty, comment);
+        } catch (IllegalStateException e) {
+            log.warn("AddExtraCharge outcome unknown: {}", e.getMessage());
+            return null;
         }
     }
 

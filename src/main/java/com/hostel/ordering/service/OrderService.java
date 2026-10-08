@@ -266,11 +266,11 @@ public class OrderService {
     }
 
     @Transactional
-    public Order postChargeForOrder(String orderId, String room, String updatedBy) {
+    public Order postChargeForOrder(String orderId, String room, String updatedBy, boolean acknowledgeUnconfirmed) {
         // Atomically claim the order for chargepost before calling eZee.
         // Known ceiling: if JVM dies between claiming and saving, order is stranded in IN_PROGRESS
         // state with no automatic recovery — this is safe (no double charge) but needs manual reset.
-        Order order = orderRepository.claimForChargePost(orderId, room);
+        Order order = orderRepository.claimForChargePost(orderId, room, acknowledgeUnconfirmed);
         if (order == null) {
             Order conflict = orderRepository.findById(orderId).orElse(null);
             if (conflict == null) {
@@ -287,6 +287,13 @@ public class OrderService {
                 return conflict;
             }
             if ("FAILED".equals(state)) {
+                boolean unconfirmed = conflict.getChargePostedItems() != null && conflict.getChargePostedItems().stream()
+                        .anyMatch(i -> i.startsWith(EzeeChargePostService.UNCONFIRMED_PREFIX));
+                if (unconfirmed && !acknowledgeUnconfirmed) {
+                    throw new com.hostel.ordering.exception.ChargeUnconfirmedException(
+                            "eZee did not confirm an earlier attempt, so an item may already be on the guest's folio. "
+                                    + "Check the folio in eZee first; if the item is not there, post again and confirm.");
+                }
                 throw new IllegalArgumentException("Part of this charge is already on room "
                         + conflict.getChargePostRoom() + ". Retry in that room.");
             }

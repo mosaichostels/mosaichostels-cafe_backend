@@ -66,6 +66,11 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(new ErrorResponse(ex.getMessage()), HttpStatus.BAD_REQUEST);
     }
 
+    @ExceptionHandler(ChargeUnconfirmedException.class)
+    public ResponseEntity<ErrorResponse> handleChargeUnconfirmed(ChargeUnconfirmedException ex) {
+        return new ResponseEntity<>(new ErrorResponse(ex.getMessage()), HttpStatus.CONFLICT);
+    }
+
     @ExceptionHandler(com.hostel.ordering.ezee.EzeeUnavailableException.class)
     public ResponseEntity<ErrorResponse> handleEzeeUnavailable(com.hostel.ordering.ezee.EzeeUnavailableException ex) {
         log.warn("eZee unavailable: {}", ex.getMessage());

@@ -398,4 +398,88 @@ class EzeeChargePostServiceTest {
         org.mockito.Mockito.verify(ezeeClient)
                 .postExtraCharge(eq("2002"), eq("9"), eq("FOOD1"), eq("20.00"), eq("4"), any());
     }
+
+    private Order orderWithOneItem() {
+        Order order = sampleOrder();
+        order.getItems().get(0).setMenuItemId("aloo");
+        return order;
+    }
+
+    private void roomHas(String folio, String resno) {
+        Map<String, String> ok = new LinkedHashMap<>();
+        ok.put("status", "ok");
+        when(ezeeClient.postRoomQuery(any()))
+                .thenReturn(new RoomQueryResult(ok, List.of(occupantRow(folio, resno))));
+    }
+
+    @Test
+    void post_noReplyFromEzee_marksOutcomeUnconfirmedAndStops() {
+        service = new EzeeChargePostService(ezeeClient, "FOOD1", "ESSENTIAL1");
+        Order order = orderWithOneItem();
+        roomHas("8", "1001");
+        when(ezeeClient.postExtraCharge(any(), any(), any(), any(), any(), any()))
+                .thenThrow(new IllegalStateException("timeout"));
+
+        Order result = service.post(order, "106");
+
+        assertEquals("FAILED", result.getChargePostStatus());
+        assertTrue(result.getChargePostedItems().contains("UNCONFIRMED:aloo#0"), result.getChargePostedItems().toString());
+        assertTrue(result.getChargePostError().contains("folio"), result.getChargePostError());
+    }
+
+    @Test
+    void post_acknowledgedRetryAfterUnconfirmed_postsTheItemAndClearsTheMarker() {
+        service = new EzeeChargePostService(ezeeClient, "FOOD1", "ESSENTIAL1");
+        Order order = orderWithOneItem();
+        order.setChargePostFolio("8");
+        order.setChargePostReservation("1001");
+        order.setChargePostedItems(new java.util.ArrayList<>(List.of("UNCONFIRMED:aloo#0")));
+        roomHas("8", "1001");
+        Map<String, String> ok = new LinkedHashMap<>();
+        ok.put("status", "ok");
+        when(ezeeClient.postExtraCharge(any(), any(), any(), any(), any(), any())).thenReturn(ok);
+
+        Order result = service.post(order, "106");
+
+        assertEquals("QUEUED", result.getChargePostStatus());
+        assertEquals(List.of("aloo#0"), result.getChargePostedItems());
+    }
+
+    @Test
+    void post_partialRetryWhereRoomNowBelongsToAnotherReservation_isStopped() {
+        service = new EzeeChargePostService(ezeeClient, "FOOD1", "ESSENTIAL1");
+        Order order = orderWithOneItem();
+        OrderItem second = new OrderItem();
+        second.setMenuItemId("tea");
+        second.setMenuItemName("Tea");
+        second.setPrice(20.0);
+        second.setQuantity(1);
+        second.setSubtotal(20.0);
+        order.setItems(List.of(order.getItems().get(0), second));
+        order.setChargePostFolio("8");
+        order.setChargePostReservation("1001");
+        order.setChargePostedItems(new java.util.ArrayList<>(List.of("aloo#0")));
+        roomHas("9", "2002");
+
+        Order result = service.post(order, "106");
+
+        assertEquals("FAILED", result.getChargePostStatus());
+        assertTrue(result.getChargePostError().contains("different reservation"), result.getChargePostError());
+        org.mockito.Mockito.verify(ezeeClient, org.mockito.Mockito.never())
+                .postExtraCharge(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void post_recordsTheReservationAlongsideTheFolio() {
+        service = new EzeeChargePostService(ezeeClient, "FOOD1", "ESSENTIAL1");
+        Order order = orderWithOneItem();
+        roomHas("8", "1001");
+        Map<String, String> ok = new LinkedHashMap<>();
+        ok.put("status", "ok");
+        when(ezeeClient.postExtraCharge(any(), any(), any(), any(), any(), any())).thenReturn(ok);
+
+        Order result = service.post(order, "106");
+
+        assertEquals("1001", result.getChargePostReservation());
+    }
 }

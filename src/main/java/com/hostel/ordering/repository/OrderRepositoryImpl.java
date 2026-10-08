@@ -63,24 +63,29 @@ public class OrderRepositoryImpl implements OrderRepositoryCustom {
         return query;
     }
 
-    static Criteria claimCriteria(String orderId, String room) {
+    static Criteria claimCriteria(String orderId, String room, boolean acknowledgeUnconfirmed) {
         // A FAILED attempt may be retried, but if it already put part of the charge on a folio the
         // retry must go to that same room - eZee cannot void, so a second room means a double charge.
-        Criteria failedRetry = new Criteria().andOperator(
-                Criteria.where("chargePostStatus").is("FAILED"),
-                new Criteria().orOperator(
-                        Criteria.where("chargePostedItems").in(Arrays.asList(null, new ArrayList<>())),
-                        Criteria.where("chargePostRoom").is(room)));
+        List<Criteria> failedRetry = new ArrayList<>();
+        failedRetry.add(Criteria.where("chargePostStatus").is("FAILED"));
+        failedRetry.add(new Criteria().orOperator(
+                Criteria.where("chargePostedItems").in(Arrays.asList(null, new ArrayList<>())),
+                Criteria.where("chargePostRoom").is(room)));
+        if (!acknowledgeUnconfirmed) {
+            // No reply from eZee: the item may already be on the folio, so a human has to look first.
+            failedRetry.add(Criteria.where("chargePostedItems").not().regex("^UNCONFIRMED:"));
+        }
         return Criteria.where("_id").is(orderId)
                 .and("status").is("DELIVERED")
-                .orOperator(Criteria.where("chargePostStatus").is(null), failedRetry);
+                .orOperator(Criteria.where("chargePostStatus").is(null),
+                        new Criteria().andOperator(failedRetry.toArray(new Criteria[0])));
     }
 
     @Override
-    public Order claimForChargePost(String orderId, String room) {
+    public Order claimForChargePost(String orderId, String room, boolean acknowledgeUnconfirmed) {
         Update update = new Update().set("chargePostStatus", "IN_PROGRESS");
         return mongoTemplate.findAndModify(
-                new Query(claimCriteria(orderId, room)),
+                new Query(claimCriteria(orderId, room, acknowledgeUnconfirmed)),
                 update,
                 FindAndModifyOptions.options().returnNew(true),
                 Order.class

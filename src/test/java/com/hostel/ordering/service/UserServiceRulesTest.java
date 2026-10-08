@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
+import java.util.concurrent.*;
 import java.util.Optional;
 import java.util.Set;
 
@@ -88,5 +89,44 @@ class UserServiceRulesTest {
         User saved = userService.updateUser("2", "kitchen", null, Set.of("ROLE_STAFF"));
 
         assertNull(saved.getTokensValidFrom());
+    }
+
+    @Test
+    void twoAdminsCannotDemoteEachOtherAtTheSameTime() throws Exception {
+        User a = user("1", "alice", "ROLE_ADMIN");
+        User b = user("2", "bob", "ROLE_ADMIN");
+        when(userRepository.findById("1")).thenReturn(Optional.of(a));
+        when(userRepository.findById("2")).thenReturn(Optional.of(b));
+        // Hold each thread inside the "is there another admin?" read until its rival arrives (or
+        // 300ms passes). Unserialised, both pass the check; serialised, the second sees the first's save.
+        CyclicBarrier meet = new CyclicBarrier(2);
+        when(userRepository.findAll()).thenAnswer(inv -> {
+            // A real repository hands back fresh copies as of the read, not the live objects.
+            List<User> snapshot = List.of(user("1", "alice", a.getRoles().toArray(new String[0])),
+                    user("2", "bob", b.getRoles().toArray(new String[0])));
+            try { meet.await(300, TimeUnit.MILLISECONDS); } catch (Exception ignored) { }
+            return snapshot;
+        });
+        when(userRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        Future<Boolean> demoteA = pool.submit(() -> tryDemote("1", "alice"));
+        Future<Boolean> demoteB = pool.submit(() -> tryDemote("2", "bob"));
+        boolean okA = demoteA.get(5, TimeUnit.SECONDS);
+        boolean okB = demoteB.get(5, TimeUnit.SECONDS);
+        pool.shutdown();
+
+        assertTrue(okA ^ okB, "exactly one demotion must win (A=" + okA + ", B=" + okB + ")");
+        assertTrue(a.getRoles().contains("ROLE_ADMIN") || b.getRoles().contains("ROLE_ADMIN"));
+    }
+
+    private boolean tryDemote(String id, String name) {
+        try {
+            userService.updateUser(id, name, null, Set.of("ROLE_STAFF"));
+            return true;
+        } catch (IllegalArgumentException e) {
+            if (!e.getMessage().contains("last administrator")) throw e;
+            return false;
+        }
     }
 }

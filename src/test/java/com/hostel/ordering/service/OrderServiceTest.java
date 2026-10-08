@@ -200,7 +200,7 @@ class OrderServiceTest {
         existing.setStatus("DELIVERED");
         existing.setBookingName("Test Guest");
 
-        when(orderRepository.claimForChargePost("order1", "106")).thenReturn(existing);
+        when(orderRepository.claimForChargePost("order1", "106", false)).thenReturn(existing);
         when(ezeeChargePostService.post(existing, "106")).thenAnswer(inv -> {
             Order o = inv.getArgument(0);
             o.setChargePostStatus("QUEUED");
@@ -209,7 +209,7 @@ class OrderServiceTest {
         });
         when(orderRepository.save(existing)).thenReturn(existing);
 
-        Order result = svc.postChargeForOrder("order1", "106", "staff1");
+        Order result = svc.postChargeForOrder("order1", "106", "staff1", false);
 
         assertEquals("QUEUED", result.getChargePostStatus());
         assertEquals("CHECKED", result.getStatus());
@@ -226,7 +226,7 @@ class OrderServiceTest {
         existing.setStatus("DELIVERED");
         existing.setBookingName("Test Guest");
 
-        when(orderRepository.claimForChargePost("order1", "106")).thenReturn(existing);
+        when(orderRepository.claimForChargePost("order1", "106", false)).thenReturn(existing);
         when(ezeeChargePostService.post(existing, "106")).thenAnswer(inv -> {
             Order o = inv.getArgument(0);
             o.setChargePostStatus("FAILED");
@@ -235,7 +235,7 @@ class OrderServiceTest {
         });
         when(orderRepository.save(existing)).thenReturn(existing);
 
-        Order result = svc.postChargeForOrder("order1", "106", "staff1");
+        Order result = svc.postChargeForOrder("order1", "106", "staff1", false);
 
         assertEquals("FAILED", result.getChargePostStatus());
         assertEquals("DELIVERED", result.getStatus());
@@ -254,10 +254,10 @@ class OrderServiceTest {
         existing.setChargePostRequestId("2805");
 
         // claimForChargePost returns null because chargePostStatus is already QUEUED
-        when(orderRepository.claimForChargePost("order1", "106")).thenReturn(null);
+        when(orderRepository.claimForChargePost("order1", "106", false)).thenReturn(null);
         when(orderRepository.findById("order1")).thenReturn(java.util.Optional.of(existing));
 
-        Order result = svc.postChargeForOrder("order1", "106", "staff1");
+        Order result = svc.postChargeForOrder("order1", "106", "staff1", false);
 
         // Result should be the existing order without calling eZee
         assertNotNull(result);
@@ -273,7 +273,7 @@ class OrderServiceTest {
 
         when(orderRepository.findById("missing")).thenReturn(java.util.Optional.empty());
 
-        Order result = svc.postChargeForOrder("missing", "106", "staff1");
+        Order result = svc.postChargeForOrder("missing", "106", "staff1", false);
 
         assertNull(result);
     }
@@ -366,10 +366,10 @@ class OrderServiceTest {
         Order existing = new Order();
         existing.setId("order1");
         existing.setStatus("CANCELLED");
-        when(orderRepository.claimForChargePost("order1", "106")).thenReturn(null);
+        when(orderRepository.claimForChargePost("order1", "106", false)).thenReturn(null);
         when(orderRepository.findById("order1")).thenReturn(Optional.of(existing));
 
-        assertThrows(IllegalArgumentException.class, () -> chargeService().postChargeForOrder("order1", "106", "admin"));
+        assertThrows(IllegalArgumentException.class, () -> chargeService().postChargeForOrder("order1", "106", "admin", false));
         org.mockito.Mockito.verifyNoInteractions(ezeeChargePostService);
     }
 
@@ -381,10 +381,10 @@ class OrderServiceTest {
         existing.setChargePostStatus("FAILED");
         existing.setChargePostRoom("106");
         existing.setChargePostedItems(new ArrayList<>(List.of("a#0")));
-        when(orderRepository.claimForChargePost("order1", "107")).thenReturn(null);
+        when(orderRepository.claimForChargePost("order1", "107", false)).thenReturn(null);
         when(orderRepository.findById("order1")).thenReturn(Optional.of(existing));
 
-        assertThrows(IllegalArgumentException.class, () -> chargeService().postChargeForOrder("order1", "107", "admin"));
+        assertThrows(IllegalArgumentException.class, () -> chargeService().postChargeForOrder("order1", "107", "admin", false));
         org.mockito.Mockito.verifyNoInteractions(ezeeChargePostService);
     }
 
@@ -394,11 +394,11 @@ class OrderServiceTest {
         existing.setId("order1");
         existing.setStatus("DELIVERED");
         existing.setChargePostedItems(new ArrayList<>(List.of("a#0")));
-        when(orderRepository.claimForChargePost("order1", "106")).thenReturn(existing);
+        when(orderRepository.claimForChargePost("order1", "106", false)).thenReturn(existing);
         when(ezeeChargePostService.post(existing, "106")).thenThrow(new RuntimeException("boom"));
         when(orderRepository.save(existing)).thenReturn(existing);
 
-        Order result = chargeService().postChargeForOrder("order1", "106", "admin");
+        Order result = chargeService().postChargeForOrder("order1", "106", "admin", false);
 
         assertEquals("FAILED", result.getChargePostStatus());
         assertEquals(List.of("a#0"), result.getChargePostedItems());
@@ -458,5 +458,36 @@ class OrderServiceTest {
 
         assertEquals(1, deleted);
         org.mockito.Mockito.verify(orderRepository).deleteAll(List.of(done));
+    }
+
+    @Test
+    void postChargeForOrder_unconfirmedEarlierAttempt_needsAcknowledgement() {
+        Order existing = new Order();
+        existing.setId("order1");
+        existing.setStatus("DELIVERED");
+        existing.setChargePostStatus("FAILED");
+        existing.setChargePostedItems(new ArrayList<>(List.of("UNCONFIRMED:a#0")));
+        when(orderRepository.claimForChargePost("order1", "106", false)).thenReturn(null);
+        when(orderRepository.findById("order1")).thenReturn(Optional.of(existing));
+
+        assertThrows(com.hostel.ordering.exception.ChargeUnconfirmedException.class,
+                () -> chargeService().postChargeForOrder("order1", "106", "admin", false));
+        org.mockito.Mockito.verifyNoInteractions(ezeeChargePostService);
+    }
+
+    @Test
+    void postChargeForOrder_acknowledgementIsPassedToTheClaim() {
+        Order existing = new Order();
+        existing.setId("order1");
+        existing.setStatus("DELIVERED");
+        when(orderRepository.claimForChargePost("order1", "106", true)).thenReturn(existing);
+        when(ezeeChargePostService.post(existing, "106")).thenAnswer(inv -> {
+            Order o = inv.getArgument(0);
+            o.setChargePostStatus("QUEUED");
+            return o;
+        });
+        when(orderRepository.save(existing)).thenReturn(existing);
+
+        assertEquals("QUEUED", chargeService().postChargeForOrder("order1", "106", "admin", true).getChargePostStatus());
     }
 }

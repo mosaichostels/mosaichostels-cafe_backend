@@ -32,4 +32,20 @@ class JwtUtilsRevocationTest {
         assertFalse(jwtUtils.isIssuedBeforeValidFrom(token, issuedAt));
         assertTrue(jwtUtils.isIssuedBeforeValidFrom(token, issuedAt + 1));
     }
+
+    @Test
+    void tokenIssuedInTheSameSecondAfterTheWatermarkIsNotRejected() {
+        JwtUtils jwtUtils = new JwtUtils();
+        ReflectionTestUtils.setField(jwtUtils, "jwtSecret", "01234567890123456789012345678901");
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                new User("alice", "password", List.of(new SimpleGrantedAuthority("ROLE_STAFF"))),
+                null, List.of(new SimpleGrantedAuthority("ROLE_STAFF")));
+
+        long watermark = System.currentTimeMillis();
+        String token = jwtUtils.generateJwtToken(authentication);
+
+        // iat alone is truncated to the second, which is earlier than a watermark set moments before
+        assertFalse(jwtUtils.isIssuedBeforeValidFrom(token, watermark));
+        assertTrue(jwtUtils.isIssuedBeforeValidFrom(token, System.currentTimeMillis() + 5_000));
+    }
 }

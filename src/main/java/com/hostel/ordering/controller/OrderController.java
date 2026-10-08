@@ -142,22 +142,23 @@ public class OrderController {
         }
 
         String auditedBy = getAuthenticatedUser(authentication);
+        // Every bulk delete - delete-all or a filter broad enough to match everything (dateFrom=0) -
+        // needs the server-issued token, so a single request can never wipe history unconfirmed.
+        String scope = "delete-orders:" + auditedBy;
+        if (confirmToken == null || confirmToken.isEmpty()) {
+            Map<String, Object> response = new java.util.HashMap<>();
+            response.put("error", "Confirmation required for bulk delete");
+            response.put("requiresConfirmation", true);
+            response.put("confirmToken", confirmTokenService.issue(scope));
+            response.put("tokenExpiry", System.currentTimeMillis() + confirmTokenService.ttlMs());
+            return ResponseEntity.status(400).body(response);
+        }
+        if (!confirmTokenService.consume(scope, confirmToken)) {
+            throw new IllegalArgumentException("Confirmation token expired or invalid");
+        }
+
         String result;
         if (all) {
-            String scope = "delete-all-orders:" + auditedBy;
-            if (confirmToken == null || confirmToken.isEmpty()) {
-                // First call: hand out a single-use token the client must send back.
-                Map<String, Object> response = new java.util.HashMap<>();
-                response.put("error", "Confirmation required for delete-all");
-                response.put("requiresConfirmation", true);
-                response.put("confirmToken", confirmTokenService.issue(scope));
-                response.put("tokenExpiry", System.currentTimeMillis() + confirmTokenService.ttlMs());
-                return ResponseEntity.status(400).body(response);
-            }
-            if (!confirmTokenService.consume(scope, confirmToken)) {
-                throw new IllegalArgumentException("Confirmation token expired or invalid");
-            }
-
             int deleted = orderService.deleteAllOrders();
             auditService.logAction("DELETE_ALL_ORDERS",
                     "Admin cleared orders - User: " + auditedBy + ", deleted: " + deleted);
@@ -195,7 +196,8 @@ public class OrderController {
         }
 
         String updatedBy = getAuthenticatedUser(authentication);
-        Order result = orderService.postChargeForOrder(id, room, updatedBy);
+        boolean acknowledged = "true".equalsIgnoreCase(payload.get("acknowledgeUnconfirmed"));
+        Order result = orderService.postChargeForOrder(id, room, updatedBy, acknowledged);
 
         if (result != null) {
             cacheIdempotencyIfPresent(idempotencyKey, result);
