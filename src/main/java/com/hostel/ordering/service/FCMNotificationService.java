@@ -14,8 +14,11 @@ public class FCMNotificationService {
 
     private final FirebaseMessaging firebaseMessaging;
 
-    public FCMNotificationService(FirebaseMessaging firebaseMessaging) {
+    private final NtfyNotificationService ntfy;
+
+    public FCMNotificationService(FirebaseMessaging firebaseMessaging, NtfyNotificationService ntfy) {
         this.firebaseMessaging = firebaseMessaging;
+        this.ntfy = ntfy;
     }
 
     @Async
@@ -54,6 +57,7 @@ public class FCMNotificationService {
                     .putData("body", body)
                     .build();
 
+            ntfy.send(title, body, "fork_and_knife");
             String response = firebaseMessaging.send(message);
             logger.info("✅ FCM notification sent: {}", response);
 
@@ -95,6 +99,7 @@ public class FCMNotificationService {
                     .putData("body", body)
                     .build();
 
+            ntfy.send(title, body, "x");
             String response = firebaseMessaging.send(message);
             logger.info("✅ FCM cancellation notification sent: {}", response);
 
