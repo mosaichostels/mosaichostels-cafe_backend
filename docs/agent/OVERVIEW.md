@@ -1,5 +1,11 @@
 # Overview
 
-Spring Boot REST API for the Mosaic Hostels cafe ordering system (`com.hostel:ordering-system`, pom.xml). Consumers: a static web frontend (Vercel) and a staff/admin Android app, in sibling repos (workspace `../AGENTS.md`). Persists to MongoDB, posts order charges to the eZee PMS, sends FCM push notifications.
+Read when: you need the purpose, consumers or deploy target of this service.
+Verified: 2026-10-23 @ 24bdfbb
 
-Deploy: Docker image on a Hugging Face Space (`mosaichostels/cafe_backend`), port 7860 (README.md, Dockerfile). Push to `main` runs `.github/workflows/sync_to_hf.yml`: `mvn -B verify`, then a force-push to the Space.
+- What: Spring Boot REST API for the Mosaic Hostels cafe ordering system (`com.hostel:ordering-system:1.0.0`, pom.xml:11-12).
+- Consumers: static web frontend (Vercel) and staff/admin Android app, in sibling repos (`../AGENTS.md`). Guests order unauthenticated (`POST /orders`); staff/admin use JWT.
+- Persists: MongoDB. Posts order charges to eZee PMS (HTTP). Push: Firebase Cloud Messaging.
+- Deploy: Docker image on Hugging Face Space `mosaichostels/cafe_backend`, port 7860 (README.md, Dockerfile:14).
+- Pipeline: push to `main` -> `.github/workflows/sync_to_hf.yml`: job `build` (`mvn -B verify`, JDK 17 temurin) -> job `sync-to-hub` (`git push --force` to the Space, secret `HF_TOKEN`). Also `workflow_dispatch`.
+- Root `README.md` is Hugging Face Space metadata (front matter) + deploy notes; do not remove the front matter.

@@ -4,4 +4,4 @@ Spring Boot 3 / Java 17 API (MongoDB, eZee PMS charge posting, FCM) deployed to 
 Workspace rules live outside this repo: `../AGENTS.md` and `../docs/backend/AGENTS.md`.
 
 ## Project context
-See [docs/agent/README.md](docs/agent/README.md).
+Before any task, read `docs/agent/README.md`, then only the files its table lists for your task type. After changing code, update the affected file and `STATUS.md`.

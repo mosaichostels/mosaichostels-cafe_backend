@@ -1,8 +1,19 @@
 # Commands
 
-Not run in this pass (no build executed).
-- Build + test (CI uses this): `mvn -B verify`
-- Compile only (the Claude hook uses this): `mvn -q -o compile`
-- Package: `mvn clean package -DskipTests` (Dockerfile)
-- Docker run: image listens on 7860 with profile `prod`
-- Deploy: push to `main` (GitHub Action, needs secret `HF_TOKEN`). Local run command / dev profile: unknown (no `application.yml`; only `application-prod.yml`).
+Read when: building, testing, running, deploying or debugging hooks.
+Verified: 2026-10-23 @ 24bdfbb. Commands below were read from CI/Dockerfile/hooks; none were executed in this pass (not run).
+
+| Goal | Command | Source |
+| --- | --- | --- |
+| Build + all tests (CI) | `mvn -B verify` | sync_to_hf.yml |
+| Compile only (Claude hook) | `mvn -q -o compile` (offline) | ../.claude/hooks/backend-compile-check.sh |
+| One test class | `mvn -q test -Dtest=OrderServiceTest` (standard surefire; not run) | pom |
+| Package jar | `mvn clean package -DskipTests -q` | Dockerfile:7 |
+| Run packaged | `java -Dspring.profiles.active=prod -jar target/*.jar` needs prod env vars (ENVIRONMENT.md) | Dockerfile entrypoint |
+| Docker | image listens on 7860, profile `prod`, `-Xmx4g` | Dockerfile |
+| Health | `GET /health` | HealthController |
+| Seed config data | `mongo hostel_ordering mongodb-init.js` (manual, idempotent inserts) | src/main/resources/mongodb-init.js:4 |
+| Deploy | push to `main`; needs GitHub secret `HF_TOKEN` | sync_to_hf.yml |
+
+- Local dev run / dev profile: unknown (no `application.yml`; only `application-prod.yml`; `ezee.mock` flag exists, see ENVIRONMENT.md).
+- Hook scripts live in the parent workspace: `../.claude/hooks/`.

@@ -1,8 +1,16 @@
 # Gotchas
 
-- Rules, agents, skills and hook scripts live in the parent workspace folder (not a repo, not on GitHub): `../AGENTS.md`, `../docs/backend/AGENTS.md`, `../.claude/{agents,skills,hooks}`. `.claude/settings.json` here calls `$CLAUDE_PROJECT_DIR/../.claude/hooks/backend-guard-prod-config.sh` (PreToolUse) and `backend-compile-check.sh` (PostToolUse, runs `mvn -q -o compile`); both exist and are executable. They break if this repo is moved away from the workspace.
-- `.codex/hooks.json` is gitignored and calls `/Users/naveen/.agents/hooks/project_sync.py` (absolute, exists). Different from the Claude hooks, so it is kept.
-- Push to `main` force-deploys to the live Space after CI passes.
-- The Space sleeps without inbound traffic; `HeartbeatTask` and Docker HEALTHCHECK do not prevent it; scheduled jobs may not fire.
+Read when: debugging, deploying, editing hooks, or before touching prod config.
+Verified: 2026-10-23 @ 24bdfbb
+
+- Workspace coupling: rules, agents, skills and hook scripts live in the parent folder (not a repo, not on GitHub): `../AGENTS.md`, `../docs/backend/AGENTS.md`, `../.claude/{agents,skills,hooks}`.
+- `.claude/settings.json` hooks reference `$CLAUDE_PROJECT_DIR/../.claude/hooks/backend-*.sh` in the parent folder: `backend-guard-prod-config.sh` (PreToolUse; blocks edits to `application-prod.yml`, exit 2) and `backend-compile-check.sh` (PostToolUse on `*.java`, runs `mvn -q -o compile`, 120 s timeout; needs `jq` and an offline-ready `~/.m2`). Both exist and are executable. They break if the repo moves away from the workspace.
+- `.codex/hooks.json` is gitignored and calls `/Users/naveen/.agents/hooks/project_sync.py pre|post` (absolute; exists). Different from Claude hooks, so kept. `.agents/` does not exist here.
+- Push to `main` force-pushes to the live Space after CI passes; a bad merge hits production.
+- Space sleeps without inbound traffic; `HeartbeatTask` and Docker HEALTHCHECK do not prevent it, so scheduled jobs (stale charge recovery, audit cleanup) may not fire while asleep.
 - Production CORS preflight is answered by the HF proxy; test origins with a real request.
-- No base `application.yml`; local run setup unknown.
+- No base `application.yml`: local run setup unknown; `CORS_ALLOWED_ORIGINS` and `MONGODB_URI` have no prod default, startup fails without them.
+- `FirebaseConfig` fails startup without credentials.
+- `lazy-initialization: true` in prod: wiring errors can surface at first use, not at boot.
+- Rate-limit state is in-memory and per instance; resets on restart.
+- Do not rename `ezee` charge-post statuses or `UNCONFIRMED:` prefix: stored on orders and read by clients.

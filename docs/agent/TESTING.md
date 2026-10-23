@@ -1,3 +1,21 @@
 # Testing
 
-31 test classes under `src/test/java/com/hostel/ordering/` (config, controller, dto, ezee, model, repository, security, service). Run with `mvn -B verify` (what CI runs before deploy). Not run in this pass. Test framework details beyond spring-boot-starter-test: unknown.
+Read when: adding/running tests or judging whether a change is covered.
+Verified: 2026-10-23 @ 24bdfbb. Not run in this pass; pass state unknown.
+
+- Run: `mvn -B verify` (CI gate before deploy). Single class: `mvn -q test -Dtest=<Class>` (not run).
+- Size: 31 test classes, 135 `@Test` methods under `src/test/java/com/hostel/ordering/`, mirroring packages. No `src/test/resources`.
+- Tools: JUnit 5 (all 31), Mockito with `MockitoExtension` (13 classes, `@Mock`/`@InjectMocks`), `ReflectionTestUtils` (5), `MockMvc` (1 class), `@TestPropertySource` (1). No embedded Mongo / Testcontainers imports found.
+
+| Area | Test classes |
+| --- | --- |
+| config | ProdCorsConfigTest, RateLimitFilterTest, SecurityConfigTest, WebConfigTest |
+| controller | AuthControllerThrottleTest, HealthAndCorsTest, NotificationControllerSecurityTest, OrderControllerDeleteTest, OrderControllerTest |
+| dto / model | CreateOrderRequestValidationTest, OrderTest |
+| ezee | EzeeChargePostServiceTest, EzeeClientTest, EzeeXmlUtilTest |
+| repository | OrderRepositoryClaimTest |
+| security | AuthTokenFilterTest, JwtUtilsRevocationTest, LoginThrottleTest |
+| service | AuditServiceTest, AuthServiceRevocationTest, CategoryDeleteGuardTest, CategoryRenameCascadeTest, ConfirmTokenServiceTest, DormitoryOrderingTest, OrderCreateIdempotencyTest, OrderServiceTest, OrderStatusSeedingTest, RestoreDeletedItemTest, StaleChargePostRecoveryTest, UserServiceDeleteGuardTest, UserServiceRulesTest |
+
+- eZee/charge-post edits: run at least EzeeChargePostServiceTest, StaleChargePostRecoveryTest, OrderRepositoryClaimTest.
+- Coverage tooling (jacoco etc.): none in pom.

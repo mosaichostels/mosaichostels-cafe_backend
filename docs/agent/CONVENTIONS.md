@@ -1,11 +1,16 @@
 # Conventions
 
-From backend AGENTS (not independently re-verified in code beyond file existence):
-- Never interpolate user input into `$regex`; use `Pattern.quote`.
-- Soft delete for `MenuItem`/`OtherEssential` (`deleted` flag, repositories filter it); dormitories hard-delete.
-- Declare indexes on models (`auto-index-creation: true` in prod yml).
-- Error responses carry no internal detail; use `IllegalArgumentException` for messages callers may read.
-- Method-level `@PreAuthorize` overrides HTTP `permitAll()`; guest POST /orders needs `or isAnonymous()`.
-- Never edit `application-prod.yml` without the user (a hook blocks it; deploys on push to main).
-- Controllers are the API contract source of truth for frontend `js/api.js` and Android `ApiService.java`.
-- Code review for eZee changes: workspace agent `backend-ezee-charge-reviewer`.
+Read when: writing or reviewing code here.
+Verified: 2026-10-23 @ 24bdfbb. Items marked (AGENTS) come from backend AGENTS (`../docs/backend/AGENTS.md`) and were not all re-derived from code.
+
+- Never interpolate user input into `$regex`; use `Pattern.quote` (AGENTS).
+- Soft delete (`deleted` flag, repos filter it) for `MenuItem`/`OtherEssential`; dormitories hard-delete (AGENTS).
+- Declare indexes on models; `auto-index-creation: true` in prod yml makes them real (application-prod.yml:18).
+- Error bodies carry no internal detail (`GlobalExceptionHandler`, `ErrorResponse`); throw `IllegalArgumentException` only for messages callers may read (AGENTS).
+- Method-level `@PreAuthorize` overrides HTTP `permitAll()`; guest `POST /orders` needs `or isAnonymous()` (OrderController:32).
+- New protected endpoint: add `@PreAuthorize`; default is authenticated (SecurityConfig:73).
+- Never edit `application-prod.yml` without the user (hook blocks it; deploys on push).
+- Controllers are the contract source of truth for frontend `js/api.js` and Android `ApiService.java`; changing a route/shape needs sibling-repo follow-up.
+- eZee changes: review with workspace agent `backend-ezee-charge-reviewer`.
+- Mark deliberate shortcuts with `ponytail:` comments (e.g. RateLimitFilter:24).
+- Tests: JUnit 5 + Mockito, one test class per unit, named for the behaviour (TESTING.md).

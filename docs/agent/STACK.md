@@ -1,8 +1,21 @@
 # Stack
 
-Verified from pom.xml and Dockerfile.
-- Java 17 (`release` 17), Maven, Spring Boot 3.5.10
-- Starters: web, data-mongodb, security, validation, test; devtools excluded from the jar
-- jjwt 0.11.5 (JWT), Lombok 1.18.42, firebase-admin 9.1.1 (FCM)
-- Docker: build `maven:3.9.6-eclipse-temurin-17`, run `eclipse-temurin:17-jre`, `-Xmx4g`, profile `prod`
-- Test libs: spring-boot-starter-test only (specific frameworks used beyond that: see TESTING.md)
+Read when: choosing libraries, checking versions, or touching the build/image.
+Verified: 2026-10-23 @ 24bdfbb (source: pom.xml, Dockerfile)
+
+| Item | Value |
+| --- | --- |
+| Language / build | Java 17 (pom.xml:16), Maven; no wrapper (`mvnw` absent) |
+| Framework | Spring Boot 3.5.10 parent (pom.xml:7) |
+| Starters | web, data-mongodb, security, validation, test |
+| JWT | jjwt 0.11.5 (api/impl/jackson) |
+| Push | firebase-admin 9.1.1 |
+| Boilerplate | Lombok (annotation processor in maven-compiler-plugin 3.11.0) |
+| Dev | spring-boot-devtools (excluded from the jar) |
+| Tests | spring-boot-starter-test: JUnit 5, Mockito (see TESTING.md) |
+| DB | MongoDB via Spring Data (`MongoTemplate` for custom queries) |
+| Image build | `maven:3.9.6-eclipse-temurin-17` (stage 1) |
+| Image run | `eclipse-temurin:17-jre`, `-Xmx4g`, `-Dserver.port=7860`, `-Dspring.profiles.active=prod` |
+| Container health | `HEALTHCHECK` curls `localhost:7860/health` every 2m (Dockerfile:17) |
+| Actuator | only `health` exposed, details hidden (application-prod.yml:35-40) |
+| Prod tuning | Tomcat threads 200/min-spare 20, `lazy-initialization: true` (application-prod.yml:2-12) |
