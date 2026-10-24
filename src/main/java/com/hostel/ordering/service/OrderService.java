@@ -269,8 +269,8 @@ public class OrderService {
                     data.put("bookingName", order.getBookingName() != null ? order.getBookingName() : "Order");
                     fcmNotificationService.sendNotificationToToken(
                             fcmToken,
-                            "Order Ready to Post",
-                            "Order for " + order.getBookingName() + " marked delivered - post charge now?",
+                            "Ready to post",
+                            data.get("bookingName") + " delivered. Post charge?",
                             data
                     );
                 }

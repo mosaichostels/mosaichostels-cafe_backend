@@ -14,3 +14,4 @@ Verified: 2026-10-23 @ 24bdfbb
 - `lazy-initialization: true` in prod: wiring errors can surface at first use, not at boot.
 - Rate-limit state is in-memory and per instance; resets on restart.
 - Do not rename `ezee` charge-post statuses or `UNCONFIRMED:` prefix: stored on orders and read by clients.
+- Run Maven on JDK 17 (`JAVA_HOME=/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home`). The default Homebrew `mvn` uses JDK 27, where Lombok 1.18.42 fails with `ClassNotFoundException: com.sun.tools.javac.tree.EndPosTable` during compile.

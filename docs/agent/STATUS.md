@@ -8,3 +8,4 @@ Verified: 2026-10-23 @ 24bdfbb
 - Not run in this pass: build, tests. Pass state: unknown.
 - Unknown: local run instructions, deployed version, where prod secrets are managed, exact env name for `config.jwtSecret`.
 - Agent config: consolidation check found nothing to change (see run report); `.claude/settings.json` tracked, `.codex/hooks.json` local.
+- 2026-10-24: `OrderService` admin "post charge" push text shortened to "Ready to post" / "<name> delivered. Post charge?" (matches the Android fallback in `NotificationHelper`). Uncommitted, not deployed. `mvn -B compile` passes on JDK 17; tests not run.
