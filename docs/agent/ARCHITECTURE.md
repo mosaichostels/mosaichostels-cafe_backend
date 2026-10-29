@@ -1,7 +1,8 @@
-# Architecture
-
 Read when: tracing a request, changing auth, orders, eZee posting, schedulers or data.
-Verified: 2026-10-23 @ 24bdfbb
+Verified: 2026-10-29 @ 8b57217
+Covers: src/main/java/com/hostel/ordering/controller/**/*.java, src/main/java/com/hostel/ordering/service/**/*.java, src/main/java/com/hostel/ordering/config/**/*.java, src/main/java/com/hostel/ordering/model/**/*.java, src/main/java/com/hostel/ordering/repository/**/*.java
+
+# Architecture
 
 Flow: `request -> RateLimitFilter / AuthTokenFilter (SecurityConfig) -> controller (@PreAuthorize) -> service -> repository (Mongo)`. Hot path: `OrderController -> OrderService -> EzeeChargePostService -> EzeeClient`, then `FCMNotificationService`. No SQL.
 
@@ -16,11 +17,12 @@ Flow: `request -> RateLimitFilter / AuthTokenFilter (SecurityConfig) -> controll
 | `DELETE /orders`, `/orders/{id}`; `POST /orders/{id}/chargepost`; `GET /orders/{id}/ezee-candidates` | ADMIN only (OrderController:93,108,175,202) |
 | `/notifications/subscribe`, `/unsubscribe` | ADMIN, STAFF |
 | `POST /users/me/register-fcm` | any authenticated |
-| `/users` CRUD, `/audit` (GET, DELETE), POST/PUT/DELETE on `/config/categories`, `/config/dormitories`, `/config/statuses`, menu-items and other-essentials writes | ADMIN only |
+| `/users` CRUD, `/audit` | SUPERADMIN only (Admin gets 403) |
+| POST/PUT/DELETE on `/config/categories`, `/config/dormitories`, `/config/statuses`, menu-items and other-essentials writes | ADMIN only |
 | everything else | authenticated |
 
 ## Auth
-- Stateless JWT Bearer, CSRF off, roles ADMIN/STAFF (`security/`). `JwtUtils` expiry default 3600000 ms; refresh grace default 365 days.
+- Stateless JWT Bearer, CSRF off, roles SUPERADMIN/ADMIN/STAFF; hierarchy bean is only `ROLE_SUPERADMIN > ROLE_ADMIN`; login/refresh return hierarchy-expanded roles (`security/`, `SecurityConfig.roleHierarchy`). `JwtUtils` expiry default 3600000 ms; refresh grace default 365 days.
 - Logout sets per-user `User.tokensValidFrom` watermark (model/User.java:34) plus blacklist; refresh does not blacklist the old token (DECISIONS.md).
 - `LoginThrottle`: per-account login guessing. `RateLimitFilter` (60s window, in-memory, max 10000 keys): `POST /orders` 30/min, `POST /auth/login` 10/min; key = JWT user else client IP (X-Forwarded-For trusted only if peer is private/loopback).
 

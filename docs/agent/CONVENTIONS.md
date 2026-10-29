@@ -1,7 +1,8 @@
-# Conventions
-
 Read when: writing or reviewing code here.
-Verified: 2026-10-23 @ 24bdfbb. Items marked (AGENTS) come from backend AGENTS (`../docs/backend/AGENTS.md`) and were not all re-derived from code.
+Verified: 2026-10-29 @ 8b57217. Items marked (AGENTS) come from backend AGENTS (`../docs/backend/AGENTS.md`) and were not all re-derived from code.
+Covers: ../docs/backend/AGENTS.md, src/main/java/**/*.java, src/main/resources/**
+
+# Conventions
 
 - Never interpolate user input into `$regex`; use `Pattern.quote` (AGENTS).
 - Soft delete (`deleted` flag, repos filter it) for `MenuItem`/`OtherEssential`; dormitories hard-delete (AGENTS).

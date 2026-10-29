@@ -1,7 +1,8 @@
-# Environment
-
 Read when: configuring, deploying, or debugging startup. Names only; no values read.
-Verified: 2026-10-23 @ 24bdfbb (source: application-prod.yml and `@Value`/`getenv` in src/main)
+Verified: 2026-10-29 @ 8b57217 (source: application-prod.yml and `@Value`/`getenv` in src/main)
+Covers: src/main/resources/application-prod.yml, src/main/java/**/*.java, Dockerfile
+
+# Environment
 
 | Name | Where used | Notes |
 | --- | --- | --- |

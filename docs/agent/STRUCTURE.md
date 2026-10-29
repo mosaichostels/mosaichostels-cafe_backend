@@ -1,7 +1,8 @@
-# Structure
-
 Read when: you must find where code lives or add a file.
-Verified: 2026-10-23 @ 24bdfbb
+Verified: 2026-10-29 @ 8b57217
+Covers: src/main/java/**/*.java, src/main/resources/**, src/test/java/**/*.java, pom.xml
+
+# Structure
 
 Base package `src/main/java/com/hostel/ordering/` (all paths below relative to it):
 

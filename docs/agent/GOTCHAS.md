@@ -1,7 +1,8 @@
-# Gotchas
-
 Read when: debugging, deploying, editing hooks, or before touching prod config.
-Verified: 2026-10-23 @ 24bdfbb
+Verified: 2026-10-29 @ 8b57217
+Covers: ../AGENTS.md, ../docs/backend/AGENTS.md, .claude/settings.json, .codex/hooks.json, src/main/java/com/hostel/ordering/service/OrderService.java
+
+# Gotchas
 
 - Workspace coupling: rules, agents, skills and hook scripts live in the parent folder (not a repo, not on GitHub): `../AGENTS.md`, `../docs/backend/AGENTS.md`, `../.claude/{agents,skills,hooks}`.
 - `.claude/settings.json` hooks reference `$CLAUDE_PROJECT_DIR/../.claude/hooks/backend-*.sh` in the parent folder: `backend-guard-prod-config.sh` (PreToolUse; blocks edits to `application-prod.yml`, exit 2) and `backend-compile-check.sh` (PostToolUse on `*.java`, runs `mvn -q -o compile`, 120 s timeout; needs `jq` and an offline-ready `~/.m2`). Both exist and are executable. They break if the repo moves away from the workspace.

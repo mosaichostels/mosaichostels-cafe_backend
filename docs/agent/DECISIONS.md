@@ -1,7 +1,8 @@
-# Decisions
-
 Read when: about to change auth, idempotency, eZee posting, rate limits or notifications.
-Verified: 2026-10-23 @ 24bdfbb. Source: backend AGENTS (`../docs/backend/AGENTS.md`) plus code comments where cited.
+Verified: 2026-10-29 @ 8b57217. Source: backend AGENTS (`../docs/backend/AGENTS.md`) plus code comments where cited.
+Covers: -
+
+# Decisions
 
 | Decision | Why / where |
 | --- | --- |

@@ -1,7 +1,8 @@
-# Commands
-
 Read when: building, testing, running, deploying or debugging hooks.
-Verified: 2026-10-23 @ 24bdfbb. Commands below were read from CI/Dockerfile/hooks; none were executed in this pass (not run).
+Verified: 2026-10-29 @ 8b57217. Commands below were read from CI/Dockerfile/hooks; not run in this refresh.
+Covers: pom.xml, Dockerfile, .github/workflows/**, .claude/**, .codex/**
+
+# Commands
 
 | Goal | Command | Source |
 | --- | --- | --- |

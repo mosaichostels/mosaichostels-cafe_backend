@@ -1,7 +1,8 @@
-# Testing
-
 Read when: adding/running tests or judging whether a change is covered.
-Verified: 2026-10-23 @ 24bdfbb. Not run in this pass; pass state unknown.
+Verified: 2026-10-29 @ 8b57217. Not run in this refresh; pass state unknown.
+Covers: src/test/java/**/*.java, pom.xml, .github/workflows/**
+
+# Testing
 
 - Run: `mvn -B verify` (CI gate before deploy). Single class: `mvn -q test -Dtest=<Class>` (not run).
 - Size: 31 test classes, 135 `@Test` methods under `src/test/java/com/hostel/ordering/`, mirroring packages. No `src/test/resources`.

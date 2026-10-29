@@ -1,7 +1,7 @@
 # Agent context router
 
 Read when: starting any task in this repo (read this first, then only the files your task row lists).
-Verified: 2026-10-23 @ 24bdfbb (branch `main`; code lives only here, no other worktrees/branches: `git worktree list`, `git branch -a`).
+Verified: 2026-10-29 @ 8b57217 (branch `main`; code lives only here, no other worktrees/branches: `git worktree list`, `git branch -a`).
 
 | Task | Read |
 | --- | --- |
@@ -12,6 +12,8 @@ Verified: 2026-10-23 @ 24bdfbb (branch `main`; code lives only here, no other wo
 | Auth / security change | ARCHITECTURE.md, CONVENTIONS.md, TESTING.md |
 | Deploy / config / env | COMMANDS.md, ENVIRONMENT.md, GOTCHAS.md |
 | First look at the repo | OVERVIEW.md, STACK.md, STRUCTURE.md |
+
+Coverage: [COVERAGE.md](COVERAGE.md); 2 unknowns remain. Full-read cost: 4,682 estimated tokens. Verified 2026-10-29 @ 8b57217.
 
 | File | One line |
 | --- | --- |

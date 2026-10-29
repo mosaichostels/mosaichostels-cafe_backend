@@ -1,0 +1,131 @@
+{
+  "files": [
+    {
+      "file": "ARCHITECTURE.md",
+      "read_when": "tracing a request, changing auth, orders, eZee posting, schedulers or data.",
+      "verified_commit": "2026-10-29 @ 8b57217",
+      "covers": [
+        "src/main/java/com/hostel/ordering/controller/**/*.java",
+        "src/main/java/com/hostel/ordering/service/**/*.java",
+        "src/main/java/com/hostel/ordering/config/**/*.java",
+        "src/main/java/com/hostel/ordering/model/**/*.java",
+        "src/main/java/com/hostel/ordering/repository/**/*.java"
+      ],
+      "tokens_est": 983
+    },
+    {
+      "file": "COMMANDS.md",
+      "read_when": "building, testing, running, deploying or debugging hooks.",
+      "verified_commit": "2026-10-29 @ 8b57217. Commands below were read from CI/Dockerfile/hooks; not run in this refresh.",
+      "covers": [
+        "pom.xml",
+        "Dockerfile",
+        ".github/workflows/**",
+        ".claude/**",
+        ".codex/**"
+      ],
+      "tokens_est": 327
+    },
+    {
+      "file": "CONVENTIONS.md",
+      "read_when": "writing or reviewing code here.",
+      "verified_commit": "2026-10-29 @ 8b57217. Items marked (AGENTS) come from backend AGENTS (`../docs/backend/AGENTS.md`) and were not all re-derived from code.",
+      "covers": [
+        "../docs/backend/AGENTS.md",
+        "src/main/java/**/*.java",
+        "src/main/resources/**"
+      ],
+      "tokens_est": 367
+    },
+    {
+      "file": "DECISIONS.md",
+      "read_when": "about to change auth, idempotency, eZee posting, rate limits or notifications.",
+      "verified_commit": "2026-10-29 @ 8b57217. Source: backend AGENTS (`../docs/backend/AGENTS.md`) plus code comments where cited.",
+      "covers": [],
+      "tokens_est": 316
+    },
+    {
+      "file": "ENVIRONMENT.md",
+      "read_when": "configuring, deploying, or debugging startup. Names only; no values read.",
+      "verified_commit": "2026-10-29 @ 8b57217 (source: application-prod.yml and `@Value`/`getenv` in src/main)",
+      "covers": [
+        "src/main/resources/application-prod.yml",
+        "src/main/java/**/*.java",
+        "Dockerfile"
+      ],
+      "tokens_est": 403
+    },
+    {
+      "file": "GOTCHAS.md",
+      "read_when": "debugging, deploying, editing hooks, or before touching prod config.",
+      "verified_commit": "2026-10-29 @ 8b57217",
+      "covers": [
+        "../AGENTS.md",
+        "../docs/backend/AGENTS.md",
+        ".claude/settings.json",
+        ".codex/hooks.json",
+        "src/main/java/com/hostel/ordering/service/OrderService.java"
+      ],
+      "tokens_est": 545
+    },
+    {
+      "file": "OVERVIEW.md",
+      "read_when": "you need the purpose, consumers or deploy target of this service.",
+      "verified_commit": "2026-10-29 @ 8b57217",
+      "covers": [
+        "README.md",
+        "pom.xml",
+        "Dockerfile",
+        "src/main/java/**/*.java"
+      ],
+      "tokens_est": 254
+    },
+    {
+      "file": "STACK.md",
+      "read_when": "choosing libraries, checking versions, or touching the build/image.",
+      "verified_commit": "2026-10-29 @ 8b57217 (source: pom.xml, Dockerfile)",
+      "covers": [
+        "pom.xml",
+        "Dockerfile",
+        "gradle.properties"
+      ],
+      "tokens_est": 305
+    },
+    {
+      "file": "STATUS.md",
+      "read_when": "always, at the start and end of every task (update after changing code).",
+      "verified_commit": "2026-10-29 @ 8b57217",
+      "covers": [
+        "src/main/**",
+        "src/test/**",
+        "docs/agent/**",
+        "AGENTS.md"
+      ],
+      "tokens_est": 247
+    },
+    {
+      "file": "STRUCTURE.md",
+      "read_when": "you must find where code lives or add a file.",
+      "verified_commit": "2026-10-29 @ 8b57217",
+      "covers": [
+        "src/main/java/**/*.java",
+        "src/main/resources/**",
+        "src/test/java/**/*.java",
+        "pom.xml"
+      ],
+      "tokens_est": 508
+    },
+    {
+      "file": "TESTING.md",
+      "read_when": "adding/running tests or judging whether a change is covered.",
+      "verified_commit": "2026-10-29 @ 8b57217. Not run in this refresh; pass state unknown.",
+      "covers": [
+        "src/test/java/**/*.java",
+        "pom.xml",
+        ".github/workflows/**"
+      ],
+      "tokens_est": 427
+    }
+  ],
+  "nested": []
+}

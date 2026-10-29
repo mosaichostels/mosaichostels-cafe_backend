@@ -1,7 +1,8 @@
-# Stack
-
 Read when: choosing libraries, checking versions, or touching the build/image.
-Verified: 2026-10-23 @ 24bdfbb (source: pom.xml, Dockerfile)
+Verified: 2026-10-29 @ 8b57217 (source: pom.xml, Dockerfile)
+Covers: pom.xml, Dockerfile, gradle.properties
+
+# Stack
 
 | Item | Value |
 | --- | --- |

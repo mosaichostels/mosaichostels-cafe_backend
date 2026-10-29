@@ -1,7 +1,8 @@
-# Overview
-
 Read when: you need the purpose, consumers or deploy target of this service.
-Verified: 2026-10-23 @ 24bdfbb
+Verified: 2026-10-29 @ 8b57217
+Covers: README.md, pom.xml, Dockerfile, src/main/java/**/*.java
+
+# Overview
 
 - What: Spring Boot REST API for the Mosaic Hostels cafe ordering system (`com.hostel:ordering-system:1.0.0`, pom.xml:11-12).
 - Consumers: static web frontend (Vercel) and staff/admin Android app, in sibling repos (`../AGENTS.md`). Guests order unauthenticated (`POST /orders`); staff/admin use JWT.
