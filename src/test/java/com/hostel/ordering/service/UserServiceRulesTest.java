@@ -56,6 +56,31 @@ class UserServiceRulesTest {
     }
 
     @Test
+    void normalizesBareSuperAdmin() {
+        when(userRepository.findByUsername("boss")).thenReturn(Optional.empty());
+        when(encoder.encode("longenough")).thenReturn("enc");
+        when(userRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        User saved = userService.createUser("boss", "longenough", Set.of("SUPERADMIN"));
+
+        assertEquals(Set.of("ROLE_SUPERADMIN"), saved.getRoles());
+    }
+
+    @Test
+    void refusesDemotingLastSuperAdminToAdmin() {
+        User sa = user("1", "boss", "ROLE_SUPERADMIN");
+        User admin = user("2", "admin", "ROLE_ADMIN");
+        when(userRepository.findById("1")).thenReturn(Optional.of(sa));
+        when(userRepository.findAll()).thenReturn(List.of(sa, admin));
+
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> userService.updateUser("1", "boss", null, Set.of("ROLE_ADMIN")));
+
+        assertEquals("Cannot remove the last SuperAdmin's role. Promote another SuperAdmin first.", e.getMessage());
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
     void updateUser_refusesToDemoteTheLastAdmin() {
         User onlyAdmin = user("1", "admin", "ROLE_ADMIN");
         when(userRepository.findById("1")).thenReturn(Optional.of(onlyAdmin));
