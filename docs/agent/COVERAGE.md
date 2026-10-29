@@ -23,5 +23,5 @@
 | Deploy | documented in COMMANDS.md and OVERVIEW.md |
 | Runbooks | not applicable: no repo-local runbook exists |
 | Glossary | not applicable: terms are covered inline |
-| Observability | unknown: where production logs, metrics, and alerts are viewed |
-| External | unknown: owner/account links for MongoDB, eZee, Firebase, and Hugging Face |
+| Observability | documented in OBSERVABILITY.md |
+| External | documented in EXTERNAL.md (per-service owners unknown) |

@@ -1,5 +1,5 @@
 Read when: choosing libraries, checking versions, or touching the build/image.
-Verified: 2026-10-29 @ 8b57217 (source: pom.xml, Dockerfile)
+Verified: 2026-10-29 @ 9e39a6f (source: pom.xml, Dockerfile)
 Covers: pom.xml, Dockerfile, gradle.properties
 
 # Stack
@@ -17,6 +17,6 @@ Covers: pom.xml, Dockerfile, gradle.properties
 | DB | MongoDB via Spring Data (`MongoTemplate` for custom queries) |
 | Image build | `maven:3.9.6-eclipse-temurin-17` (stage 1) |
 | Image run | `eclipse-temurin:17-jre`, `-Xmx4g`, `-Dserver.port=7860`, `-Dspring.profiles.active=prod` |
-| Container health | `HEALTHCHECK` curls `localhost:7860/health` every 2m (Dockerfile:17) |
-| Actuator | only `health` exposed, details hidden (application-prod.yml:35-40) |
-| Prod tuning | Tomcat threads 200/min-spare 20, `lazy-initialization: true` (application-prod.yml:2-12) |
+| Container health | `HEALTHCHECK` curls `localhost:7860/health` every 2m (Dockerfile:18) |
+| Actuator | only `health` exposed, details hidden (application-prod.yml:32-38) |
+| Prod tuning | Tomcat threads 200/min-spare 20, `lazy-initialization: true` (application-prod.yml:2-13) |

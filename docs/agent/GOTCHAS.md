@@ -1,5 +1,5 @@
 Read when: debugging, deploying, editing hooks, or before touching prod config.
-Verified: 2026-10-29 @ 8b57217
+Verified: 2026-10-29 @ 9e39a6f
 Covers: ../AGENTS.md, ../docs/backend/AGENTS.md, .claude/settings.json, .codex/hooks.json, src/main/java/com/hostel/ordering/service/OrderService.java
 
 # Gotchas

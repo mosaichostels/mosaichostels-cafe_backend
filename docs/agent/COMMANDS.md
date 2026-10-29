@@ -1,6 +1,6 @@
 Read when: building, testing, running, deploying or debugging hooks.
-Verified: 2026-10-29 @ 8b57217. Commands below were read from CI/Dockerfile/hooks; not run in this refresh.
-Covers: pom.xml, Dockerfile, .github/workflows/**, .claude/**, .codex/**
+Verified: 2026-10-29 @ 9e39a6f. Commands read from CI/Dockerfile/hooks; `mvn -B -o test` run on JDK 17 (passes). Others not run.
+Covers: scripts/**, pom.xml, Dockerfile, .github/workflows/**, .claude/**, .codex/**
 
 # Commands
 
@@ -8,12 +8,13 @@ Covers: pom.xml, Dockerfile, .github/workflows/**, .claude/**, .codex/**
 | --- | --- | --- |
 | Build + all tests (CI) | `mvn -B verify` | sync_to_hf.yml |
 | Compile only (Claude hook) | `mvn -q -o compile` (offline) | ../.claude/hooks/backend-compile-check.sh |
-| One test class | `mvn -q test -Dtest=OrderServiceTest` (standard surefire; not run) | pom |
+| One test class | `mvn -q test -Dtest=OrderServiceTest` (standard surefire) | pom |
 | Package jar | `mvn clean package -DskipTests -q` | Dockerfile:7 |
 | Run packaged | `java -Dspring.profiles.active=prod -jar target/*.jar` needs prod env vars (ENVIRONMENT.md) | Dockerfile entrypoint |
 | Docker | image listens on 7860, profile `prod`, `-Xmx4g` | Dockerfile |
 | Health | `GET /health` | HealthController |
 | Seed config data | `mongo hostel_ordering mongodb-init.js` (manual, idempotent inserts) | src/main/resources/mongodb-init.js:4 |
+| Promote SuperAdmin | `MONGODB_URI=... scripts/promote-superadmin.sh <username>` (re-runnable; user must log in again; not run) | scripts/promote-superadmin.sh:3 |
 | Deploy | push to `main`; needs GitHub secret `HF_TOKEN` | sync_to_hf.yml |
 
 - Local dev run / dev profile: unknown (no `application.yml`; only `application-prod.yml`; `ezee.mock` flag exists, see ENVIRONMENT.md).

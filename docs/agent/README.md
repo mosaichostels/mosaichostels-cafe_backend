@@ -1,7 +1,7 @@
 # Agent context router
 
 Read when: starting any task in this repo (read this first, then only the files your task row lists).
-Verified: 2026-10-29 @ 8b57217 (branch `main`; code lives only here, no other worktrees/branches: `git worktree list`, `git branch -a`).
+Verified: 2026-10-29 @ 9e39a6f (branch `main`; code lives only here, no other worktrees/branches: `git worktree list`, `git branch -a`).
 
 | Task | Read |
 | --- | --- |
@@ -10,10 +10,10 @@ Verified: 2026-10-29 @ 8b57217 (branch `main`; code lives only here, no other wo
 | New feature / endpoint | CONVENTIONS.md, STRUCTURE.md, DECISIONS.md, ARCHITECTURE.md |
 | eZee charge posting change | ARCHITECTURE.md (eZee section), DECISIONS.md, GOTCHAS.md, TESTING.md |
 | Auth / security change | ARCHITECTURE.md, CONVENTIONS.md, TESTING.md |
-| Deploy / config / env | COMMANDS.md, ENVIRONMENT.md, GOTCHAS.md |
+| Deploy / config / env / incident | COMMANDS.md, ENVIRONMENT.md, OBSERVABILITY.md, GOTCHAS.md |
 | First look at the repo | OVERVIEW.md, STACK.md, STRUCTURE.md |
 
-Coverage: [COVERAGE.md](COVERAGE.md); 2 unknowns remain. Full-read cost: 4,682 estimated tokens. Verified 2026-10-29 @ 8b57217.
+Coverage: [COVERAGE.md](COVERAGE.md); 0 unknowns remain. Full-read cost: 5,345 estimated tokens. Verified 2026-10-29 @ 9e39a6f.
 
 | File | One line |
 | --- | --- |
@@ -24,6 +24,8 @@ Coverage: [COVERAGE.md](COVERAGE.md); 2 unknowns remain. Full-read cost: 4,682 e
 | ARCHITECTURE.md | Request flows, auth, routes + roles, collections, eZee, schedulers |
 | CONVENTIONS.md | Coding rules to follow |
 | ENVIRONMENT.md | Env var / property NAMES only |
+| EXTERNAL.md | Accounts and owners (no secrets) |
+| OBSERVABILITY.md | Where logs, metrics, alerts live (HF Space logs only) |
 | TESTING.md | Test layout, tools, how to run |
 | DECISIONS.md | Durable design decisions and why |
 | GOTCHAS.md | Traps, workspace coupling, hooks |

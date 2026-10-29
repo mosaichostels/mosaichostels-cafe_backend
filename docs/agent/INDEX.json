@@ -3,7 +3,7 @@
     {
       "file": "ARCHITECTURE.md",
       "read_when": "tracing a request, changing auth, orders, eZee posting, schedulers or data.",
-      "verified_commit": "2026-10-29 @ 8b57217",
+      "verified_commit": "2026-10-29 @ 9e39a6f",
       "covers": [
         "src/main/java/com/hostel/ordering/controller/**/*.java",
         "src/main/java/com/hostel/ordering/service/**/*.java",
@@ -11,25 +11,26 @@
         "src/main/java/com/hostel/ordering/model/**/*.java",
         "src/main/java/com/hostel/ordering/repository/**/*.java"
       ],
-      "tokens_est": 983
+      "tokens_est": 1119
     },
     {
       "file": "COMMANDS.md",
       "read_when": "building, testing, running, deploying or debugging hooks.",
-      "verified_commit": "2026-10-29 @ 8b57217. Commands below were read from CI/Dockerfile/hooks; not run in this refresh.",
+      "verified_commit": "2026-10-29 @ 9e39a6f. Commands read from CI/Dockerfile/hooks; `mvn -B -o test` run on JDK 17 (passes). Others not run.",
       "covers": [
+        "scripts/**",
         "pom.xml",
         "Dockerfile",
         ".github/workflows/**",
         ".claude/**",
         ".codex/**"
       ],
-      "tokens_est": 327
+      "tokens_est": 374
     },
     {
       "file": "CONVENTIONS.md",
       "read_when": "writing or reviewing code here.",
-      "verified_commit": "2026-10-29 @ 8b57217. Items marked (AGENTS) come from backend AGENTS (`../docs/backend/AGENTS.md`) and were not all re-derived from code.",
+      "verified_commit": "2026-10-29 @ 9e39a6f. Items marked (AGENTS) come from backend AGENTS (`../docs/backend/AGENTS.md`) and were not all re-derived from code.",
       "covers": [
         "../docs/backend/AGENTS.md",
         "src/main/java/**/*.java",
@@ -40,25 +41,32 @@
     {
       "file": "DECISIONS.md",
       "read_when": "about to change auth, idempotency, eZee posting, rate limits or notifications.",
-      "verified_commit": "2026-10-29 @ 8b57217. Source: backend AGENTS (`../docs/backend/AGENTS.md`) plus code comments where cited.",
+      "verified_commit": "2026-10-29 @ 9e39a6f. Source: backend AGENTS (`../docs/backend/AGENTS.md`) plus code comments where cited.",
       "covers": [],
-      "tokens_est": 316
+      "tokens_est": 317
     },
     {
       "file": "ENVIRONMENT.md",
       "read_when": "configuring, deploying, or debugging startup. Names only; no values read.",
-      "verified_commit": "2026-10-29 @ 8b57217 (source: application-prod.yml and `@Value`/`getenv` in src/main)",
+      "verified_commit": "2026-10-29 @ 9e39a6f (source: application-prod.yml and `@Value`/`getenv` in src/main)",
       "covers": [
         "src/main/resources/application-prod.yml",
         "src/main/java/**/*.java",
         "Dockerfile"
       ],
-      "tokens_est": 403
+      "tokens_est": 430
+    },
+    {
+      "file": "EXTERNAL.md",
+      "read_when": "you need to know which account or owner to go to for a service.",
+      "verified_commit": "2026-10-29 @ 9e39a6f",
+      "covers": [],
+      "tokens_est": 130
     },
     {
       "file": "GOTCHAS.md",
       "read_when": "debugging, deploying, editing hooks, or before touching prod config.",
-      "verified_commit": "2026-10-29 @ 8b57217",
+      "verified_commit": "2026-10-29 @ 9e39a6f",
       "covers": [
         "../AGENTS.md",
         "../docs/backend/AGENTS.md",
@@ -69,9 +77,18 @@
       "tokens_est": 545
     },
     {
+      "file": "OBSERVABILITY.md",
+      "read_when": "investigating a production error, slow request or failed deploy.",
+      "verified_commit": "2026-10-29 @ 9e39a6f",
+      "covers": [
+        "src/main/resources/application-prod.yml"
+      ],
+      "tokens_est": 202
+    },
+    {
       "file": "OVERVIEW.md",
       "read_when": "you need the purpose, consumers or deploy target of this service.",
-      "verified_commit": "2026-10-29 @ 8b57217",
+      "verified_commit": "2026-10-29 @ 9e39a6f",
       "covers": [
         "README.md",
         "pom.xml",
@@ -83,7 +100,7 @@
     {
       "file": "STACK.md",
       "read_when": "choosing libraries, checking versions, or touching the build/image.",
-      "verified_commit": "2026-10-29 @ 8b57217 (source: pom.xml, Dockerfile)",
+      "verified_commit": "2026-10-29 @ 9e39a6f (source: pom.xml, Dockerfile)",
       "covers": [
         "pom.xml",
         "Dockerfile",
@@ -94,37 +111,38 @@
     {
       "file": "STATUS.md",
       "read_when": "always, at the start and end of every task (update after changing code).",
-      "verified_commit": "2026-10-29 @ 8b57217",
+      "verified_commit": "2026-10-29 @ 9e39a6f",
       "covers": [
         "src/main/**",
         "src/test/**",
         "docs/agent/**",
         "AGENTS.md"
       ],
-      "tokens_est": 247
+      "tokens_est": 307
     },
     {
       "file": "STRUCTURE.md",
       "read_when": "you must find where code lives or add a file.",
-      "verified_commit": "2026-10-29 @ 8b57217",
+      "verified_commit": "2026-10-29 @ 9e39a6f",
       "covers": [
         "src/main/java/**/*.java",
         "src/main/resources/**",
         "src/test/java/**/*.java",
+        "scripts/**",
         "pom.xml"
       ],
-      "tokens_est": 508
+      "tokens_est": 544
     },
     {
       "file": "TESTING.md",
       "read_when": "adding/running tests or judging whether a change is covered.",
-      "verified_commit": "2026-10-29 @ 8b57217. Not run in this refresh; pass state unknown.",
+      "verified_commit": "2026-10-29 @ 9e39a6f. `JAVA_HOME=<temurin-17> mvn -B -o test`: 156 tests, 0 failures, BUILD SUCCESS.",
       "covers": [
         "src/test/java/**/*.java",
         "pom.xml",
         ".github/workflows/**"
       ],
-      "tokens_est": 427
+      "tokens_est": 451
     }
   ],
   "nested": []

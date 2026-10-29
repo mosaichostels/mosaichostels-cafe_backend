@@ -1,12 +1,12 @@
 Read when: tracing a request, changing auth, orders, eZee posting, schedulers or data.
-Verified: 2026-10-29 @ 8b57217
+Verified: 2026-10-29 @ 9e39a6f
 Covers: src/main/java/com/hostel/ordering/controller/**/*.java, src/main/java/com/hostel/ordering/service/**/*.java, src/main/java/com/hostel/ordering/config/**/*.java, src/main/java/com/hostel/ordering/model/**/*.java, src/main/java/com/hostel/ordering/repository/**/*.java
 
 # Architecture
 
 Flow: `request -> RateLimitFilter / AuthTokenFilter (SecurityConfig) -> controller (@PreAuthorize) -> service -> repository (Mongo)`. Hot path: `OrderController -> OrderService -> EzeeChargePostService -> EzeeClient`, then `FCMNotificationService`. No SQL.
 
-## Routes and roles (SecurityConfig.java:67-73 + method @PreAuthorize)
+## Routes and roles (SecurityConfig.java:75-81 + method @PreAuthorize)
 | Route | Access |
 | --- | --- |
 | `/auth/login`, `/auth/refresh`, `/auth/logout` | public (permitAll) |
@@ -29,15 +29,18 @@ Flow: `request -> RateLimitFilter / AuthTokenFilter (SecurityConfig) -> controll
 ## Collections (@Document)
 `orders` (unique sparse index on idempotency key; compound `status_createdAt`), `users` (unique username), `menu_items`, `other_essentials`, `categories`, `dormitories`, `order_status_config`, `audit_logs`, `idempotency_keys` (TTL 3600 s).
 
+## Category rename
+Items store their category by name: `CategoryService` update (:72-82) `updateMulti`s the new name into `menu_items` or `other_essentials` (by category type), then renumbers `showOrder`. Test: `CategoryRenameCascadeTest`.
+
 ## Order create idempotency
 `Idempotency-Key` header (OrderController:34): stored on order + `IdempotencyRecord` (TTL). Status updates also cached (`order-status:<id>`, :77). Prices always re-read from DB.
 
 ## eZee charge posting (highest risk)
 - Admin picks occupant by hand: `GET /orders/{id}/ezee-candidates` then `POST /orders/{id}/chargepost`; no auto matching.
-- `OrderRepositoryImpl.claimForChargePost` (:100) atomically claims a DELIVERED order; `OrderService.java:309` calls it.
-- `chargePostStatus`: null | IN_PROGRESS | QUEUED (eZee accepted) | FAILED (model/Order.java:87-91).
+- `OrderRepositoryImpl.claimForChargePost` (:100) atomically claims a DELIVERED order; `OrderService.java:314` calls it.
+- `chargePostStatus`: null | IN_PROGRESS | QUEUED (eZee accepted) | FAILED (model/Order.java:85-91). `VOIDED` is read (OrderService:221) but never set (eZee has no void); the Order.java comment saying cancel reverses to VOIDED is stale.
 - No reply from eZee -> item recorded as `UNCONFIRMED:<id>` (EzeeChargePostService:37,241,264); retry needs admin to acknowledge after folio check. Charges cannot be voided.
-- Stale claims: `OrderService.recoverStaleChargePosts` (:402, every 60 s, claim older than 15 min) marks FAILED with `UNCONFIRMED:interrupted`.
+- Stale claims: `OrderService.recoverStaleChargePosts` (:408, every 60 s, claim older than 15 min) marks FAILED with `UNCONFIRMED:interrupted`.
 - Posting stops sending after 5 min. `ezee.mock=true` switches `EzeeClient` to `EzeeMockResponses`.
 - Deeper detail: backend AGENTS "eZee PMS integration", workspace skill `backend-ezee-integration`.
 

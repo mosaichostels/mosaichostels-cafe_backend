@@ -1,6 +1,6 @@
 Read when: you must find where code lives or add a file.
-Verified: 2026-10-29 @ 8b57217
-Covers: src/main/java/**/*.java, src/main/resources/**, src/test/java/**/*.java, pom.xml
+Verified: 2026-10-29 @ 9e39a6f
+Covers: src/main/java/**/*.java, src/main/resources/**, src/test/java/**/*.java, scripts/**, pom.xml
 
 # Structure
 
@@ -22,6 +22,7 @@ Base package `src/main/java/com/hostel/ordering/` (all paths below relative to i
 Other paths:
 - `src/main/resources/`: `application-prod.yml` (only config; no base `application.yml`), `mongodb-init.js` (manual seed script: categories, dormitories; run by hand, not by the app)
 - `src/test/java/com/hostel/ordering/`: mirrors packages; no `src/test/resources`
+- `scripts/promote-superadmin.sh`: sets one user to `ROLE_SUPERADMIN` and bumps `tokensValidFrom` (needs `MONGODB_URI`, `mongosh`)
 - `.github/workflows/sync_to_hf.yml`: CI + deploy. `Dockerfile`, `pom.xml`, `README.md` (HF front matter)
 - `.claude/settings.json`: tracked hooks (GOTCHAS.md). `.codex/hooks.json`: gitignored, local. `target/`: build output, ignored
 
