@@ -7,9 +7,6 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import com.hostel.ordering.service.AuthService;
-import com.hostel.ordering.model.User;
-import com.hostel.ordering.repository.UserRepository;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.beans.factory.annotation.Value;
 @SpringBootApplication
 @EnableAsync

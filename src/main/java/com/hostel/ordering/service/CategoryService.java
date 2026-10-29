@@ -28,9 +28,6 @@ public class CategoryService {
         this.mongoTemplate = mongoTemplate;
     }
 
-    public List<Category> getAllCategories() {
-        return categoryRepository.findAllByOrderByShowOrderAsc();
-    }
 
     public List<Category> getMenuCategories() {
         List<Category> all = categoryRepository.findAllByOrderByShowOrderAsc();
