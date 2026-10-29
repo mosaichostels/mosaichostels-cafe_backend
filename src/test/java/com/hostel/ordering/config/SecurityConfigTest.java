@@ -1,6 +1,12 @@
 package com.hostel.ordering.config;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.access.AccessDeniedException;
@@ -41,5 +47,26 @@ class SecurityConfigTest {
         assertEquals(403, response.getStatus());
         assertEquals("application/json", response.getContentType());
         assertTrue(response.getContentAsString().contains("permission"));
+    }
+
+    private static Set<String> reach(String role) {
+        return SecurityConfig.roleHierarchy()
+                .getReachableGrantedAuthorities(List.of(new SimpleGrantedAuthority(role))).stream()
+                .map(GrantedAuthority::getAuthority).collect(Collectors.toSet());
+    }
+
+    @Test
+    void superAdminReachesAdmin() {
+        assertTrue(reach("ROLE_SUPERADMIN").contains("ROLE_ADMIN"));
+    }
+
+    @Test
+    void adminDoesNotReachSuperAdmin() {
+        assertFalse(reach("ROLE_ADMIN").contains("ROLE_SUPERADMIN"));
+    }
+
+    @Test
+    void staffReachesNothingElse() {
+        assertEquals(Set.of("ROLE_STAFF"), reach("ROLE_STAFF"));
     }
 }

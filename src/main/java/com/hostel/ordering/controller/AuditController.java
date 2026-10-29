@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 @RestController
 @RequestMapping("/audit")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('SUPERADMIN')")
 public class AuditController {
 
     @Autowired

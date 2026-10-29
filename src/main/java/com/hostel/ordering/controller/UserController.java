@@ -21,13 +21,13 @@ public class UserController {
     com.hostel.ordering.service.AuditService auditService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPERADMIN')")
     public List<User> getAllUsers() {
         return userService.getAllUsers();
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPERADMIN')")
     public ResponseEntity<?> createUser(@RequestBody Map<String, Object> userRequest) {
         String username = (String) userRequest.get("username");
         String password = (String) userRequest.get("password");
@@ -43,7 +43,7 @@ public class UserController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPERADMIN')")
     public ResponseEntity<?> deleteUser(@PathVariable String id) {
         User user = userService.getUserById(id);
         String username = (user != null) ? user.getUsername() : id;
@@ -56,7 +56,7 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPERADMIN')")
     public ResponseEntity<?> updateUser(@PathVariable String id, @RequestBody Map<String, Object> userRequest) {
         String username = (String) userRequest.get("username");
         String password = (String) userRequest.get("password");
