@@ -52,6 +52,7 @@ class AuthServiceRevocationTest {
         authService.userRepository = userRepository;
         authService.auditService = auditService;
         authService.jwtUtils = jwtUtils;
+        authService.roleHierarchy = com.hostel.ordering.config.SecurityConfig.roleHierarchy();
 
         Authentication authentication = new UsernamePasswordAuthenticationToken(
                 new org.springframework.security.core.userdetails.User(
@@ -92,5 +93,69 @@ class AuthServiceRevocationTest {
         Map<String, Object> result = authService.refreshToken(token);
 
         assertEquals("alice", result.get("username"));
+    }
+
+    @Test
+    void refreshRolesIncludeAdminForSuperAdmin() {
+        User user = new User("alice", "hashed", Set.of("ROLE_SUPERADMIN"));
+        when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
+
+        @SuppressWarnings("unchecked")
+        List<String> roles = (List<String>) authService.refreshToken(token).get("roles");
+
+        assertEquals(Set.of("ROLE_SUPERADMIN", "ROLE_ADMIN"), Set.copyOf(roles));
+        assertEquals(roles.size(), Set.copyOf(roles).size());
+    }
+
+    @Test
+    void refreshRolesUnchangedForAdmin() {
+        User user = new User("alice", "hashed", Set.of("ROLE_ADMIN"));
+        when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
+
+        assertEquals(List.of("ROLE_ADMIN"), authService.refreshToken(token).get("roles"));
+    }
+
+    @Test
+    void refreshRolesNormaliseLegacyUnprefixedRoles() {
+        assertRefreshRoles(Set.of("SUPERADMIN"), Set.of("ROLE_SUPERADMIN", "ROLE_ADMIN"));
+        assertRefreshRoles(Set.of("ROLE_ADMIN"), Set.of("ROLE_ADMIN"));
+        assertRefreshRoles(Set.of("staff"), Set.of("ROLE_STAFF"));
+        // legacy and prefixed forms of the same role collapse to one entry
+        assertRefreshRoles(Set.of("ADMIN", "ROLE_ADMIN"), Set.of("ROLE_ADMIN"));
+    }
+
+    @SuppressWarnings("unchecked")
+    private void assertRefreshRoles(Set<String> stored, Set<String> expected) {
+        org.mockito.Mockito.reset(userRepository);
+        when(userRepository.findByUsername("alice")).thenReturn(Optional.of(new User("alice", "hashed", stored)));
+        List<String> roles = (List<String>) authService.refreshToken(token).get("roles");
+        assertEquals(expected, Set.copyOf(roles));
+        assertEquals(roles.size(), Set.copyOf(roles).size());
+    }
+
+    @Test
+    void loginRolesIncludeAdminForSuperAdmin() {
+        assertLoginRoles(Set.of("ROLE_SUPERADMIN"), Set.of("ROLE_SUPERADMIN", "ROLE_ADMIN"));
+    }
+
+    @Test
+    void adminLoginRolesUnchanged() {
+        assertLoginRoles(Set.of("ROLE_ADMIN"), Set.of("ROLE_ADMIN"));
+    }
+
+    @SuppressWarnings("unchecked")
+    private void assertLoginRoles(Set<String> stored, Set<String> expected) {
+        org.springframework.security.authentication.AuthenticationManager am =
+                org.mockito.Mockito.mock(org.springframework.security.authentication.AuthenticationManager.class);
+        List<SimpleGrantedAuthority> auths = stored.stream().map(SimpleGrantedAuthority::new).toList();
+        Authentication a = new UsernamePasswordAuthenticationToken(
+                new org.springframework.security.core.userdetails.User("alice", "pw", auths), null, auths);
+        when(am.authenticate(org.mockito.ArgumentMatchers.any())).thenReturn(a);
+        authService.authenticationManager = am;
+
+        List<String> roles = (List<String>) authService.login("alice", "pw").get("roles");
+
+        assertEquals(expected, Set.copyOf(roles));
+        assertEquals(expected.size(), roles.size());
     }
 }

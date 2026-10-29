@@ -31,7 +31,7 @@ public class UserService {
         return userRepository.findById(id).orElse(null);
     }
 
-    private static final Set<String> ALLOWED_ROLES = Set.of("ROLE_ADMIN", "ROLE_STAFF");
+    private static final Set<String> ALLOWED_ROLES = Set.of("ROLE_SUPERADMIN", "ROLE_ADMIN", "ROLE_STAFF");
     private static final int MIN_PASSWORD_LENGTH = 8;
 
     // Accepts "STAFF" as well as "ROLE_STAFF"; anything else is refused rather than stored, since
@@ -58,12 +58,26 @@ public class UserService {
         }
     }
 
+    private static boolean isAdmin(Set<String> roles) {
+        return roles != null && (roles.contains("ROLE_ADMIN") || roles.contains("ROLE_SUPERADMIN"));
+    }
+
     private void requireAnotherAdmin(User user, String message) {
         long remainingAdmins = userRepository.findAll().stream()
                 .filter(u -> !u.getId().equals(user.getId()))
-                .filter(u -> u.getRoles() != null && u.getRoles().contains("ROLE_ADMIN"))
+                .filter(u -> isAdmin(u.getRoles()))
                 .count();
         if (remainingAdmins == 0) {
+            throw new IllegalArgumentException(message);
+        }
+    }
+
+    private void requireAnotherSuperAdmin(User user, String message) {
+        long remaining = userRepository.findAll().stream()
+                .filter(u -> !u.getId().equals(user.getId()))
+                .filter(u -> u.getRoles() != null && u.getRoles().contains("ROLE_SUPERADMIN"))
+                .count();
+        if (remaining == 0) {
             throw new IllegalArgumentException(message);
         }
     }
@@ -94,8 +108,11 @@ public class UserService {
             // Refuse to remove the last administrator. Every admin-only endpoint would become
             // unreachable, including user management itself, so there would be no way back in
             // short of editing the database by hand.
-            if (user.getRoles() != null && user.getRoles().contains("ROLE_ADMIN")) {
+            if (isAdmin(user.getRoles())) {
                 requireAnotherAdmin(user, "Cannot delete the last administrator. Create another admin first.");
+            }
+            if (user.getRoles() != null && user.getRoles().contains("ROLE_SUPERADMIN")) {
+                requireAnotherSuperAdmin(user, "Cannot delete the last SuperAdmin. Promote another SuperAdmin first.");
             }
             userRepository.delete(user);
             log.info("User {} deleted successfully", user.getUsername());
@@ -121,9 +138,12 @@ public class UserService {
             throw new IllegalArgumentException("Username is already taken!");
         }
 
-        boolean wasAdmin = user.getRoles() != null && user.getRoles().contains("ROLE_ADMIN");
-        if (wasAdmin && !cleanRoles.contains("ROLE_ADMIN")) {
+        if (isAdmin(user.getRoles()) && !isAdmin(cleanRoles)) {
             requireAnotherAdmin(user, "Cannot remove the last administrator's admin role. Create another admin first.");
+        }
+        if (user.getRoles() != null && user.getRoles().contains("ROLE_SUPERADMIN")
+                && !cleanRoles.contains("ROLE_SUPERADMIN")) {
+            requireAnotherSuperAdmin(user, "Cannot remove the last SuperAdmin's role. Promote another SuperAdmin first.");
         }
 
         boolean credentialsChanged = changingPassword

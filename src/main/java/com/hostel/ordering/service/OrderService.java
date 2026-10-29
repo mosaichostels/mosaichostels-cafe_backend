@@ -258,8 +258,13 @@ public class OrderService {
 
     private void sendDeliveredNotificationToAdmins(Order order) {
         try {
-            java.util.List<com.hostel.ordering.model.User> admins = userRepository.findByRolesContaining("ROLE_ADMIN");
-            for (com.hostel.ordering.model.User admin : admins) {
+            java.util.Map<String, com.hostel.ordering.model.User> byId = new java.util.LinkedHashMap<>();
+            for (String role : new String[] {"ROLE_ADMIN", "ROLE_SUPERADMIN"}) {
+                for (com.hostel.ordering.model.User u : userRepository.findByRolesContaining(role)) {
+                    byId.putIfAbsent(u.getId() != null ? u.getId() : u.getUsername(), u);
+                }
+            }
+            for (com.hostel.ordering.model.User admin : byId.values()) {
                 String fcmToken = admin.getFcmToken();
                 if (fcmToken != null && !fcmToken.isBlank()) {
                     java.util.Map<String, String> data = new java.util.HashMap<>();

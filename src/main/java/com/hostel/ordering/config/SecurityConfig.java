@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -33,6 +35,12 @@ public class SecurityConfig {
 
     @Autowired
     RateLimitFilter rateLimitFilter;
+
+    // static so method security sees it early; every hasRole('ADMIN') check now also accepts SUPERADMIN.
+    @Bean
+    public static RoleHierarchy roleHierarchy() {
+        return RoleHierarchyImpl.fromHierarchy("ROLE_SUPERADMIN > ROLE_ADMIN");
+    }
 
     @Bean
     public AuthTokenFilter authenticationJwtTokenFilter() {

@@ -217,6 +217,40 @@ class OrderServiceTest {
     }
 
     @Test
+    void deliveredNotificationReachesSuperAdmins() {
+        OrderService svc = new OrderService(orderRepository, fcmNotificationService, auditService, orderStatusService,
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository, idempotencyService, dormitoryService);
+        Order existing = new Order();
+        existing.setId("o1");
+        existing.setBookingName("Guest");
+        com.hostel.ordering.model.User admin = new com.hostel.ordering.model.User("a", "x", java.util.Set.of("ROLE_ADMIN"));
+        admin.setId("1");
+        admin.setFcmToken("tokA");
+        com.hostel.ordering.model.User both = new com.hostel.ordering.model.User("b", "x", java.util.Set.of("ROLE_ADMIN", "ROLE_SUPERADMIN"));
+        both.setId("2");
+        both.setFcmToken("tokB");
+        com.hostel.ordering.model.User sup = new com.hostel.ordering.model.User("s", "x", java.util.Set.of("ROLE_SUPERADMIN"));
+        sup.setId("3");
+        sup.setFcmToken("tokS");
+
+        when(orderStatusService.getAllStatuses()).thenReturn(List.of(
+                new com.hostel.ordering.model.OrderStatusConfig("DELIVERED", "Delivered", "green", false)));
+        when(orderRepository.findById("o1")).thenReturn(Optional.of(existing));
+        when(orderRepository.save(existing)).thenReturn(existing);
+        when(userRepository.findByRolesContaining("ROLE_ADMIN")).thenReturn(List.of(admin, both));
+        when(userRepository.findByRolesContaining("ROLE_SUPERADMIN")).thenReturn(List.of(sup, both));
+
+        svc.updateOrderStatus("o1", "DELIVERED", "staff1");
+
+        org.mockito.Mockito.verify(fcmNotificationService).sendNotificationToToken(
+                org.mockito.ArgumentMatchers.eq("tokA"), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyMap());
+        org.mockito.Mockito.verify(fcmNotificationService).sendNotificationToToken(
+                org.mockito.ArgumentMatchers.eq("tokS"), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyMap());
+        org.mockito.Mockito.verify(fcmNotificationService, org.mockito.Mockito.times(1)).sendNotificationToToken(
+                org.mockito.ArgumentMatchers.eq("tokB"), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    @Test
     void postChargeForOrder_ezeeRejects_savesFailedAndLeavesStatusUnchanged() {
         OrderService svc = new OrderService(orderRepository, null, auditService, orderStatusService,
                 menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository, idempotencyService, dormitoryService);

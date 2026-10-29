@@ -12,10 +12,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import java.util.Collection;
+import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 import java.util.ArrayList;
 
 @Service
@@ -37,6 +41,22 @@ public class AuthService {
     @Autowired
     AuditService auditService;
 
+    @Autowired
+    RoleHierarchy roleHierarchy;
+
+    // Older Android builds only look for ROLE_ADMIN, so a SuperAdmin must also report it.
+    private List<String> expandRoles(Collection<String> roles) {
+        return roleHierarchy.getReachableGrantedAuthorities(
+                        roles.stream().map(AuthService::withRolePrefix).map(SimpleGrantedAuthority::new).toList())
+                .stream().map(GrantedAuthority::getAuthority).distinct().toList();
+    }
+
+    // Legacy rows may store "ADMIN"; login sees ROLE_ADMIN via UserDetailsService, so refresh must agree.
+    private static String withRolePrefix(String role) {
+        String r = role.trim().toUpperCase(java.util.Locale.ROOT);
+        return r.startsWith("ROLE_") ? r : "ROLE_" + r;
+    }
+
     public Map<String, Object> login(String username, String password) {
         if (username == null || username.isBlank()) {
             throw new IllegalArgumentException("Username cannot be empty");
@@ -57,9 +77,8 @@ public class AuthService {
         Map<String, Object> response = new HashMap<>();
         response.put("token", jwt);
         response.put("username", userDetails.getUsername());
-        response.put("roles", userDetails.getAuthorities().stream()
-                .map(item -> item.getAuthority())
-                .collect(Collectors.toList()));
+        response.put("roles", expandRoles(userDetails.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority).toList()));
 
         log.info("User {} logged in successfully", userDetails.getUsername());
         auditService.logAction("LOGIN_SUCCESS", "User logged in: " + userDetails.getUsername());
@@ -115,7 +134,7 @@ public class AuthService {
         Map<String, Object> response = new HashMap<>();
         response.put("token", newToken);
         response.put("username", user.getUsername());
-        response.put("roles", new java.util.ArrayList<>(user.getRoles()));
+        response.put("roles", expandRoles(user.getRoles()));
 
         log.info("Token refreshed for user {}", username);
         auditService.logAction("TOKEN_REFRESH", "Token refreshed for user: " + username);

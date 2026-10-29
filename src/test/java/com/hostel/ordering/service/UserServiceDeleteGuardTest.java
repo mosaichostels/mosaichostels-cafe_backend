@@ -73,4 +73,67 @@ class UserServiceDeleteGuardTest {
 
         verify(userRepository, times(1)).delete(staff);
     }
+
+    @Test
+    void refusesDeletingLastSuperAdmin() {
+        User sa = user("1", "boss", "ROLE_SUPERADMIN");
+        User admin = user("2", "admin", "ROLE_ADMIN");
+        when(userRepository.findById("1")).thenReturn(Optional.of(sa));
+        when(userRepository.findAll()).thenReturn(List.of(sa, admin));
+
+        IllegalArgumentException e =
+                assertThrows(IllegalArgumentException.class, () -> userService.deleteUser("1"));
+
+        assertEquals("Cannot delete the last SuperAdmin. Promote another SuperAdmin first.", e.getMessage());
+        verify(userRepository, never()).delete(any());
+    }
+
+    @Test
+    void allowsDeletingSuperAdminWhenAnotherExists() {
+        User first = user("1", "boss", "ROLE_SUPERADMIN");
+        User second = user("2", "boss2", "ROLE_SUPERADMIN");
+        when(userRepository.findById("1")).thenReturn(Optional.of(first));
+        when(userRepository.findAll()).thenReturn(List.of(first, second));
+
+        userService.deleteUser("1");
+
+        verify(userRepository, times(1)).delete(first);
+    }
+
+    @Test
+    void deletingLastAdminOnlyStillRefusedWhenNoSuperAdmin() {
+        User only = user("1", "admin", "ROLE_ADMIN");
+        User staff = user("2", "kitchen", "ROLE_STAFF");
+        when(userRepository.findById("1")).thenReturn(Optional.of(only));
+        when(userRepository.findAll()).thenReturn(List.of(only, staff));
+
+        IllegalArgumentException e =
+                assertThrows(IllegalArgumentException.class, () -> userService.deleteUser("1"));
+
+        assertEquals("Cannot delete the last administrator. Create another admin first.", e.getMessage());
+    }
+
+    @Test
+    void deletingNonLastAdminAllowedWhenNoSuperAdminExists() {
+        User a = user("1", "a", "ROLE_ADMIN");
+        User b = user("2", "b", "ROLE_ADMIN");
+        when(userRepository.findById("1")).thenReturn(Optional.of(a));
+        when(userRepository.findAll()).thenReturn(List.of(a, b));
+
+        userService.deleteUser("1");
+
+        verify(userRepository, times(1)).delete(a);
+    }
+
+    @Test
+    void superAdminCountsAsAdminForLastAdminGuard() {
+        User sa = user("1", "boss", "ROLE_SUPERADMIN");
+        User admin = user("2", "admin", "ROLE_ADMIN");
+        when(userRepository.findById("2")).thenReturn(Optional.of(admin));
+        when(userRepository.findAll()).thenReturn(List.of(sa, admin));
+
+        userService.deleteUser("2");
+
+        verify(userRepository, times(1)).delete(admin);
+    }
 }
