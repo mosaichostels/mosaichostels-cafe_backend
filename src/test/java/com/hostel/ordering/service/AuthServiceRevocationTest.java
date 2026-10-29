@@ -116,6 +116,24 @@ class AuthServiceRevocationTest {
     }
 
     @Test
+    void refreshRolesNormaliseLegacyUnprefixedRoles() {
+        assertRefreshRoles(Set.of("SUPERADMIN"), Set.of("ROLE_SUPERADMIN", "ROLE_ADMIN"));
+        assertRefreshRoles(Set.of("ROLE_ADMIN"), Set.of("ROLE_ADMIN"));
+        assertRefreshRoles(Set.of("staff"), Set.of("ROLE_STAFF"));
+        // legacy and prefixed forms of the same role collapse to one entry
+        assertRefreshRoles(Set.of("ADMIN", "ROLE_ADMIN"), Set.of("ROLE_ADMIN"));
+    }
+
+    @SuppressWarnings("unchecked")
+    private void assertRefreshRoles(Set<String> stored, Set<String> expected) {
+        org.mockito.Mockito.reset(userRepository);
+        when(userRepository.findByUsername("alice")).thenReturn(Optional.of(new User("alice", "hashed", stored)));
+        List<String> roles = (List<String>) authService.refreshToken(token).get("roles");
+        assertEquals(expected, Set.copyOf(roles));
+        assertEquals(roles.size(), Set.copyOf(roles).size());
+    }
+
+    @Test
     void loginRolesIncludeAdminForSuperAdmin() {
         assertLoginRoles(Set.of("ROLE_SUPERADMIN"), Set.of("ROLE_SUPERADMIN", "ROLE_ADMIN"));
     }

@@ -48,8 +48,14 @@ public class AuthService {
     // Older Android builds only look for ROLE_ADMIN, so a SuperAdmin must also report it.
     private List<String> expandRoles(Collection<String> roles) {
         return roleHierarchy.getReachableGrantedAuthorities(
-                        roles.stream().map(SimpleGrantedAuthority::new).toList())
+                        roles.stream().map(AuthService::withRolePrefix).map(SimpleGrantedAuthority::new).toList())
                 .stream().map(GrantedAuthority::getAuthority).distinct().toList();
+    }
+
+    // Legacy rows may store "ADMIN"; login sees ROLE_ADMIN via UserDetailsService, so refresh must agree.
+    private static String withRolePrefix(String role) {
+        String r = role.trim().toUpperCase(java.util.Locale.ROOT);
+        return r.startsWith("ROLE_") ? r : "ROLE_" + r;
     }
 
     public Map<String, Object> login(String username, String password) {
