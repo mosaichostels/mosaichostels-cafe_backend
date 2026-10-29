@@ -38,7 +38,7 @@ public class SecurityConfig {
 
     // static so method security sees it early; every hasRole('ADMIN') check now also accepts SUPERADMIN.
     @Bean
-    static RoleHierarchy roleHierarchy() {
+    public static RoleHierarchy roleHierarchy() {
         return RoleHierarchyImpl.fromHierarchy("ROLE_SUPERADMIN > ROLE_ADMIN");
     }
 
