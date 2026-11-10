@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class PmsHousekeepingService {
 
-    private static final Pattern DIGITS = Pattern.compile("\\d+|\\D+");
+    private static final Pattern DIGITS = Pattern.compile("[0-9]+|[^0-9]+");
 
     private final PmsHousekeepingFeed feed;
 
@@ -42,7 +42,7 @@ public class PmsHousekeepingService {
                 continue;
             }
             String name = text(r, "roomname");
-            String guest = guestByRoom.get(key(name));
+            String guest = name.isEmpty() ? null : guestByRoom.get(key(name));
             items.add(new RoomStatus(id, text(r, "unitid"), text(r, "roomtypeid"), name, text(r, "roomtypename"),
                     r.path("hkstatus").asText(""), "yes".equalsIgnoreCase(text(r, "isblocked")), guest != null,
                     guest == null ? "" : guest));
@@ -56,25 +56,48 @@ public class PmsHousekeepingService {
         return room.strip().toLowerCase(Locale.ROOT);
     }
 
-    /** Digit runs compare by value, other runs case-insensitively. */
+    /**
+     * Total order: tokens of ASCII digit runs and other runs compared pairwise (digits before text; digits by
+     * numeric value without parsing; text case-insensitively), fewer tokens first, then raw compareTo.
+     */
     static int natural(String a, String b) {
-        Matcher x = DIGITS.matcher(a);
-        Matcher y = DIGITS.matcher(b);
-        while (x.find() && y.find()) {
-            String p = x.group();
-            String q = y.group();
-            int d;
-            if (Character.isDigit(p.charAt(0)) && Character.isDigit(q.charAt(0))) {
-                String ps = p.replaceFirst("^0+(?=.)", "");
-                String qs = q.replaceFirst("^0+(?=.)", "");
-                d = ps.length() != qs.length() ? Integer.compare(ps.length(), qs.length()) : ps.compareTo(qs);
-            } else {
-                d = p.compareToIgnoreCase(q);
-            }
+        List<String> x = tokens(a);
+        List<String> y = tokens(b);
+        for (int i = 0; i < Math.min(x.size(), y.size()); i++) {
+            int d = compareToken(x.get(i), y.get(i));
             if (d != 0) {
                 return d;
             }
         }
-        return Integer.compare(a.length(), b.length()) == 0 ? a.compareTo(b) : Integer.compare(a.length(), b.length());
+        int d = Integer.compare(x.size(), y.size());
+        return d != 0 ? d : a.compareTo(b);
+    }
+
+    private static List<String> tokens(String s) {
+        List<String> t = new ArrayList<>();
+        Matcher m = DIGITS.matcher(s);
+        while (m.find()) {
+            t.add(m.group());
+        }
+        return t;
+    }
+
+    private static boolean isDigits(String t) {
+        char c = t.charAt(0);
+        return c >= '0' && c <= '9';
+    }
+
+    private static int compareToken(String p, String q) {
+        boolean pd = isDigits(p);
+        boolean qd = isDigits(q);
+        if (pd != qd) {
+            return pd ? -1 : 1;
+        }
+        if (!pd) {
+            return p.toLowerCase(Locale.ROOT).compareTo(q.toLowerCase(Locale.ROOT));
+        }
+        String ps = p.replaceFirst("^0+(?=.)", "");
+        String qs = q.replaceFirst("^0+(?=.)", "");
+        return ps.length() != qs.length() ? Integer.compare(ps.length(), qs.length()) : ps.compareTo(qs);
     }
 }

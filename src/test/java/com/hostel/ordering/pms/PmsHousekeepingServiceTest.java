@@ -226,6 +226,7 @@ class PmsHousekeepingServiceTest {
             clock.addAndGet(Duration.ofSeconds(31).toMillis());
             when(GATEWAY.json(any(), eq("InhouseRoomStatus"), any(), any())).thenThrow(new PmsUpstreamException("x"));
             service.rooms();
+            assertFalse(app.list.isEmpty(), "stale path should have logged something to inspect");
             for (ILoggingEvent e : app.list) {
                 String m = e.getFormattedMessage() + e.getThrowableProxy();
                 for (String pii : new String[] {"Zed", "Quill", "guest.test", "Secret"}) {
@@ -235,6 +236,91 @@ class PmsHousekeepingServiceTest {
         } finally {
             root.detachAppender(app);
             root.setLevel(old);
+        }
+    }
+
+    @Test
+    void namelessRoomPicksUpNoGuest() {
+        reply("{\"roomlist\":[" + room("1", "", "", "No") + "],\"checkinguestlist\":[" + guest("", "Ghost") + "]}");
+        RoomStatus r = service.rooms().value().get(0);
+        assertFalse(r.occupied());
+        assertEquals("", r.guestName());
+    }
+
+    private static final String[] ALPHA = {"a", "A", "b", "B", "0", "1", "2", "\u0663", " ", ""};
+
+    private static void gen(String cur, int depth, List<String> out) {
+        out.add(cur);
+        if (depth == 0) {
+            return;
+        }
+        for (String c : ALPHA) {
+            if (!c.isEmpty()) {
+                gen(cur + c, depth - 1, out);
+            }
+        }
+    }
+
+    @Test
+    void naturalIsAntisymmetricAndTransitive() {
+        List<String> all = new java.util.ArrayList<>();
+        gen("", 4, all);
+        java.util.Random rnd = new java.util.Random(42);
+        for (String a : all) {
+            for (int k = 0; k < 40; k++) {
+                String b = all.get(rnd.nextInt(all.size()));
+                assertEquals(Integer.signum(PmsHousekeepingService.natural(a, b)),
+                        -Integer.signum(PmsHousekeepingService.natural(b, a)), a + "|" + b);
+            }
+        }
+        for (int k = 0; k < 400_000; k++) {
+            String a = all.get(rnd.nextInt(all.size()));
+            String b = all.get(rnd.nextInt(all.size()));
+            String c = all.get(rnd.nextInt(all.size()));
+            if (PmsHousekeepingService.natural(a, b) <= 0 && PmsHousekeepingService.natural(b, c) <= 0) {
+                assertTrue(PmsHousekeepingService.natural(a, c) <= 0, a + "|" + b + "|" + c);
+            }
+        }
+    }
+
+    @Test
+    void naturalExplicitCases() {
+        int n = 0;
+        assertTrue(PmsHousekeepingService.natural("2", "10") < 0);
+        assertTrue(PmsHousekeepingService.natural("D1", "D2") < 0);
+        assertTrue(PmsHousekeepingService.natural("Room 2", "Room 02") != 0);
+        assertEquals(-Integer.signum(PmsHousekeepingService.natural("Room 02", "Room 2")),
+                Integer.signum(PmsHousekeepingService.natural("Room 2", "Room 02")));
+        String big = "9".repeat(45);
+        assertTrue(PmsHousekeepingService.natural("1" + "0".repeat(44), big) < 0);
+        assertTrue(PmsHousekeepingService.natural("", "a") < 0);
+        assertTrue(PmsHousekeepingService.natural("1", "a") < 0);
+        String[][] triples = {{"b1b1", "B1B2", "b01b"}, {"aa001a", "aA1B", "aa001"}};
+        for (String[] t : triples) {
+            for (String a : t) {
+                for (String b : t) {
+                    for (String c : t) {
+                        if (PmsHousekeepingService.natural(a, b) <= 0 && PmsHousekeepingService.natural(b, c) <= 0) {
+                            assertTrue(PmsHousekeepingService.natural(a, c) <= 0, a + b + c);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    void shuffledBoardAlwaysSorts() {
+        List<String> rooms = new java.util.ArrayList<>();
+        for (int i = 1; i <= 47; i++) {
+            rooms.add(room("" + (100 + i), i % 5 == 0 ? "D" + i : i % 7 == 0 ? "r0" + i : "" + i, "", "No"));
+        }
+        java.util.Random rnd = new java.util.Random(7);
+        for (int k = 0; k < 200; k++) {
+            java.util.Collections.shuffle(rooms, rnd);
+            clock.addAndGet(Duration.ofSeconds(31).toMillis());
+            reply("{\"roomlist\":[" + String.join(",", rooms) + "]}");
+            assertEquals(47, service.rooms().value().size());
         }
     }
 }
