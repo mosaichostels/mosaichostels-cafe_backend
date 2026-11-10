@@ -65,6 +65,9 @@ public class PmsCache {
                     mine.completeExceptionally(ex);
                     throw ex;
                 }
+                if (ex instanceof InterruptedException) {
+                    Thread.currentThread().interrupt();
+                }
                 log.debug("pms cache: load failed for key {}, serving stale", key);
                 result = new Cached<>((T) prior.value(), prior.fetchedAtMs(), true);
             }

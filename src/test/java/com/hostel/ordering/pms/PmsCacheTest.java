@@ -142,6 +142,20 @@ class PmsCacheTest {
     }
 
     @Test
+    void interruptedLoaderWithPriorValueServesStaleAndKeepsInterruptFlag() throws Exception {
+        cache.getOrLoad("k", TTL, () -> "old");
+        now.addAndGet(10_000);
+        try {
+            Cached<String> c = cache.getOrLoad("k", TTL, () -> { throw new InterruptedException(); });
+            assertTrue(c.stale());
+            assertEquals("old", c.value());
+            assertTrue(Thread.currentThread().isInterrupted());
+        } finally {
+            Thread.interrupted(); // clear so it cannot leak into other tests
+        }
+    }
+
+    @Test
     void evictForcesReload() throws Exception {
         cache.getOrLoad("k", TTL, () -> "a");
         cache.evict("k");
