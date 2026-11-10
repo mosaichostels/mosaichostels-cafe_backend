@@ -25,7 +25,8 @@ Properties with no env mapping in the yml (set elsewhere or defaults):
 | `config.jwtRefreshGraceMs` | 31536000000 |
 | `audit.retention-days` | 90 |
 | `pms.enabled` | hub kill switch; `false` throws before any eZee I/O (code default on); env `PMS_ENABLED` |
-| `pms.hub-per5s`, `pms.cafe-reserve` | rate-limit window shares (defaults 3 and 2); env `PMS_HUB_PER5S`, `PMS_CAFE_RESERVE` |
+| `pms.hub-per5s`, `pms.cafe-reserve` | rate-limit window shares (defaults 2 and 2); env `PMS_HUB_PER5S`, `PMS_CAFE_RESERVE` |
+| `pms.cafe-quiet-ms` | hub reads yield this long after any café eZee call (default 3000); env `PMS_CAFE_QUIET_MS` |
 | `pms.writes.<feature>` | write flag per feature, default off; NOT settable by a per-feature env var (see below) |
 | `pms.canary.<feature>` | canary list per feature |
 | `pms.ttl.<name>` | cache TTL seconds; env `PMS_TTL_<NAME>` for single-word names |
