@@ -350,6 +350,166 @@ class PmsWriteGuardTest {
         assertThrows(PmsTargetBusyException.class, () -> run("k2", "B1", ok("B1")));
     }
 
+    // M-3: target and request hash are part of the claim, so blank ones are refused before anything happens.
+    @Test
+    void blankTargetOrRequestHashIsRefusedBeforeEzee() {
+        for (String blank : new String[] {null, " "}) {
+            IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                    () -> run(guard, "k1", blank, HASH, ok("B1")));
+            assertEquals("targetId is required", e.getMessage());
+            e = assertThrows(IllegalArgumentException.class, () -> run(guard, "k1", "B1", blank, ok("B1")));
+            assertEquals("requestHash is required", e.getMessage());
+        }
+        assertEquals(0, calls.get());
+        assertEquals(0, store.size());
+        verifyNoInteractions(audit);
+    }
+
+    /** The in-memory store with switchable failures for the store-failure paths (I-4). */
+    static class FailingStore extends InMemoryPmsWriteClaimStore {
+        boolean failMarkDone;
+        boolean failMarkUnconfirmed;
+        boolean failDelete;
+
+        @Override
+        public synchronized PmsWriteClaim markDone(String id, State from, String resultJson, Instant doneAt) {
+            if (failMarkDone) {
+                throw new IllegalStateException("mongo down");
+            }
+            return super.markDone(id, from, resultJson, doneAt);
+        }
+
+        @Override
+        public synchronized PmsWriteClaim markUnconfirmed(String id, Instant createdBefore) {
+            if (failMarkUnconfirmed) {
+                throw new IllegalStateException("mongo down");
+            }
+            return super.markUnconfirmed(id, createdBefore);
+        }
+
+        @Override
+        public synchronized PmsWriteClaim delete(String id, State state) {
+            if (failDelete) {
+                throw new IllegalStateException("mongo down");
+            }
+            return super.delete(id, state);
+        }
+    }
+
+    private final FailingStore failing = new FailingStore();
+
+    private PmsWriteGuard failingGuard(Instant now) {
+        return new PmsWriteGuard(new PmsFlags(props), failing, audit, new ObjectMapper(), Clock.fixed(now, ZoneOffset.UTC));
+    }
+
+    @Test
+    void markDoneFailureAfterASuccessfulCallIsUnconfirmedAndAudited() {
+        failing.failMarkDone = true;
+        PmsUnconfirmedException e = assertThrows(PmsUnconfirmedException.class,
+                () -> run(failingGuard(T0), "k1", "B1", HASH, ok("B1")));
+        assertEquals("PMS write outcome unknown", e.getMessage());
+        assertEquals(1, calls.get());
+        // parked straight away instead of waiting for the stuck sweep
+        assertEquals(State.UNCONFIRMED, failing.find("k1").getState());
+        verify(audit).logAction("PMS_CHECKIN_UNCONFIRMED", "booking=B1");
+        verify(audit, never()).logAction("PMS_CHECKIN", "booking=B1");
+    }
+
+    @Test
+    void markDoneAndParkBothFailingIsStillUnconfirmed() {
+        failing.failMarkDone = true;
+        failing.failMarkUnconfirmed = true;
+        assertThrows(PmsUnconfirmedException.class, () -> run(failingGuard(T0), "k1", "B1", HASH, ok("B1")));
+        assertEquals(1, calls.get());
+        verify(audit).logAction("PMS_CHECKIN_UNCONFIRMED", "booking=B1");
+    }
+
+    @Test
+    void markUnconfirmedFailureOnAnAmbiguousCallIsUnconfirmedNotTheStoreError() {
+        failing.failMarkUnconfirmed = true;
+        PmsUnconfirmedException e = assertThrows(PmsUnconfirmedException.class,
+                () -> run(failingGuard(T0), "k1", "B1", HASH, () -> {
+                    calls.incrementAndGet();
+                    throw new PmsUpstreamException("PMS request timed out");
+                }));
+        assertEquals("PMS write outcome unknown", e.getMessage());
+        assertNull(e.getCause());
+        assertEquals(1, calls.get());
+        verify(audit).logAction("PMS_CHECKIN_UNCONFIRMED", "booking=B1");
+    }
+
+    @Test
+    void markUnconfirmedFailureOnAReadBackMismatchIsUnconfirmed() {
+        failing.failMarkUnconfirmed = true;
+        assertThrows(PmsUnconfirmedException.class, () -> failingGuard(T0).execute(F, "B1", "k1", HASH, "CHECKIN",
+                "booking=B1", Moved.class, ok("B1"), m -> false));
+        verify(audit).logAction("PMS_CHECKIN_UNCONFIRMED", "booking=B1");
+    }
+
+    @Test
+    void anAuditFailureDoesNotMaskTheUnconfirmedOutcome() {
+        failing.failMarkUnconfirmed = true;
+        org.mockito.Mockito.doThrow(new IllegalStateException("audit down")).when(audit)
+                .logAction(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+        assertThrows(PmsUnconfirmedException.class, () -> run(failingGuard(T0), "k1", "B1", HASH, () -> {
+            throw new PmsUpstreamException("PMS request timed out");
+        }));
+    }
+
+    @Test
+    void anAuditFailureAfterAConfirmedWriteStillReturnsTheResult() {
+        org.mockito.Mockito.doThrow(new IllegalStateException("audit down")).when(audit)
+                .logAction(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+        PmsWriteResult<Moved> r = run("k1", "B1", ok("B1"));
+        assertTrue(r.confirmed());
+        assertEquals(State.DONE, store.find("k1").getState());
+    }
+
+    @Test
+    void deleteFailureOnADefiniteFailureStillRethrowsTheOriginal() {
+        failing.failDelete = true;
+        PmsAuthException auth = new PmsAuthException("auth");
+        RuntimeException thrown = assertThrows(RuntimeException.class,
+                () -> run(failingGuard(T0), "k1", "B1", HASH, () -> {
+                    throw auth;
+                }));
+        assertSame(auth, thrown);
+        PmsUpstreamException notSent = PmsUpstreamException.notSent("PMS integration disabled");
+        thrown = assertThrows(RuntimeException.class, () -> run(failingGuard(T0), "k2", "B2", HASH, () -> {
+            throw notSent;
+        }));
+        assertSame(notSent, thrown);
+        verifyNoInteractions(audit);
+    }
+
+    @Test
+    void aStuckParkFailureOnRetryIsStillUnconfirmed() {
+        PmsWriteClaim c = new PmsWriteClaim("k1", F, "B1", HASH, "CHECKIN", T0);
+        c.setOpenLockKey(F + ":B1");
+        c.setState(State.IN_PROGRESS);
+        failing.insert(c);
+        failing.failMarkUnconfirmed = true;
+        assertThrows(PmsUnconfirmedException.class,
+                () -> run(failingGuard(T0.plus(Duration.ofMinutes(6))), "k1", "B1", HASH, ok("B1")));
+        assertEquals(0, calls.get());
+    }
+
+    @Test
+    void aCallThatOutlivesTheStuckBoundReturnsUnconfirmedAndKeepsTheLock() {
+        PmsWriteGuard later = guardAt(T0.plus(Duration.ofMinutes(6)));
+        PmsWriteResult<Moved> r = run("k1", "B1", () -> {
+            calls.incrementAndGet();
+            later.unconfirmed(); // another request's listing parks this claim while eZee is still answering
+            return new Moved("B1", "101");
+        });
+        assertFalse(r.confirmed());
+        assertEquals(new Moved("B1", "101"), r.value());
+        assertEquals(State.UNCONFIRMED, store.find("k1").getState());
+        verify(audit).logAction("PMS_CHECKIN_UNCONFIRMED", "idempotencyKey=k1 targetId=B1");
+        verify(audit, never()).logAction("PMS_CHECKIN", "booking=B1");
+        assertThrows(PmsTargetBusyException.class, () -> run("k2", "B1", ok("B1")));
+    }
+
     @Test
     void readBackFalseMarksUnconfirmedAndReturnsUnconfirmedResult() {
         PmsWriteResult<Moved> r = guard.execute(F, "B1", "k1", HASH, "CHECKIN", "booking=B1", Moved.class,

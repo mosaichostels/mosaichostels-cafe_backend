@@ -76,6 +76,19 @@ public class PmsWriteGuard {
     /**
      * Runs {@code eZeeCall} at most once for this key and at most one at a time for this target. Audit
      * entries carry only {@code auditDetails} as given, so callers must pass ids and action names only.
+     *
+     * <p>Contract for callers:
+     * <ul>
+     * <li>{@code eZeeCall} must make exactly ONE eZee write request. If a second request failed definitely
+     * after a first one applied, the claim would be released and the applied write could be repeated.</li>
+     * <li>The idempotency key must match {@code [A-Za-z0-9._:-]{1,128}}: a UUID or base64url, not standard
+     * base64 ({@code + / =} are refused). {@code targetId} and {@code requestHash} must not be blank.</li>
+     * <li>A replay of a claim an admin resolved APPLIED, or whose result could not be serialised, returns
+     * {@code value == null} with {@code confirmed == true}: callers must null-check the value.</li>
+     * <li>DONE claims expire after 24 h (TTL on {@code doneAt}); after that the same key executes again.</li>
+     * <li>Once eZee was called, any failure to record the outcome surfaces as {@link PmsUnconfirmedException}
+     * (check eZee before retrying), never as a raw error.</li>
+     * </ul>
      */
     public <T> PmsWriteResult<T> execute(String feature, String targetId, String idempotencyKey, String requestHash,
             String auditAction, String auditDetails, Class<T> type, Supplier<T> eZeeCall, Predicate<T> readBack) {
@@ -84,6 +97,12 @@ public class PmsWriteGuard {
         }
         if (!KEY.matcher(idempotencyKey).matches()) {
             throw new IllegalArgumentException("Idempotency-Key is invalid");
+        }
+        if (targetId == null || targetId.isBlank()) {
+            throw new IllegalArgumentException("targetId is required");
+        }
+        if (requestHash == null || requestHash.isBlank()) {
+            throw new IllegalArgumentException("requestHash is required");
         }
         flags.requireWrite(feature);
         List<String> canary = flags.canary(feature);
@@ -107,7 +126,13 @@ public class PmsWriteGuard {
         } catch (RuntimeException e) {
             if (definitelyNotApplied(e)) {
                 // eZee definitely did not apply the write: free the target so the caller can try again.
-                store.delete(idempotencyKey, State.IN_PROGRESS);
+                try {
+                    store.delete(idempotencyKey, State.IN_PROGRESS);
+                } catch (RuntimeException deleteFailed) {
+                    // the claim stays IN_PROGRESS and the stuck sweep parks it; the caller still learns why
+                    log.warn("PMS write {} claim not released: {}", idempotencyKey,
+                            deleteFailed.getClass().getSimpleName());
+                }
                 throw e;
             }
             log.warn("PMS write {} outcome unknown: {}", idempotencyKey, e.getClass().getSimpleName());
@@ -119,11 +144,25 @@ public class PmsWriteGuard {
             markUnconfirmed(idempotencyKey, auditAction, auditDetails);
             return new PmsWriteResult<>(value, false);
         }
-        if (store.markDone(idempotencyKey, State.IN_PROGRESS, toJson(value), clock.instant()) == null) {
+        PmsWriteClaim done;
+        try {
+            done = store.markDone(idempotencyKey, State.IN_PROGRESS, toJson(value), clock.instant());
+        } catch (RuntimeException e) {
+            // eZee answered but the outcome could not be recorded: park it if the store lets us, audit, report.
+            log.warn("PMS write {} outcome not recorded: {}", idempotencyKey, e.getClass().getSimpleName());
+            try {
+                store.markUnconfirmed(idempotencyKey, null);
+            } catch (RuntimeException parkFailed) {
+                // left IN_PROGRESS; the stuck sweep parks it after STUCK_AFTER
+            }
+            auditQuietly("PMS_" + auditAction + "_UNCONFIRMED", auditDetails);
+            throw new PmsUnconfirmedException("PMS write outcome unknown");
+        }
+        if (done == null) {
             // Already marked stuck (call outlived STUCK_AFTER); the claim stays UNCONFIRMED for an admin.
             return new PmsWriteResult<>(value, false);
         }
-        audit.logAction("PMS_" + auditAction, auditDetails);
+        auditQuietly("PMS_" + auditAction, auditDetails);
         return new PmsWriteResult<>(value, true);
     }
 
@@ -181,16 +220,42 @@ public class PmsWriteGuard {
         if (claim.getState() != State.IN_PROGRESS || claim.getCreatedAt().isAfter(cutoff)) {
             return false;
         }
-        if (store.markUnconfirmed(claim.getId(), cutoff) != null) {
-            audit.logAction("PMS_" + claim.getAuditAction() + "_UNCONFIRMED",
+        PmsWriteClaim parked;
+        try {
+            parked = store.markUnconfirmed(claim.getId(), cutoff);
+        } catch (RuntimeException e) {
+            // still stuck: callers report it as unknown or busy, and the next caller retries the park
+            log.warn("PMS write {} could not be parked: {}", claim.getId(), e.getClass().getSimpleName());
+            return true;
+        }
+        if (parked != null) {
+            auditQuietly("PMS_" + claim.getAuditAction() + "_UNCONFIRMED",
                     "idempotencyKey=" + claim.getId() + " targetId=" + claim.getTargetId());
         }
         return true;
     }
 
+    /** Parks the claim as UNCONFIRMED and audits it; a store failure still audits and ends as unconfirmed. */
     private void markUnconfirmed(String idempotencyKey, String auditAction, String auditDetails) {
-        if (store.markUnconfirmed(idempotencyKey, null) != null) {
-            audit.logAction("PMS_" + auditAction + "_UNCONFIRMED", auditDetails);
+        PmsWriteClaim parked;
+        try {
+            parked = store.markUnconfirmed(idempotencyKey, null);
+        } catch (RuntimeException e) {
+            log.warn("PMS write {} could not be parked: {}", idempotencyKey, e.getClass().getSimpleName());
+            auditQuietly("PMS_" + auditAction + "_UNCONFIRMED", auditDetails);
+            throw new PmsUnconfirmedException("PMS write outcome unknown");
+        }
+        if (parked != null) {
+            auditQuietly("PMS_" + auditAction + "_UNCONFIRMED", auditDetails);
+        }
+    }
+
+    /** Audit after eZee was called must never turn the outcome into a raw error. */
+    private void auditQuietly(String action, String details) {
+        try {
+            audit.logAction(action, details);
+        } catch (RuntimeException e) {
+            log.warn("PMS audit {} not written: {}", action, e.getClass().getSimpleName());
         }
     }
 
