@@ -50,11 +50,3 @@ ezee:
   hotel-code: ${EZEE_HOTEL_CODE:}
   food-charge-id: ${EZEE_FOOD_CHARGE_ID:}
   essential-charge-id: ${EZEE_ESSENTIAL_CHARGE_ID:}
-
-pms:
-  enabled: true
-  hub-per5s: 3
-  cafe-reserve: 2
-  writes: {}
-  canary: {}
-  ttl: {}
