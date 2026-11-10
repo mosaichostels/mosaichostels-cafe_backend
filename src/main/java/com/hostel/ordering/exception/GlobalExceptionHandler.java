@@ -13,6 +13,9 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 
+import com.hostel.ordering.pms.PmsException;
+
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -77,6 +80,30 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(
                 new ErrorResponse("eZee is not reachable right now. Try again in a moment."),
                 HttpStatus.BAD_GATEWAY);
+    }
+
+    /**
+     * Body is {errorCode, message} with a fixed text per code. The exception message may carry
+     * eZee response detail, so it is logged only and never returned.
+     */
+    @ExceptionHandler(PmsException.class)
+    public ResponseEntity<Map<String, String>> handlePms(PmsException ex) {
+        log.warn("PMS {}: {}", ex.code(), ex.getMessage());
+        HttpStatus status;
+        String message;
+        switch (ex.code()) {
+            case "PMS_AUTH" -> { status = HttpStatus.BAD_GATEWAY; message = "The PMS rejected our credentials."; }
+            case "PMS_UPSTREAM" -> { status = HttpStatus.BAD_GATEWAY; message = "The PMS returned an error. Try again in a moment."; }
+            case "PMS_BUSY" -> { status = HttpStatus.SERVICE_UNAVAILABLE; message = "The PMS is busy. Try again in a moment."; }
+            case "PMS_NOT_ENABLED" -> { status = HttpStatus.NOT_IMPLEMENTED; message = "This PMS feature is not enabled."; }
+            case "PMS_FEATURE_DISABLED" -> { status = HttpStatus.FORBIDDEN; message = "This PMS action is switched off."; }
+            case "PMS_UNCONFIRMED" -> { status = HttpStatus.CONFLICT; message = "The PMS did not confirm the change. Check before retrying."; }
+            case "PMS_IN_PROGRESS" -> { status = HttpStatus.CONFLICT; message = "This request is already in progress."; }
+            case "PMS_TARGET_BUSY" -> { status = HttpStatus.CONFLICT; message = "Another change to this target is in progress."; }
+            case "IDEMPOTENCY_MISMATCH" -> { status = HttpStatus.CONFLICT; message = "This request key was already used for a different request."; }
+            default -> { status = HttpStatus.BAD_GATEWAY; message = "The PMS request failed."; }
+        }
+        return new ResponseEntity<>(Map.of("errorCode", ex.code(), "message", message), status);
     }
 
     /**
