@@ -13,8 +13,10 @@ import org.springframework.stereotype.Component;
 public class PmsProperties {
 
     private boolean enabled = true;
-    private int hubPer5s = 3;
+    private int hubPer5s = 2;
     private int cafeReserve = 2;
+    /** Hub reads yield this long after any café eZee call, so a charge burst is never squeezed by hub traffic. */
+    private long cafeQuietMs = 3000;
     /** Per-feature write flags; a missing feature means writes are off. */
     private Map<String, Boolean> writes = new HashMap<>();
     /** Per-feature target ids a write may touch while it is being proven. */
@@ -33,6 +35,8 @@ public class PmsProperties {
     public void setHubPer5s(int hubPer5s) { this.hubPer5s = hubPer5s; }
     public int getCafeReserve() { return cafeReserve; }
     public void setCafeReserve(int cafeReserve) { this.cafeReserve = cafeReserve; }
+    public long getCafeQuietMs() { return cafeQuietMs; }
+    public void setCafeQuietMs(long cafeQuietMs) { this.cafeQuietMs = cafeQuietMs; }
     public Map<String, Boolean> getWrites() { return writes; }
     public void setWrites(Map<String, Boolean> writes) { this.writes = writes; }
     public Map<String, List<String>> getCanary() { return canary; }

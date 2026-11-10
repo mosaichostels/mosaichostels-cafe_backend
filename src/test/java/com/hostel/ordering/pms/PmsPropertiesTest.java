@@ -22,11 +22,13 @@ class PmsPropertiesTest {
     void bindsConfiguredValues() {
         PmsProperties p = bind(Map.of(
                 "pms.hub-per5s", "5",
+                "pms.cafe-quiet-ms", "1500",
                 "pms.writes.room-status", "true",
                 "pms.canary.room-status[0]", "R101",
                 "pms.ttl.arrivals", "20"));
 
         assertEquals(5, p.getHubPer5s());
+        assertEquals(1500L, p.getCafeQuietMs());
         assertEquals(true, p.getWrites().get("room-status"));
         assertEquals(List.of("R101"), p.getCanary().get("room-status"));
         assertEquals(Duration.ofSeconds(20), p.ttl("arrivals", Duration.ofSeconds(45)));
@@ -42,7 +44,8 @@ class PmsPropertiesTest {
         PmsProperties p = bind(Map.of());
 
         assertTrue(p.isEnabled());
-        assertEquals(3, p.getHubPer5s());
+        assertEquals(2, p.getHubPer5s());
+        assertEquals(3000L, p.getCafeQuietMs());
         assertEquals(2, p.getCafeReserve());
         assertTrue(p.getWrites().isEmpty());
         assertTrue(p.getCanary().isEmpty());

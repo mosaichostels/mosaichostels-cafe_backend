@@ -13,7 +13,17 @@ import org.junit.jupiter.api.Test;
 class PmsRateLimiterTest {
 
     private final AtomicLong now = new AtomicLong(1_000);
-    private final PmsRateLimiter limiter = new PmsRateLimiter(new PmsProperties(), now::get);
+    private final PmsRateLimiter limiter = new PmsRateLimiter(props(3), now::get);
+
+    private static PmsProperties props(int hubPer5s) {
+        PmsProperties p = new PmsProperties();
+        p.setHubPer5s(hubPer5s);
+        return p;
+    }
+
+    private void advanceMillis(long ms) {
+        now.addAndGet(ms * 1_000_000L);
+    }
 
     private void advanceSeconds(long s) {
         now.addAndGet(s * 1_000_000_000L);
@@ -110,5 +120,49 @@ class PmsRateLimiterTest {
         advanceSeconds(5);
         limiter.recordCafeCall();
         assertEquals(1, limiter.usedInWindow());
+    }
+
+    @Test
+    void hubYieldsForQuietPeriodAfterCafeCallThenResumes() {
+        limiter.recordCafeCall();
+        assertFalse(limiter.tryAcquire(PmsPriority.HUB));
+        advanceMillis(2_999);
+        assertFalse(limiter.tryAcquire(PmsPriority.HUB));
+        // age == quiet is allowed (comparison is strictly "<")
+        advanceMillis(1);
+        assertTrue(limiter.tryAcquire(PmsPriority.HUB));
+    }
+
+    @Test
+    void secondCafeCallRestartsQuietPeriod() {
+        limiter.recordCafeCall();
+        advanceMillis(2_000);
+        limiter.recordCafeCall();
+        advanceMillis(2_000);
+        assertFalse(limiter.tryAcquire(PmsPriority.HUB));
+        advanceMillis(1_000);
+        assertTrue(limiter.tryAcquire(PmsPriority.HUB));
+    }
+
+    @Test
+    void cafeIsUnaffectedDuringQuietPeriod() {
+        limiter.recordCafeCall();
+        assertTrue(limiter.tryAcquire(PmsPriority.CAFE));
+        assertDoesNotThrow(limiter::recordCafeCall);
+        assertEquals(3, limiter.usedInWindow());
+    }
+
+    @Test
+    void hubUnchangedWhenNoCafeCallEverRecorded() {
+        PmsRateLimiter fresh = new PmsRateLimiter(props(2), new AtomicLong(0)::get);
+        assertTrue(fresh.tryAcquire(PmsPriority.HUB));
+        assertTrue(fresh.tryAcquire(PmsPriority.HUB));
+        assertFalse(fresh.tryAcquire(PmsPriority.HUB));
+    }
+
+    @Test
+    void hubAcquireThrowsBusyWhileQuietPeriodHolds() {
+        limiter.recordCafeCall();
+        assertThrows(PmsBusyException.class, () -> limiter.acquire(PmsPriority.HUB, Duration.ofMillis(60)));
     }
 }

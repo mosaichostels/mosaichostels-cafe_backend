@@ -11,7 +11,8 @@ import org.springframework.stereotype.Component;
  * {@code acquire}/{@code tryAcquire} only: a HUB acquire is admitted while the window holds fewer than
  * {@code hubPer5s} entries, a CAFE acquire while it holds fewer than {@code hubPer5s + cafeReserve}.
  * The café's live charge path does not acquire: {@code recordCafeCall} records each café request without any
- * limit (Ruling 8), so the window can briefly exceed the cap and hub reads then wait.
+ * limit (Ruling 8), so the window can briefly exceed the cap and hub reads then wait. HUB is also refused for
+ * {@code cafeQuietMs} after the last café call, so a charge burst (roomquery + one AddExtraCharge per item) is not squeezed.
  */
 @Component
 public class PmsRateLimiter {
@@ -23,6 +24,9 @@ public class PmsRateLimiter {
     private final PmsProperties props;
     private final LongSupplier nanoClock;
     private final ArrayDeque<Long> acquired = new ArrayDeque<>();
+    private final long cafeQuietNanos;
+    private boolean cafeCallSeen;
+    private long lastCafeCallNanos;
 
     @Autowired
     public PmsRateLimiter(PmsProperties props) {
@@ -32,11 +36,17 @@ public class PmsRateLimiter {
     PmsRateLimiter(PmsProperties props, LongSupplier nanoClock) {
         this.props = props;
         this.nanoClock = nanoClock;
+        this.cafeQuietNanos = Duration.ofMillis(props.getCafeQuietMs()).toNanos();
     }
 
     /** Takes a slot if one is free right now. */
     public synchronized boolean tryAcquire(PmsPriority priority) {
         evict();
+        // Strict "<": a café call exactly cafeQuietMs old no longer blocks the hub.
+        if (priority == PmsPriority.HUB && cafeCallSeen
+                && nanoClock.getAsLong() - lastCafeCallNanos < cafeQuietNanos) {
+            return false;
+        }
         int limit = props.getHubPer5s() + (priority == PmsPriority.CAFE ? props.getCafeReserve() : 0);
         if (acquired.size() >= limit) {
             return false;
@@ -51,7 +61,10 @@ public class PmsRateLimiter {
      */
     public synchronized void recordCafeCall() {
         evict();
-        acquired.addLast(nanoClock.getAsLong());
+        long now = nanoClock.getAsLong();
+        acquired.addLast(now);
+        cafeCallSeen = true;
+        lastCafeCallNanos = now;
     }
 
     /** Waits up to 2 s for a slot, then gives up with {@link PmsBusyException}. */
