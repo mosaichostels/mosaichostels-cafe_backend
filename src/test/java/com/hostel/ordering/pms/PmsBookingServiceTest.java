@@ -3,6 +3,7 @@ package com.hostel.ordering.pms;
 import static com.hostel.ordering.pms.PmsFrontDeskServiceTest.json;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -70,7 +71,7 @@ class PmsBookingServiceTest {
         assertEquals(new BigDecimal("1500.50"), d.folios().get(0).total());
         assertEquals(new BigDecimal("1000.50"), d.folios().get(0).due());
         assertEquals(BigDecimal.ZERO, d.folios().get(1).total());
-        assertEquals(BigDecimal.ZERO, d.folios().get(1).paid());
+        assertNull(d.folios().get(1).paid());
         assertFalse(c.stale());
         verify(gateway).json(EzeeFamily.CONNECTIVITY, "FetchSingleBooking", Map.of("BookingId", "9001-2"),
                 PmsPriority.HUB);
@@ -108,9 +109,25 @@ class PmsBookingServiceTest {
     @Test
     void failingFolioCallDoesNotFailDetailAndIsNotCached() throws Exception {
         when(gateway.json(eq(EzeeFamily.KIOSK), any(), any(), any())).thenThrow(new PmsUpstreamException("down"));
-        assertEquals(0, service.detail("9001-1").value().folios().size());
+        Cached<BookingDetail> down = service.detail("9001-1");
+        assertEquals(0, down.value().folios().size());
+        assertTrue(down.stale());
         when(gateway.json(eq(EzeeFamily.KIOSK), any(), any(), any())).thenReturn(json(BILLS));
-        assertEquals(2, service.detail("9001-1").value().folios().size());
+        Cached<BookingDetail> up = service.detail("9001-1");
+        assertEquals(2, up.value().folios().size());
+        assertFalse(up.stale());
+    }
+
+    @Test
+    void thousandsSeparatorsAreAccepted() throws Exception {
+        when(gateway.json(eq(EzeeFamily.KIOSK), any(), any(), any())).thenReturn(json(
+                "{\"Success\":{\"FolioList\":[{\"foliono\":\"F1\",\"TotalCharges\":\"1,234.50\"}]}}"));
+        assertEquals(new BigDecimal("1234.50"), service.detail("9001-1").value().folios().get(0).total());
+    }
+
+    @Test
+    void explicitSubBookingIdMatchingNoTranFallsBackToFirst() {
+        assertEquals("9001-1", service.detail("9001-9").value().summary().bookingId());
     }
 
     @Test

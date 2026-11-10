@@ -1,10 +1,13 @@
 package com.hostel.ordering.pms;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import static com.hostel.ordering.pms.PmsJson.elements;
+import static com.hostel.ordering.pms.PmsJson.nights;
+import static com.hostel.ordering.pms.PmsJson.text;
+
 import com.hostel.ordering.pms.dto.BookingSummary;
 import java.time.Duration;
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -61,38 +64,10 @@ public class PmsFrontDeskService {
     private static List<BookingSummary> mapReservations(JsonNode reply) {
         List<BookingSummary> items = new ArrayList<>();
         for (JsonNode r : elements(reply.path("Reservations").path("Reservation"))) {
-            String guest = (text(r, "FirstName") + " " + text(r, "LastName")).strip();
-            String source = text(r, "Source");
             for (JsonNode t : elements(r.path("BookingTran"))) {
-                String start = text(t, "Start");
-                String end = text(t, "End");
-                items.add(new BookingSummary(text(t, "SubBookingId"), guest, text(t, "RoomName"),
-                        text(t, "RoomTypeName"), start, end, nights(start, end), text(t, "CurrentStatus"), source));
+                items.add(PmsJson.summary(r, t));
             }
         }
         return items;
-    }
-
-    private static int nights(String start, String end) {
-        var s = PmsDates.leadingDate(start);
-        var e = PmsDates.leadingDate(end);
-        if (s.isEmpty() || e.isEmpty()) {
-            return 0;
-        }
-        return (int) Math.max(0, ChronoUnit.DAYS.between(s.get(), e.get()));
-    }
-
-    /** eZee sends a lone child as an object in some replies; treat it as a one-element list. */
-    private static List<JsonNode> elements(JsonNode n) {
-        if (n.isArray()) {
-            List<JsonNode> l = new ArrayList<>();
-            n.forEach(l::add);
-            return l;
-        }
-        return n.isObject() ? List.of(n) : List.of();
-    }
-
-    private static String text(JsonNode n, String field) {
-        return n.path(field).asText("").strip();
     }
 }
