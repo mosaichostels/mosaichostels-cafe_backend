@@ -134,8 +134,13 @@ class PmsReconcileServiceTest {
     }
 
     static String row(String folio, String date, String amount) {
+        return row(folio, date, amount, "Extra Charges", "Food Charge");
+    }
+
+    static String row(String folio, String date, String amount, String type, String particular) {
         return "\"1\",\"Synthetic Hostel\",\"H1\",\"" + folio + "\",\"" + date + "\",\"V1\",\"I1\",\"Zed Quill\","
-                + "\"Zed Quill\",\"Extra Charge\",\"Food Charge\",\"1\",\"INR\",\"" + amount + "\",\"0\"\r\n";
+                + "\"Zed Quill\",\"" + type + "\",\"" + particular + "\",\"1.0000\",\"INR\",\"" + amount
+                + "\",\"0\"\r\n";
     }
 
     private void orders(Order... os) {
@@ -295,8 +300,9 @@ class PmsReconcileServiceTest {
     @Test
     void bomReorderedColumnsQuotesAndThousandsSeparators() {
         orders(order("o1", "QUEUED", "F100", 1250.0));
-        csv("﻿ amount ,\"Particular\",\"Guest Name\",\" FOLIO NO\",\"date\"\n"
-                + "\"1,250.00\",\"Food, \"\"special\"\"\nline\",\"Quill, Zed \"\"Q\"\"\",\"F100\",\"2026-11-10\"\n");
+        csv("\uFEFF amount ,\"Particular\",\"Note\",\"Guest Name\",\" FOLIO NO\",\"date\",\" TYPE \"\n"
+                + "\"1,250.00\",\" food CHARGE \",\"Food, \"\"special\"\"\nline\",\"Quill, Zed \"\"Q\"\"\",\"F100\","
+                + "\"2026-11-10\",\"EXTRA charges \"\n");
         assertEquals(List.of("FOUND"), statuses("2026-11-10"));
     }
 
@@ -337,6 +343,56 @@ class PmsReconcileServiceTest {
         assertTrue(r.stale());
         assertEquals(1_000, r.asOf());
         assertEquals(List.of("FOUND"), r.items().stream().map(ChargeCheck::eZeeStatus).toList());
+    }
+
+    @Test
+    void oneRowCannotProveTwoOrdersOnTheSameFolioDayAndAmount() {
+        orders(order("o1", "QUEUED", "F100", 120.0), order("o2", "QUEUED", "F100", 120.0));
+        csv(HEADER + row("F100", "2026-11-10", "120.00"));
+        assertEquals(List.of("UNKNOWN", "UNKNOWN"), statuses("2026-11-10"));
+    }
+
+    @Test
+    void twoRowsProveTwoOrdersOnTheSameFolioDayAndAmount() {
+        orders(order("o1", "QUEUED", "F100", 120.0), order("o2", "QUEUED", "F100", 120.0));
+        csv(HEADER + row("F100", "2026-11-10", "120.00") + row("F100", "2026-11-10", "120"));
+        assertEquals(List.of("FOUND", "FOUND"), statuses("2026-11-10"));
+    }
+
+    @Test
+    void anItemSubtotalSharedWithAnotherOrdersTotalIsConsumedToo() {
+        Order a = order("o1", "QUEUED", "F100", 150.0);
+        a.setItems(new ArrayList<>(List.of(item("m1", 100), item("m2", 50))));
+        a.setChargePostedItems(new ArrayList<>(List.of("m1#0", "m2#1")));
+        orders(a, order("o2", "QUEUED", "F100", 100.0));
+        csv(HEADER + row("F100", "2026-11-10", "100.00"));
+        assertEquals(List.of("UNKNOWN", "UNKNOWN"), statuses("2026-11-10"));
+    }
+
+    @Test
+    void paymentAndRoomRowsWithTheSameAmountDoNotCount() {
+        orders(order("o1", "QUEUED", "F100", 250.0));
+        csv(HEADER + row("F100", "2026-11-10", "250.00", "Bank", "UPI")
+                + row("F100", "2026-11-10", "250.00", "Cash", "Cash")
+                + row("F100", "2026-11-10", "250.00", "Room Charges", "Room Charges")
+                + row("F100", "2026-11-10", "250.00", "Extra Charges", "Room Charges")
+                + row("F100", "2026-11-10", "250.00", "Bank", "Food Charge"));
+        assertEquals(List.of("MISSING"), statuses("2026-11-10"));
+    }
+
+    @Test
+    void essentialChargeLineMatchesWithCaseAndSpaceVariants() {
+        orders(order("o1", "QUEUED", "F100", 40.0), order("o2", "QUEUED", "F200", 60.0));
+        csv(HEADER + row("F100", "2026-11-10", "40.00", "Extra Charges", "Essential")
+                + row("F200", "2026-11-10", "60.00", "  extra CHARGES ", " FOOD charge "));
+        assertEquals(List.of("FOUND", "FOUND"), statuses("2026-11-10"));
+    }
+
+    @Test
+    void missingTypeColumnIsUnknown() {
+        orders(order("o1", "QUEUED", "F100", 250.0));
+        csv("\"Folio No\",\"Date\",\"Particular\",\"Amount\"\r\n\"F100\",\"2026-11-10\",\"Food Charge\",\"250.00\"\r\n");
+        assertEquals(List.of("UNKNOWN"), statuses("2026-11-10"));
     }
 
     // ---- window, cache, cap, dates ----

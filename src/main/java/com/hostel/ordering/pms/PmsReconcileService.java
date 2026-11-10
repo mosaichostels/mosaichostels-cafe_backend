@@ -32,12 +32,16 @@ import org.springframework.stereotype.Service;
  * params fromdate/todate). Header columns seen live (controller spike, 2026-11-10): "Unique id","Hotel Name",
  * "Hotel Code","Folio No","Date","VoucherNo/ReceiptNo","Invoice Number","Guest Name","Bill To Name",
  * "Guest GST Number","State","Phone Number","Mobile Number","Type","Particular","Qty","Currency","Amount",... ;
- * one row per bill item. The Date column's format was not seen, so several are accepted.
+ * one row per bill item. Live probe 2026-11-11: Date is ISO yyyy-MM-dd (other formats kept as a fallback); café
+ * charges are Type "Extra Charges" with Particular "Food Charge" or "Essential"; only those rows are charge rows.
  *
- * <p>Match rule (Rulings P1-5, P1-6), conservative so a charge is never falsely FOUND: FOUND only when a row has the
- * order's chargePostFolio, the IST day of chargePostAt, and an Amount equal to the order total or one confirmed
- * posted item's subtotal. MISSING when the CSV was valid and no such row exists. UNKNOWN when the CSV is unavailable
- * or has an unexpected header, no row's date parses, the order has no folio, or an undated row could be the charge.
+ * <p>Match rule (Rulings P1-5, P1-6, P1-13), conservative so a charge is never falsely FOUND: FOUND only when a
+ * charge row has the order's chargePostFolio, the IST day of chargePostAt, and an Amount equal to the order total or
+ * one confirmed posted item's subtotal. FOUND means at least one charge line of the order was found. Rows are
+ * consumed: when several orders on one folio and day claim the same amount, that amount proves FOUND only if there
+ * are at least as many rows as claimants; fewer (but some) rows make those claimants UNKNOWN. MISSING when the CSV
+ * was valid and no such row exists. UNKNOWN when the CSV is unavailable or has an unexpected header, no row's date
+ * parses, the order has no folio, or an undated charge row could be the charge.
  * Only folio numbers, days and amounts are kept from the CSV; names, rooms and folios are never logged.
  */
 @Service
@@ -50,6 +54,10 @@ public class PmsReconcileService {
     static final String NOT_APPLICABLE = "N/A";
     private static final Set<String> CHECKED = Set.of("QUEUED", "CHECKED");
     private static final Set<String> NOT_POSTED = Set.of("FAILED", "VOIDED");
+    // Café charge lines as seen in the live Retrieve Bills probe of 2026-11-11 (Ruling P1-13), compared lower-cased.
+    static final String CHARGE_TYPE = "extra charges";
+    static final String FOOD_PARTICULAR = "food charge";
+    static final String ESSENTIAL_PARTICULAR = "essential";
     private static final List<DateTimeFormatter> DATE_FORMATS = List.of(
             DateTimeFormatter.ISO_LOCAL_DATE,
             DateTimeFormatter.ofPattern("dd-MM-uuuu").withResolverStyle(ResolverStyle.STRICT),
@@ -61,10 +69,11 @@ public class PmsReconcileService {
     public record Result(List<ChargeCheck> items, long asOf, boolean stale, boolean truncated) {}
 
     /**
-     * The CSV reduced to what matching needs. valid=false: unexpected header. dated: folio -> day -> amounts;
-     * undated: folio -> amounts of rows whose date did not parse.
+     * The CSV reduced to what matching needs. valid=false: unexpected header. dated: folio -> day -> amount -> number
+     * of charge rows; undated: folio -> amounts of charge rows whose date did not parse.
      */
-    record Bills(boolean valid, int rows, int datedRows, Map<String, Map<LocalDate, Set<BigDecimal>>> dated,
+    record Bills(boolean valid, int rows, int datedRows,
+            Map<String, Map<LocalDate, Map<BigDecimal, Integer>>> dated,
             Map<String, Set<BigDecimal>> undated) {
         static final Bills INVALID = new Bills(false, 0, 0, Map.of(), Map.of());
     }
@@ -131,6 +140,15 @@ public class PmsReconcileService {
             }
         }
 
+        // How many checked orders claim each folio/day/amount, so one row cannot prove two orders.
+        Map<String, Integer> claimants = new HashMap<>();
+        for (Order o : list) {
+            if (checkable(o)) {
+                for (BigDecimal a : candidates(o)) {
+                    claimants.merge(claimKey(o, a), 1, Integer::sum);
+                }
+            }
+        }
         List<ChargeCheck> items = new ArrayList<>(list.size());
         for (Order o : list) {
             String ours = o.getChargePostStatus();
@@ -143,7 +161,7 @@ public class PmsReconcileService {
             } else if (!CHECKED.contains(ours) || !checkable(o) || bills == null) {
                 theirs = UNKNOWN;
             } else {
-                theirs = match(o, bills, first, last);
+                theirs = match(o, bills, first, last, claimants);
             }
             String room = o.getChargePostRoom() != null && !o.getChargePostRoom().isBlank()
                     ? o.getChargePostRoom() : o.getDormitory();
@@ -163,7 +181,11 @@ public class PmsReconcileService {
         return Instant.ofEpochMilli(o.getChargePostAt()).atZone(PmsDates.IST).toLocalDate();
     }
 
-    static String match(Order o, Bills bills, LocalDate first, LocalDate last) {
+    private static String claimKey(Order o, BigDecimal amount) {
+        return o.getChargePostFolio().strip() + "|" + postDay(o) + "|" + amount;
+    }
+
+    static String match(Order o, Bills bills, LocalDate first, LocalDate last, Map<String, Integer> claimants) {
         LocalDate day = postDay(o);
         if (!bills.valid() || (bills.rows() > 0 && bills.datedRows() == 0) || day.isBefore(first)
                 || day.isAfter(last)) {
@@ -171,9 +193,17 @@ public class PmsReconcileService {
         }
         Set<BigDecimal> wanted = candidates(o);
         String folio = o.getChargePostFolio().strip();
-        Set<BigDecimal> onDay = bills.dated().getOrDefault(folio, Map.of()).getOrDefault(day, Set.of());
-        if (onDay.stream().anyMatch(wanted::contains)) {
-            return FOUND;
+        Map<BigDecimal, Integer> onDay = bills.dated().getOrDefault(folio, Map.of()).getOrDefault(day, Map.of());
+        boolean shared = false;
+        for (BigDecimal a : wanted) {
+            int rows = onDay.getOrDefault(a, 0);
+            if (rows > 0 && rows >= claimants.getOrDefault(claimKey(o, a), 1)) {
+                return FOUND;
+            }
+            shared |= rows > 0;
+        }
+        if (shared) {
+            return UNKNOWN;
         }
         return bills.undated().getOrDefault(folio, Set.of()).stream().anyMatch(wanted::contains) ? UNKNOWN : MISSING;
     }
@@ -241,10 +271,12 @@ public class PmsReconcileService {
         Integer folioCol = col.get("folio no");
         Integer dateCol = col.get("date");
         Integer amountCol = col.get("amount");
-        if (folioCol == null || dateCol == null || amountCol == null || !col.containsKey("particular")) {
+        Integer typeCol = col.get("type");
+        Integer particularCol = col.get("particular");
+        if (folioCol == null || dateCol == null || amountCol == null || typeCol == null || particularCol == null) {
             return Bills.INVALID;
         }
-        Map<String, Map<LocalDate, Set<BigDecimal>>> dated = new HashMap<>();
+        Map<String, Map<LocalDate, Map<BigDecimal, Integer>>> dated = new HashMap<>();
         Map<String, Set<BigDecimal>> undated = new HashMap<>();
         int count = 0;
         int datedCount = 0;
@@ -260,13 +292,16 @@ public class PmsReconcileService {
             if (d != null) {
                 datedCount++;
             }
-            if (amt == null) {
+            String particular = PmsCsv.headerName(cell(row, particularCol));
+            if (amt == null || !CHARGE_TYPE.equals(PmsCsv.headerName(cell(row, typeCol)))
+                    || !(FOOD_PARTICULAR.equals(particular) || ESSENTIAL_PARTICULAR.equals(particular))) {
                 continue;
             }
             if (d == null) {
                 undated.computeIfAbsent(folio, k -> new HashSet<>()).add(amt);
             } else {
-                dated.computeIfAbsent(folio, k -> new HashMap<>()).computeIfAbsent(d, k -> new HashSet<>()).add(amt);
+                dated.computeIfAbsent(folio, k -> new HashMap<>()).computeIfAbsent(d, k -> new HashMap<>())
+                        .merge(amt, 1, Integer::sum);
             }
         }
         return new Bills(true, count, datedCount, dated, undated);
