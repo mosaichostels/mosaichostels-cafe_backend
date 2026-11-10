@@ -56,6 +56,10 @@ public class PmsStatusController {
             });
             checkedAt = probe.fetchedAtMs();
             stale = probe.stale();
+            // stale means the latest refresh failed and only the last good value was served
+            if (stale) {
+                verdict = "UPSTREAM";
+            }
         } catch (PmsAuthException e) {
             verdict = "AUTH";
         } catch (InterruptedException e) {

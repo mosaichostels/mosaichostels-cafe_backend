@@ -150,14 +150,15 @@ class PmsStatusControllerTest {
     }
 
     @Test
-    void failedRefreshServesLastGoodAsStale() {
+    void failedRefreshAfterGoodProbeReportsUpstreamStaleWithOldCheckedAt() {
         as("ROLE_SUPERADMIN");
         PROPS.setTtl(Map.of("status", 0L));
-        controller.status();
-        when(GATEWAY.json(any(), any(), any(), any())).thenThrow(new PmsUpstreamException("down"));
+        long good = controller.status().checkedAt();
+        when(GATEWAY.json(any(), any(), any(), any())).thenThrow(new PmsAuthException("bad"));
         PmsStatusController.Status s = controller.status();
-        assertEquals("OK", s.eZee());
+        assertEquals("UPSTREAM", s.eZee());
         assertTrue(s.stale());
+        assertEquals(good, s.checkedAt());
     }
 
     @Test
