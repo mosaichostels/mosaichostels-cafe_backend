@@ -7,8 +7,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
- * Sliding 5 s window shared by hub and café. eZee allows 5 requests per 5 s: the hub may fill
- * {@code hubPer5s} of them, the café may use all {@code hubPer5s + cafeReserve}.
+ * Sliding 5 s window shared by hub and café. eZee allows 5 requests per 5 s. The caps apply to
+ * {@code acquire}/{@code tryAcquire} only: a HUB acquire is admitted while the window holds fewer than
+ * {@code hubPer5s} entries, a CAFE acquire while it holds fewer than {@code hubPer5s + cafeReserve}.
+ * The café's live charge path does not acquire: {@code recordCafeCall} records each café request without any
+ * limit (Ruling 8), so the window can briefly exceed the cap and hub reads then wait.
  */
 @Component
 public class PmsRateLimiter {

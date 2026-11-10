@@ -1,6 +1,5 @@
 package com.hostel.ordering.pms;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -51,7 +50,7 @@ public class PmsStatusController {
         boolean stale = false;
         try {
             Cached<Boolean> probe = cache.getOrLoad(KEY, props.ttl("status", Duration.ofSeconds(60)), () -> {
-                JsonNode ignored = gateway.json(EzeeFamily.KIOSK, "RetrieveCurrency", Map.of(), PmsPriority.HUB);
+                gateway.json(EzeeFamily.KIOSK, "RetrieveCurrency", Map.of(), PmsPriority.HUB);
                 return Boolean.TRUE;
             });
             checkedAt = probe.fetchedAtMs();
