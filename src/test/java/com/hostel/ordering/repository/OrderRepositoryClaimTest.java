@@ -27,6 +27,17 @@ class OrderRepositoryClaimTest {
     }
 
     @Test
+    void chargeReconcileQueryIsBoundedByCreatedAtAndLimit() {
+        var q = OrderRepositoryImpl.chargeReconcileQuery(100L, 200L, 501);
+        String json = q.getQueryObject().toJson();
+        assertTrue(json.contains("\"createdAt\": {\"$gte\": 100, \"$lt\": 200}"), json);
+        assertTrue(json.contains("\"status\": \"DELIVERED\""), json);
+        assertTrue(json.contains("\"chargePostStatus\": {\"$ne\": null}"), json);
+        assertTrue(q.getLimit() == 501, "limit");
+        assertTrue(q.getSortObject().toJson().contains("\"createdAt\": 1"), q.getSortObject().toJson());
+    }
+
+    @Test
     void claimStampsTheTimeSoAStuckClaimCanBeFound() {
         String update = OrderRepositoryImpl.claimUpdate("106").getUpdateObject().toJson();
         assertTrue(update.contains("chargePostAt"), update);

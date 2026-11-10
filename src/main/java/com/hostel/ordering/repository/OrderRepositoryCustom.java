@@ -26,4 +26,10 @@ public interface OrderRepositoryCustom {
     /** Orders whose claim has been held since before cutoffMs - the process that took it is gone. */
     List<Order> findStaleChargePosts(long cutoffMs);
 
+    /**
+     * Orders created in [fromMs, toMs) that were delivered or have any chargepost outcome, oldest first,
+     * at most {@code limit} of them (charge reconciliation).
+     */
+    List<Order> findForChargeReconcile(long fromMs, long toMs, int limit);
+
 }

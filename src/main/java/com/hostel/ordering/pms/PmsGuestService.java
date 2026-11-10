@@ -90,19 +90,15 @@ public class PmsGuestService {
      * column is found by header ("Guest Name", "Name" or "Contact_person"); no such header gives an empty map.
      */
     static Map<String, Integer> countStays(String csv) {
-        List<List<String>> rows = parseCsv(csv);
+        List<List<String>> rows = PmsCsv.parse(csv);
         int col = -1;
-        int start = 0;
-        while (start < rows.size() && rows.get(start).stream().allMatch(String::isBlank)) {
-            start++;
-        }
+        int start = PmsCsv.firstNonBlank(rows);
         if (start == rows.size()) {
             return Map.of();
         }
         List<String> header = rows.get(start);
         for (int i = 0; i < header.size() && col < 0; i++) {
-            String h = header.get(i).replace("﻿", "").strip().toLowerCase(Locale.ROOT);
-            if (NAME_COLUMNS.contains(h)) {
+            if (NAME_COLUMNS.contains(PmsCsv.headerName(header.get(i)))) {
                 col = i;
             }
         }
@@ -117,46 +113,5 @@ public class PmsGuestService {
             }
         }
         return counts;
-    }
-
-    /** RFC 4180: quoted fields may hold commas, line breaks and doubled quotes. */
-    static List<List<String>> parseCsv(String s) {
-        List<List<String>> rows = new ArrayList<>();
-        List<String> row = new ArrayList<>();
-        StringBuilder f = new StringBuilder();
-        boolean quoted = false;
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (quoted) {
-                if (c != '"') {
-                    f.append(c);
-                } else if (i + 1 < s.length() && s.charAt(i + 1) == '"') {
-                    f.append('"');
-                    i++;
-                } else {
-                    quoted = false;
-                }
-            } else if (c == '"') {
-                quoted = true;
-            } else if (c == ',') {
-                row.add(f.toString());
-                f.setLength(0);
-            } else if (c == '\n' || c == '\r') {
-                if (c == '\r' && i + 1 < s.length() && s.charAt(i + 1) == '\n') {
-                    i++;
-                }
-                row.add(f.toString());
-                f.setLength(0);
-                rows.add(row);
-                row = new ArrayList<>();
-            } else {
-                f.append(c);
-            }
-        }
-        if (f.length() > 0 || !row.isEmpty()) {
-            row.add(f.toString());
-            rows.add(row);
-        }
-        return rows;
     }
 }
