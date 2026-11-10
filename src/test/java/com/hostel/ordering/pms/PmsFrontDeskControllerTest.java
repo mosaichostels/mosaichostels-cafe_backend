@@ -53,7 +53,8 @@ class PmsFrontDeskControllerTest {
     static PmsFrontDeskController newController() {
         PmsCache cache = new PmsCache();
         return new PmsFrontDeskController(new PmsFrontDeskService(GATEWAY, cache, PROPS,
-                new PmsHousekeepingFeed(GATEWAY, cache, PROPS)), new PmsBookingService(GATEWAY, cache, PROPS), CLOCK);
+                new PmsHousekeepingFeed(GATEWAY, cache, PROPS)), new PmsBookingService(GATEWAY, cache, PROPS),
+                new PmsGuestService(GATEWAY, cache, PROPS), CLOCK);
     }
 
     @Configuration
@@ -182,5 +183,30 @@ class PmsFrontDeskControllerTest {
                 .thenReturn(com.fasterxml.jackson.databind.node.NullNode.getInstance());
         mvc.perform(get("/pms/bookings/5")).andExpect(
                 org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
+    }
+
+    @Test
+    void guestSearchRolesBodyAndBadQueries() throws Exception {
+        when(GATEWAY.json(eq(EzeeFamily.CONNECTIVITY), eq("GuestList"), any(), any())).thenReturn(
+                PmsFrontDeskServiceTest.json(PmsGuestServiceTest.guests("Asha Rao:1:Yes")));
+        when(GATEWAY.text(eq(EzeeFamily.GUEST_DB), any(), any(), any())).thenReturn("Name\nAsha Rao\n");
+        assertThrows(AuthenticationCredentialsNotFoundException.class, () -> controller.guests("asha"));
+        as("ROLE_GUEST");
+        assertThrows(AccessDeniedException.class, () -> controller.guests("asha"));
+        for (String role : new String[] {"ROLE_STAFF", "ROLE_ADMIN", "ROLE_SUPERADMIN"}) {
+            as(role);
+            assertEquals(1, controller.guests("asha").items().size());
+        }
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(newController())
+                .setControllerAdvice(new GlobalExceptionHandler()).build();
+        String body = mvc.perform(get("/pms/guests?q=asha")).andReturn().getResponse().getContentAsString();
+        assertTrue(body.contains("\"stays\":1") && body.contains("\"vip\":true") && body.contains("\"asOf\""));
+        for (String banned : new String[] {"5550009", "secret lane", "mobile", "phone", "address"}) {
+            assertFalse(body.toLowerCase().contains(banned), "leaked " + banned);
+        }
+        for (String bad : new String[] {"", "?q=", "?q=a", "?q=" + "x".repeat(61)}) {
+            mvc.perform(get("/pms/guests" + bad)).andExpect(
+                    org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
+        }
     }
 }
