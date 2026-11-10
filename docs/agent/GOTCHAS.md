@@ -1,5 +1,5 @@
 Read when: debugging, deploying, editing hooks, or before touching prod config.
-Verified: 2026-11-10 @ a8c6ac6
+Verified: 2026-11-10 @ d3b129c
 Covers: ../AGENTS.md, ../docs/backend/AGENTS.md, .claude/settings.json, .codex/hooks.json, src/main/java/com/hostel/ordering/service/OrderService.java
 
 # Gotchas
@@ -16,6 +16,6 @@ Covers: ../AGENTS.md, ../docs/backend/AGENTS.md, .claude/settings.json, .codex/h
 - Rate-limit state is in-memory and per instance; resets on restart.
 - Do not rename `ezee` charge-post statuses or `UNCONFIRMED:` prefix: stored on orders and read by clients.
 - Run Maven on JDK 17 (`JAVA_HOME=/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home`). The default Homebrew `mvn` uses JDK 27, where Lombok 1.18.42 fails with `ClassNotFoundException: com.sun.tools.javac.tree.EndPosTable` during compile.
-- eZee returns errors with HTTP 200 (auth/not-enabled codes in the body); `EzeeGateway` maps them, so never judge success by status code alone.
+- eZee returns errors with HTTP 200 (auth/not-enabled codes in the body); `EzeeGateway` maps them (marker `Errors` or `Error`, object or array, as in the café `EzeeClient`), so never judge success by status code alone.
 - `PmsCache` keys appear in a DEBUG log: never put guest names, phones or emails in a key.
 - Do not enable any `pms.writes.*` flag before the Mongo index check in STATUS.md (DEPLOY GATE).

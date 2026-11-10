@@ -1,5 +1,5 @@
 Read when: always, at the start and end of every task (update after changing code).
-Verified: 2026-11-10 @ a8c6ac6
+Verified: 2026-11-10 @ d3b129c
 Covers: src/main/**, src/test/**, docs/agent/**, AGENTS.md
 
 # Status

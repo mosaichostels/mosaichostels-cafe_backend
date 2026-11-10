@@ -1,5 +1,5 @@
 Read when: configuring, deploying, or debugging startup. Names only; no values read.
-Verified: 2026-11-10 @ a8c6ac6 (source: application-prod.yml and `@Value`/`getenv` in src/main)
+Verified: 2026-11-10 @ d3b129c (source: application-prod.yml and `@Value`/`getenv` in src/main)
 Covers: src/main/resources/application-prod.yml, src/main/java/**/*.java, Dockerfile
 
 # Environment
@@ -24,12 +24,17 @@ Properties with no env mapping in the yml (set elsewhere or defaults):
 | `config.jwtExpirationMs` | 3600000 |
 | `config.jwtRefreshGraceMs` | 31536000000 |
 | `audit.retention-days` | 90 |
-| `pms.enabled` | hub kill switch; `false` throws before any eZee I/O (code default on) |
-| `pms.hub-per5s`, `pms.cafe-reserve` | rate-limit window shares (defaults 3 and 2) |
-| `pms.writes.<feature>` | write flag per feature, default off; env via relaxed binding (`PMS_WRITES_<FEATURE>`) |
+| `pms.enabled` | hub kill switch; `false` throws before any eZee I/O (code default on); env `PMS_ENABLED` |
+| `pms.hub-per5s`, `pms.cafe-reserve` | rate-limit window shares (defaults 3 and 2); env `PMS_HUB_PER5S`, `PMS_CAFE_RESERVE` |
+| `pms.writes.<feature>` | write flag per feature, default off; NOT settable by a per-feature env var (see below) |
 | `pms.canary.<feature>` | canary list per feature |
-| `pms.ttl.<name>` | cache TTL seconds |
+| `pms.ttl.<name>` | cache TTL seconds; env `PMS_TTL_<NAME>` for single-word names |
 | `ezee.base-url` | optional; gateway also reads existing `ezee.auth-code`, `ezee.hotel-code` (`PmsProperties`, `EzeeGateway`) |
+
+Per-feature maps (`pms.writes.<feature>`, `pms.canary.<feature>`): env var names cannot produce hyphenated or camel-case
+map keys (`PMS_WRITES_ROOM_STATUS` binds `room.status`, not `room-status`). Set them with ONE secret
+`SPRING_APPLICATION_JSON`, e.g. `{"pms":{"writes":{"room-status":true},"canary":{"room-status":["<bookingId>"]}}}`,
+or an owner-approved `pms:` block in `application-prod.yml`, or the planned runtime override layer in `PmsFlags` (P6).
 | `ezee.mock` | `false` in prod yml |
 | `cors.allowed-origins` | code default `http://localhost:3000` (WebConfig:10) |
 
