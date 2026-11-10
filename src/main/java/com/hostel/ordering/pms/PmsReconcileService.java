@@ -32,7 +32,8 @@ import org.springframework.stereotype.Service;
  * params fromdate/todate). Header columns seen live (controller spike, 2026-11-10): "Unique id","Hotel Name",
  * "Hotel Code","Folio No","Date","VoucherNo/ReceiptNo","Invoice Number","Guest Name","Bill To Name",
  * "Guest GST Number","State","Phone Number","Mobile Number","Type","Particular","Qty","Currency","Amount",... ;
- * one row per bill item. Live probe 2026-11-11: Date is ISO yyyy-MM-dd (other formats kept as a fallback); café
+ * one row per bill item. Amount is assumed to be the line total (price x qty): the one live café-style row with
+ * Qty 3.0000 had Amount == Total (36, Ruling P1-16), so a posted item matches on its subtotal. Live probe 2026-11-11: Date is ISO yyyy-MM-dd (other formats kept as a fallback); café
  * charges are Type "Extra Charges" with Particular "Food Charge" or "Essential"; only those rows are charge rows.
  *
  * <p>Match rule (Rulings P1-5, P1-6, P1-13), conservative so a charge is never falsely FOUND: FOUND only when a
@@ -142,6 +143,10 @@ public class PmsReconcileService {
                 asOf = c.fetchedAtMs();
                 stale = c.stale();
             } catch (RuntimeException e) {
+                // PMS switched off or the request never left: same error as every other hub route.
+                if (e instanceof PmsNotEnabledException || (e instanceof PmsUpstreamException u && !u.isSent())) {
+                    throw e;
+                }
                 // Exception class only: messages and CSV content stay out of the log.
                 log.warn("pms reconcile: Retrieve Bills unavailable ({}), charges reported UNKNOWN",
                         e.getClass().getSimpleName());
@@ -203,7 +208,7 @@ public class PmsReconcileService {
         boolean shared = false;
         for (BigDecimal a : wanted) {
             int rows = onDay.getOrDefault(a, 0);
-            if (rows > 0 && rows >= claimants.get(claimKey(o, a))) {
+            if (rows > 0 && rows >= claimants.getOrDefault(claimKey(o, a), 1)) {
                 return FOUND;
             }
             shared |= rows > 0;

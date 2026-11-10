@@ -459,6 +459,44 @@ class PmsReconcileServiceTest {
         verifyNoInteractions(GATEWAY);
     }
 
+    // Live shape (Ruling P1-16): a Qty 3.0000 café row had Amount == Total == 36, the line total.
+    static final String HEADER_WITH_TOTAL = "\"Folio No\",\"Date\",\"Type\",\"Particular\",\"Qty\",\"Amount\",\"Total\"\r\n";
+
+    @Test
+    void quantityThreeRowMatchesOnTheLineSubtotal() {
+        Order o = order("o1", "QUEUED", "F100", 36.0);
+        OrderItem it = item("m1", 36);
+        it.setQuantity(3);
+        it.setPrice(12.0);
+        o.setItems(new ArrayList<>(List.of(it, item("m2", 20))));
+        o.setTotalAmount(56.0);
+        o.setChargePostedItems(new ArrayList<>(List.of("m1#0")));
+        orders(o);
+        csv(HEADER_WITH_TOTAL + "\"F100\",\"2026-11-10\",\"Extra Charges\",\"Food Charge\",\"3.0000\",\"36\",\"36\"\r\n");
+        assertEquals(List.of("FOUND"), statuses("2026-11-10"));
+    }
+
+    @Test
+    void aTwoUnitLineDoesNotProveAOneUnitOrderOfTheSamePrice() {
+        Order a = order("a", "QUEUED", "F100", 200.0);
+        a.getItems().get(0).setQuantity(2);
+        a.getItems().get(0).setPrice(100.0);
+        orders(a, order("b", "QUEUED", "F100", 100.0));
+        csv(HEADER_WITH_TOTAL + "\"F100\",\"2026-11-10\",\"Extra Charges\",\"Food Charge\",\"2.0000\",\"200\",\"200\"\r\n");
+        assertEquals(List.of("FOUND", "MISSING"), statuses("2026-11-10"));
+    }
+
+    @Test
+    void pmsSwitchedOffIsTheSameErrorAsOtherHubRoutes() {
+        orders(order("o1", "QUEUED", "F100", 250.0));
+        PmsUpstreamException off = PmsUpstreamException.notSent("PMS integration disabled");
+        when(GATEWAY.text(any(), any(), any(), any())).thenThrow(off);
+        assertEquals(off, assertThrows(PmsUpstreamException.class, () -> service.charges("2026-11-10")));
+        reset(GATEWAY);
+        when(GATEWAY.text(any(), any(), any(), any())).thenThrow(new PmsNotEnabledException("not enabled"));
+        assertThrows(PmsNotEnabledException.class, () -> service.charges("2026-11-10"));
+    }
+
     @Test
     void negativeReversalRowsAreIgnored() {
         Order neg = order("o1", "QUEUED", "F100", -50.0);

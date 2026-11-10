@@ -46,4 +46,15 @@ class PmsExceptionMappingTest {
         assertFalse(res.getBody().toString().contains("abc123"));
         assertFalse(res.getBody().toString().contains("eZee said"));
     }
+
+    @org.junit.jupiter.api.Test
+    void onlyBusyCarriesRetryAfter() {
+        GlobalExceptionHandler h = new GlobalExceptionHandler();
+        ResponseEntity<Map<String, String>> busy = h.handlePms(new PmsBusyException(SECRET));
+        assertEquals("3", busy.getHeaders().getFirst("Retry-After"));
+        assertEquals("PMS_BUSY", busy.getBody().get("errorCode"));
+        assertEquals(2, busy.getBody().size());
+        assertEquals(null, h.handlePms(new PmsUpstreamException(SECRET)).getHeaders().getFirst("Retry-After"));
+        assertEquals(null, h.handlePms(new PmsNotEnabledException(SECRET)).getHeaders().getFirst("Retry-After"));
+    }
 }

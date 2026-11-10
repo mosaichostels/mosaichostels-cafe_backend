@@ -1,5 +1,5 @@
 Read when: about to change auth, idempotency, eZee posting, rate limits or notifications.
-Verified: 2026-11-11 @ 27745ef. Source: backend AGENTS (`../docs/backend/AGENTS.md`) plus code comments where cited.
+Verified: 2026-11-11 @ 2626fed + final review fixes. Source: backend AGENTS (`../docs/backend/AGENTS.md`) plus code comments where cited.
 Covers: -
 
 # Decisions
@@ -27,5 +27,5 @@ Covers: -
 | Stale-while-error is accepted for booking contact details | a cached `BookingDetail` (phone/email) stays in the in-memory `PmsCache` past its TTL and is served `stale=true` while eZee is down; process-local, bounded by `MAX_KEYS`, never in Mongo or logs |
 | Reconciliation never reports a false FOUND (it may say UNKNOWN or MISSING) | FOUND needs a Retrieve Bills row with the order's folio, the IST day of `chargePostAt`, and Amount equal to the order total or a confirmed item subtotal; header must have `Folio No, Date, Type, Particular, Amount`, else UNKNOWN |
 | Reconcile consumes rows: each order claims an amount with a weight | one row cannot prove two orders; claims come from every listed order with a folio and `chargePostAt` whatever its status (FAILED/UNCONFIRMED/VOIDED can leave real rows), only QUEUED/CHECKED are looked up; fewer rows than total claims = UNKNOWN |
-| Reconcile counts only café charge rows: Type "Extra Charges" and Particular "Food Charge" or "Essential" (case-insensitive) | from a read-only live Retrieve Bills probe 2026-11-11; Date is ISO yyyy-MM-dd; negative (reversal) rows are ignored; a differently named charge shows MISSING (safe direction) |
+| Reconcile counts only café charge rows: Type "Extra Charges" and Particular "Food Charge" or "Essential" (case-insensitive) | from a read-only live Retrieve Bills probe 2026-11-11; Date is ISO yyyy-MM-dd; negative (reversal) rows are ignored; a differently named charge shows MISSING (safe direction). A manual eZee posting with Particular "Food Charge" is indistinguishable from a café row. |
 | Money in hub DTOs is `BigDecimal`; an unparsable folio amount is null | eZee amounts are decimal strings; never double |

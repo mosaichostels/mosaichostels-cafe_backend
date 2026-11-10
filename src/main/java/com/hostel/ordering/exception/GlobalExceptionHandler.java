@@ -3,6 +3,7 @@ package com.hostel.ordering.exception;
 import com.hostel.ordering.model.ErrorResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -103,7 +104,11 @@ public class GlobalExceptionHandler {
             case "IDEMPOTENCY_MISMATCH" -> { status = HttpStatus.CONFLICT; message = "This request key was already used for a different request."; }
             default -> { status = HttpStatus.BAD_GATEWAY; message = "The PMS request failed."; }
         }
-        return new ResponseEntity<>(Map.of("errorCode", ex.code(), "message", message), status);
+        ResponseEntity.BodyBuilder res = ResponseEntity.status(status);
+        if (status == HttpStatus.SERVICE_UNAVAILABLE) {
+            res.header(HttpHeaders.RETRY_AFTER, "3"); // seconds; the hub budget frees up within the 5 s window
+        }
+        return res.body(Map.of("errorCode", ex.code(), "message", message));
     }
 
     /**
