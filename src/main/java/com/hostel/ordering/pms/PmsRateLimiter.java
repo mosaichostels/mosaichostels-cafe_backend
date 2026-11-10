@@ -42,6 +42,15 @@ public class PmsRateLimiter {
         return true;
     }
 
+    /**
+     * Counts a café call against the window without ever refusing or delaying it: a charge post
+     * cannot be voided, so the café must not be turned away. Hub requests absorb the overshoot.
+     */
+    public synchronized void recordCafeCall() {
+        evict();
+        acquired.addLast(nanoClock.getAsLong());
+    }
+
     /** Waits up to 2 s for a slot, then gives up with {@link PmsBusyException}. */
     public void acquire(PmsPriority priority) {
         acquire(priority, MAX_WAIT);

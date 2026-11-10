@@ -78,4 +78,37 @@ class PmsRateLimiterTest {
                 () -> limiter.acquire(PmsPriority.HUB, Duration.ofMillis(60)));
         assertEquals("PMS_BUSY", e.code());
     }
+
+    @Test
+    void recordCafeCallAlwaysCountsEvenWhenWindowIsFull() {
+        for (int i = 0; i < 3; i++) {
+            assertTrue(limiter.tryAcquire(PmsPriority.HUB));
+        }
+        limiter.recordCafeCall();
+        limiter.recordCafeCall();
+        assertEquals(5, limiter.usedInWindow());
+        assertDoesNotThrow(limiter::recordCafeCall);
+        assertEquals(6, limiter.usedInWindow());
+    }
+
+    @Test
+    void hubWaitsWhileCafeCallsFillWindowThenFrees() {
+        for (int i = 0; i < 4; i++) {
+            limiter.recordCafeCall();
+        }
+        assertFalse(limiter.tryAcquire(PmsPriority.HUB));
+        advanceSeconds(4);
+        assertFalse(limiter.tryAcquire(PmsPriority.HUB));
+        advanceSeconds(1);
+        assertEquals(0, limiter.usedInWindow());
+        assertTrue(limiter.tryAcquire(PmsPriority.HUB));
+    }
+
+    @Test
+    void recordCafeCallEvictsExpiredEntriesOnTheAdvancingClock() {
+        limiter.recordCafeCall();
+        advanceSeconds(5);
+        limiter.recordCafeCall();
+        assertEquals(1, limiter.usedInWindow());
+    }
 }
