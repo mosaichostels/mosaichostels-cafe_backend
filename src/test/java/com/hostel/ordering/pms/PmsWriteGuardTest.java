@@ -291,6 +291,65 @@ class PmsWriteGuardTest {
         assertTrue(run("k1", "B1", ok("B1")).confirmed());
     }
 
+    /** A real gateway over a fake transport, so the guard sees the exceptions the gateway really throws. */
+    private EzeeGateway gatewayWith(PmsProperties gatewayProps, EzeeGatewayTest.FakeTransport transport) {
+        gatewayProps.setHubPer5s(1000);
+        return new EzeeGateway(gatewayProps, new PmsRateLimiter(gatewayProps), transport, "https://pms.test", "K", "H");
+    }
+
+    private void assertNotSentFailureLeavesNoTrace(Supplier<Moved> call) {
+        PmsUpstreamException e = assertThrows(PmsUpstreamException.class, () -> run("k1", "B1", call));
+        assertFalse(e.isSent());
+        assertEquals(0, store.size());
+        verifyNoInteractions(audit);
+        // nothing is locked: the next write to the same target goes ahead
+        assertTrue(run("k2", "B1", ok("B1")).confirmed());
+        store.delete("k2", State.DONE);
+        org.mockito.Mockito.reset(audit);
+    }
+
+    @Test
+    void killSwitchOffIsADefiniteFailureNoClaimNoAuditNoLock() {
+        PmsProperties off = new PmsProperties();
+        off.setEnabled(false);
+        EzeeGatewayTest.FakeTransport transport = new EzeeGatewayTest.FakeTransport();
+        EzeeGateway gateway = gatewayWith(off, transport);
+        assertNotSentFailureLeavesNoTrace(() -> {
+            gateway.json(EzeeFamily.HOUSEKEEPING, "UpdateRoomStatus", Map.of(), PmsPriority.HUB);
+            return new Moved("B1", "101");
+        });
+        assertTrue(transport.calls.isEmpty());
+    }
+
+    @Test
+    void unknownRequestTypeAndBadXmlParamAreDefiniteFailures() {
+        EzeeGatewayTest.FakeTransport transport = new EzeeGatewayTest.FakeTransport();
+        EzeeGateway gateway = gatewayWith(new PmsProperties(), transport);
+        assertNotSentFailureLeavesNoTrace(() -> {
+            gateway.text(EzeeFamily.HOUSEKEEPING, "NoSuchType", Map.of(), PmsPriority.HUB);
+            return new Moved("B1", "101");
+        });
+        assertNotSentFailureLeavesNoTrace(() -> {
+            gateway.text(EzeeFamily.POS2PMS, "postcharge", Map.of("<bad>", "1"), PmsPriority.HUB);
+            return new Moved("B1", "101");
+        });
+        assertTrue(transport.calls.isEmpty());
+    }
+
+    @Test
+    void aTransportFailureThroughTheGatewayStillParksUnconfirmed() {
+        EzeeGatewayTest.FakeTransport transport = new EzeeGatewayTest.FakeTransport();
+        transport.failure = new IllegalStateException("socket reset");
+        EzeeGateway gateway = gatewayWith(new PmsProperties(), transport);
+        assertThrows(PmsUnconfirmedException.class, () -> run("k1", "B1", () -> {
+            gateway.text(EzeeFamily.HOUSEKEEPING, "UpdateRoomStatus", Map.of(), PmsPriority.HUB);
+            return new Moved("B1", "101");
+        }));
+        assertEquals(State.UNCONFIRMED, store.find("k1").getState());
+        verify(audit).logAction("PMS_CHECKIN_UNCONFIRMED", "booking=B1");
+        assertThrows(PmsTargetBusyException.class, () -> run("k2", "B1", ok("B1")));
+    }
+
     @Test
     void readBackFalseMarksUnconfirmedAndReturnsUnconfirmedResult() {
         PmsWriteResult<Moved> r = guard.execute(F, "B1", "k1", HASH, "CHECKIN", "booking=B1", Moved.class,

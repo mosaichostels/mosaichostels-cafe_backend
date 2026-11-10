@@ -97,10 +97,17 @@ public class EzeeGateway {
     private String exchange(EzeeFamily family, String requestType, Map<String, Object> params, PmsPriority priority) {
         // Kill switch: checked before the limiter so a disabled gateway spends no slot and does no I/O.
         if (!props.isEnabled()) {
-            throw new PmsUpstreamException("PMS integration disabled");
+            throw PmsUpstreamException.notSent("PMS integration disabled");
+        }
+        Request req;
+        try {
+            // build() is pure (no I/O), so any failure here means nothing was sent; built before the limiter
+            // so a bad request spends no slot.
+            req = build(family, requestType, params);
+        } catch (RuntimeException e) {
+            throw PmsUpstreamException.notSent("PMS request could not be built");
         }
         limiter.acquire(priority);
-        Request req = build(family, requestType, params);
         int maxBytes = family.maxBytesFor(requestType);
         long start = System.nanoTime();
         PmsTransport.Reply reply;

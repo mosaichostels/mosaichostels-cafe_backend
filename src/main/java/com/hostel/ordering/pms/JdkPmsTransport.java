@@ -59,7 +59,8 @@ public class JdkPmsTransport implements PmsTransport {
                             : HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
             headers.forEach(req::header);
         } catch (IllegalArgumentException e) {
-            throw new PmsUpstreamException("PMS request failed");
+            // URI/method/header validation runs before any connection is opened.
+            throw PmsUpstreamException.notSent("PMS request could not be built");
         }
         HttpRequest request = req.build();
         return exchange(() -> {

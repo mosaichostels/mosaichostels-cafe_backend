@@ -384,6 +384,81 @@ class EzeeGatewayTest {
         assertEquals(1, transport.calls.size());
     }
 
+    // I-1: failures raised before any I/O say nothing was sent; failures after the request may have left keep sent=true.
+    @Test
+    void killSwitchFailureSaysNothingWasSent() {
+        props.setEnabled(false);
+        PmsUpstreamException e = assertThrows(PmsUpstreamException.class,
+                () -> gateway.json(EzeeFamily.KIOSK, "FetchBookingRecord", Map.of(), PmsPriority.HUB));
+        assertFalse(e.isSent());
+    }
+
+    @Test
+    void unknownRequestTypeIsNotSentAndDoesNoIo() {
+        PmsUpstreamException e = assertThrows(PmsUpstreamException.class,
+                () -> gateway.text(EzeeFamily.FINANCE, "Nope", Map.of(), PmsPriority.HUB));
+        assertFalse(e.isSent());
+        assertNull(e.getCause());
+        e = assertThrows(PmsUpstreamException.class,
+                () -> gateway.json(EzeeFamily.HOUSEKEEPING, "Nope", Map.of(), PmsPriority.HUB));
+        assertFalse(e.isSent());
+        assertTrue(transport.calls.isEmpty());
+        assertEquals(0, limiter.usedInWindow());
+    }
+
+    @Test
+    void badPos2pmsParameterNameIsNotSentAndDoesNoIo() {
+        PmsUpstreamException e = assertThrows(PmsUpstreamException.class,
+                () -> gateway.text(EzeeFamily.POS2PMS, "postcharge", Map.of("bad name>", "x"), PmsPriority.CAFE));
+        assertFalse(e.isSent());
+        assertTrue(transport.calls.isEmpty());
+    }
+
+    @Test
+    void failuresAfterTheRequestLeftKeepSentTrue() {
+        transport.failure = new IllegalStateException("socket reset");
+        assertTrue(assertThrows(PmsUpstreamException.class,
+                () -> gateway.text(EzeeFamily.FINANCE, "RetrieveBills", Map.of(), PmsPriority.HUB)).isSent());
+        transport.failure = new PmsUpstreamException("PMS request timed out");
+        assertTrue(assertThrows(PmsUpstreamException.class,
+                () -> gateway.text(EzeeFamily.FINANCE, "RetrieveBills", Map.of(), PmsPriority.HUB)).isSent());
+        transport.failure = null;
+        transport.reply = new PmsTransport.Reply(502, "");
+        assertTrue(assertThrows(PmsUpstreamException.class,
+                () -> gateway.text(EzeeFamily.FINANCE, "RetrieveBills", Map.of(), PmsPriority.HUB)).isSent());
+        replyWith("x".repeat(3 * MB));
+        assertTrue(assertThrows(PmsUpstreamException.class,
+                () -> gateway.text(EzeeFamily.FINANCE, "RetrieveBills", Map.of(), PmsPriority.HUB)).isSent());
+        replyWith(CSV);
+        assertTrue(assertThrows(PmsUpstreamException.class,
+                () -> gateway.json(EzeeFamily.FINANCE, "RetrieveBills", Map.of(), PmsPriority.HUB)).isSent());
+        replyWith("{\"Errors\":{\"ErrorCode\":\"999\"}}");
+        assertTrue(assertThrows(PmsUpstreamException.class,
+                () -> gateway.json(EzeeFamily.KIOSK, "FetchBookingRecord", Map.of(), PmsPriority.HUB)).isSent());
+    }
+
+    @Test
+    void jdkTransportUrlBuildFailureIsNotSent() {
+        JdkPmsTransport jdk = new JdkPmsTransport(Duration.ofSeconds(1));
+        PmsUpstreamException e = assertThrows(PmsUpstreamException.class,
+                () -> jdk.send("GET", "https://bad host/x?APIKey=" + KEY, Map.of(), null, 2 * MB));
+        assertFalse(e.isSent());
+        assertFalse(e.getMessage().contains(KEY));
+        assertNull(e.getCause());
+    }
+
+    @Test
+    @Timeout(10)
+    void jdkTransportTimeoutAndIoFailureStaySent() {
+        JdkPmsTransport jdk = new JdkPmsTransport(Duration.ofMillis(300));
+        assertTrue(assertThrows(PmsUpstreamException.class,
+                () -> jdk.exchange(() -> new JdkPmsTransport.Opened(200, new StallingStream()), 2 * MB)).isSent());
+        assertTrue(assertThrows(PmsUpstreamException.class,
+                () -> jdk.exchange(() -> { throw new IOException("reset"); }, 2 * MB)).isSent());
+        assertTrue(assertThrows(PmsUpstreamException.class, () -> jdk.exchange(
+                () -> new JdkPmsTransport.Opened(200, new ByteArrayInputStream(new byte[3 * MB])), 2 * MB)).isSent());
+    }
+
     /** Blocks in read() until interrupted, like the JDK body stream when eZee stalls after the headers. */
     static class StallingStream extends InputStream {
         final CountDownLatch readEnded = new CountDownLatch(1);

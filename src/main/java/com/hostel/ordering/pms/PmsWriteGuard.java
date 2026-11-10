@@ -104,11 +104,12 @@ public class PmsWriteGuard {
         T value;
         try {
             value = eZeeCall.get();
-        } catch (PmsBusyException | PmsAuthException | PmsNotEnabledException | PmsFeatureDisabledException e) {
-            // eZee definitely did not apply the write: free the target so the caller can try again.
-            store.delete(idempotencyKey, State.IN_PROGRESS);
-            throw e;
         } catch (RuntimeException e) {
+            if (definitelyNotApplied(e)) {
+                // eZee definitely did not apply the write: free the target so the caller can try again.
+                store.delete(idempotencyKey, State.IN_PROGRESS);
+                throw e;
+            }
             log.warn("PMS write {} outcome unknown: {}", idempotencyKey, e.getClass().getSimpleName());
             markUnconfirmed(idempotencyKey, auditAction, auditDetails);
             throw new PmsUnconfirmedException("PMS write outcome unknown");
@@ -191,6 +192,13 @@ public class PmsWriteGuard {
         if (store.markUnconfirmed(idempotencyKey, null) != null) {
             audit.logAction("PMS_" + auditAction + "_UNCONFIRMED", auditDetails);
         }
+    }
+
+    /** Refusals before or by eZee, and gateway failures raised before any request left (not sent). */
+    private static boolean definitelyNotApplied(RuntimeException e) {
+        return e instanceof PmsBusyException || e instanceof PmsAuthException || e instanceof PmsNotEnabledException
+                || e instanceof PmsFeatureDisabledException
+                || (e instanceof PmsUpstreamException u && !u.isSent());
     }
 
     private static <T> boolean readBackMatches(Predicate<T> readBack, T value) {
