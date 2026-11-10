@@ -1,6 +1,8 @@
 package com.hostel.ordering.pms;
 
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 import org.springframework.stereotype.Component;
 
 /**
@@ -31,5 +33,12 @@ public class PmsFlags {
     public List<String> canary(String feature) {
         List<String> ids = props.getCanary().get(feature);
         return ids == null ? List.of() : ids;
+    }
+
+    /** Every feature that has a write flag or a canary list configured, sorted; for the status view. */
+    public Set<String> configuredFeatures() {
+        Set<String> features = new TreeSet<>(props.getWrites().keySet());
+        features.addAll(props.getCanary().keySet());
+        return features;
     }
 }
