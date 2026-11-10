@@ -130,11 +130,10 @@ public class EzeeGateway {
         if (!node.isObject()) {
             return false;
         }
-        JsonNode error = null;
+        JsonNode error = errorMarker(node);
         String code = null;
         String message = "";
-        if (node.path("Errors").isObject()) {
-            error = node.get("Errors");
+        if (error != null) {
             code = error.path("ErrorCode").asText("");
             message = error.path("ErrorMessage").asText("");
         } else if (node.has("error_code")) {
@@ -164,6 +163,23 @@ public class EzeeGateway {
             return true;
         }
         throw new PmsUpstreamException("PMS returned an error");
+    }
+
+    /**
+     * The kiosk/connectivity error marker: {@code Errors} (success and some rejections) or {@code Error} (kiosk
+     * rejections), as an object or as an array whose first element holds ErrorCode/ErrorMessage; null if absent.
+     */
+    private static JsonNode errorMarker(JsonNode node) {
+        for (String field : new String[] {"Errors", "Error"}) {
+            JsonNode marker = node.path(field);
+            if (marker.isArray() && marker.size() > 0) {
+                marker = marker.get(0);
+            }
+            if (marker.isObject()) {
+                return marker;
+            }
+        }
+        return null;
     }
 
     private static JsonNode parse(String body) {

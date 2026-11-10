@@ -105,6 +105,49 @@ class EzeeGatewayTest {
                 gateway.json(EzeeFamily.KIOSK, "RetrieveListofBills", Map.of(), PmsPriority.HUB));
     }
 
+    // Kiosk shapes from the café's EzeeClient: success "Errors":[{ErrorCode:"0"}], rejection "Error":[...].
+    @Test
+    void kioskArrayErrorsWithCodeZeroIsSuccessWithDataIntact() throws Exception {
+        String body = "{\"Success\":{\"SuccessMsg\":\"ok\"},\"Errors\":[{\"ErrorCode\":\"0\",\"ErrorMessage\":\"Success\"}],"
+                + "\"CurrencyList\":[{\"Code\":\"INR\"}]}";
+        replyWith(body);
+        assertEquals(mapper.readTree(body),
+                gateway.json(EzeeFamily.KIOSK, "RetrieveCurrency", Map.of(), PmsPriority.HUB));
+        assertEquals(body, gateway.text(EzeeFamily.KIOSK, "RetrieveCurrency", Map.of(), PmsPriority.HUB));
+    }
+
+    @Test
+    void kioskArrayErrorsWithAuthCodeThrowsAuth() {
+        replyWith("{\"Errors\":[{\"ErrorCode\":\"611\",\"ErrorMessage\":\"Unauthorized Access\"}]}");
+        assertThrows(PmsAuthException.class,
+                () -> gateway.json(EzeeFamily.KIOSK, "RetrieveCurrency", Map.of(), PmsPriority.HUB));
+    }
+
+    @Test
+    void kioskSingularErrorArrayMapsLikeErrors() {
+        replyWith("{\"Error\":[{\"ErrorCode\":\"611\",\"ErrorMessage\":\"Unauthorized Access\"}]}");
+        assertThrows(PmsAuthException.class,
+                () -> gateway.json(EzeeFamily.KIOSK, "RetrieveCurrency", Map.of(), PmsPriority.HUB));
+        assertThrows(PmsAuthException.class,
+                () -> gateway.text(EzeeFamily.KIOSK, "RetrieveCurrency", Map.of(), PmsPriority.HUB));
+        replyWith("{\"Error\":[{\"ErrorCode\":\"201\",\"ErrorMessage\":\"Not enabled\"}]}");
+        assertThrows(PmsNotEnabledException.class,
+                () -> gateway.json(EzeeFamily.KIOSK, "RetrieveCurrency", Map.of(), PmsPriority.HUB));
+        replyWith("{\"Error\":[{\"ErrorCode\":\"210\",\"ErrorMessage\":\"No data found\"}]}");
+        assertTrue(gateway.json(EzeeFamily.KIOSK, "FetchBookingRecord", Map.of(), PmsPriority.HUB).isNull());
+        replyWith("{\"Error\":[{\"ErrorCode\":\"104\",\"ErrorMessage\":\"Charge Id is missing\"}]}");
+        assertThrows(PmsUpstreamException.class,
+                () -> gateway.json(EzeeFamily.KIOSK, "FetchBookingRecord", Map.of(), PmsPriority.HUB));
+    }
+
+    @Test
+    void dataThatMerelyMentionsErrorIsSuccess() throws Exception {
+        String body = "{\"rooms\":[{\"note\":\"Error in minibar count\",\"ErrorCode\":\"611\"}],\"status\":\"active\"}";
+        replyWith(body);
+        assertEquals(mapper.readTree(body),
+                gateway.json(EzeeFamily.HOUSEKEEPING, "InhouseRoomStatus", Map.of(), PmsPriority.HUB));
+    }
+
     @Test
     void jsonWithoutErrorMarkerIsSuccess() {
         replyWith("{\"roomlist\":[{\"room\":\"101\"}],\"checkinguestlist\":[]}");
