@@ -1,11 +1,13 @@
 package com.hostel.ordering.pms;
 
+import com.hostel.ordering.pms.dto.BookingDetail;
 import com.hostel.ordering.pms.dto.BookingSummary;
 import java.time.Clock;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -22,16 +24,20 @@ public class PmsFrontDeskController {
         }
     }
 
+    public record Detail(BookingDetail item, long asOf, boolean stale) {}
+
     private final PmsFrontDeskService service;
+    private final PmsBookingService bookings;
     private final Clock clock;
 
     @Autowired
-    public PmsFrontDeskController(PmsFrontDeskService service) {
-        this(service, Clock.systemUTC());
+    public PmsFrontDeskController(PmsFrontDeskService service, PmsBookingService bookings) {
+        this(service, bookings, Clock.systemUTC());
     }
 
-    PmsFrontDeskController(PmsFrontDeskService service, Clock clock) {
+    PmsFrontDeskController(PmsFrontDeskService service, PmsBookingService bookings, Clock clock) {
         this.service = service;
+        this.bookings = bookings;
         this.clock = clock;
     }
 
@@ -50,5 +56,11 @@ public class PmsFrontDeskController {
     @GetMapping("/inhouse")
     public Listing inhouse() {
         return Listing.of(service.inHouse());
+    }
+
+    @GetMapping("/bookings/{bookingId}")
+    public Detail booking(@PathVariable String bookingId) {
+        Cached<BookingDetail> c = bookings.detail(bookingId);
+        return new Detail(c.value(), c.fetchedAtMs(), c.stale());
     }
 }

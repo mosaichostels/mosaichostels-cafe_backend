@@ -53,7 +53,7 @@ class PmsFrontDeskControllerTest {
     static PmsFrontDeskController newController() {
         PmsCache cache = new PmsCache();
         return new PmsFrontDeskController(new PmsFrontDeskService(GATEWAY, cache, PROPS,
-                new PmsHousekeepingFeed(GATEWAY, cache, PROPS)), CLOCK);
+                new PmsHousekeepingFeed(GATEWAY, cache, PROPS)), new PmsBookingService(GATEWAY, cache, PROPS), CLOCK);
     }
 
     @Configuration
@@ -153,5 +153,34 @@ class PmsFrontDeskControllerTest {
             }
         }
         new ObjectMapper().readTree(mvc.perform(get("/pms/arrivals")).andReturn().getResponse().getContentAsString());
+    }
+
+    @Test
+    void bookingDetailRolesAndBadIds() throws Exception {
+        when(GATEWAY.json(eq(EzeeFamily.CONNECTIVITY), eq("FetchSingleBooking"), any(), any())).thenReturn(
+                PmsFrontDeskServiceTest.json(PmsBookingServiceTest.BOOKING));
+        when(GATEWAY.json(eq(EzeeFamily.KIOSK), any(), any(), any())).thenReturn(
+                PmsFrontDeskServiceTest.json(PmsBookingServiceTest.BILLS));
+        assertThrows(AuthenticationCredentialsNotFoundException.class, () -> controller.booking("9001-1"));
+        as("ROLE_GUEST");
+        assertThrows(AccessDeniedException.class, () -> controller.booking("9001-1"));
+        for (String role : new String[] {"ROLE_STAFF", "ROLE_ADMIN", "ROLE_SUPERADMIN"}) {
+            as(role);
+            PmsFrontDeskController.Detail d = controller.booking("9001-1");
+            assertEquals(2, d.item().folios().size());
+            assertFalse(d.stale());
+        }
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(newController())
+                .setControllerAdvice(new GlobalExceptionHandler()).build();
+        for (String bad : new String[] {"abc", "1-2345", "1111111111111111111111", "%20"}) {
+            mvc.perform(get("/pms/bookings/" + bad)).andExpect(
+                    org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
+        }
+        mvc.perform(get("/pms/bookings/9001-1")).andExpect(
+                org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+        when(GATEWAY.json(eq(EzeeFamily.CONNECTIVITY), eq("FetchSingleBooking"), any(), any()))
+                .thenReturn(com.fasterxml.jackson.databind.node.NullNode.getInstance());
+        mvc.perform(get("/pms/bookings/5")).andExpect(
+                org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
     }
 }
