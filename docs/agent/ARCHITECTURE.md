@@ -1,6 +1,6 @@
 Read when: tracing a request, changing auth, orders, eZee posting, schedulers or data.
-Verified: 2026-10-29 @ 9e39a6f
-Covers: src/main/java/com/hostel/ordering/controller/**/*.java, src/main/java/com/hostel/ordering/service/**/*.java, src/main/java/com/hostel/ordering/config/**/*.java, src/main/java/com/hostel/ordering/model/**/*.java, src/main/java/com/hostel/ordering/repository/**/*.java
+Verified: 2026-11-10 @ a8c6ac6
+Covers: src/main/java/com/hostel/ordering/pms/**/*.java, src/main/java/com/hostel/ordering/controller/**/*.java, src/main/java/com/hostel/ordering/service/**/*.java, src/main/java/com/hostel/ordering/config/**/*.java, src/main/java/com/hostel/ordering/model/**/*.java, src/main/java/com/hostel/ordering/repository/**/*.java
 
 # Architecture
 
@@ -17,7 +17,8 @@ Flow: `request -> RateLimitFilter / AuthTokenFilter (SecurityConfig) -> controll
 | `DELETE /orders`, `/orders/{id}`; `POST /orders/{id}/chargepost`; `GET /orders/{id}/ezee-candidates` | ADMIN only (OrderController:93,108,175,202) |
 | `/notifications/subscribe`, `/unsubscribe` | ADMIN, STAFF |
 | `POST /users/me/register-fcm` | any authenticated |
-| `/users` CRUD, `/audit` | SUPERADMIN only (Admin gets 403) |
+| `/users` CRUD, `/audit`, `GET /pms/status` | SUPERADMIN only (Admin gets 403) |
+| `GET /pms/unconfirmed`, `POST /pms/unconfirmed/{idempotencyKey}/resolve` (body `{outcome: APPLIED\|NOT_APPLIED}`) | ADMIN (`@PreAuthorize`) |
 | POST/PUT/DELETE on `/config/categories`, `/config/dormitories`, `/config/statuses`, menu-items and other-essentials writes | ADMIN only |
 | everything else | authenticated |
 
@@ -27,7 +28,7 @@ Flow: `request -> RateLimitFilter / AuthTokenFilter (SecurityConfig) -> controll
 - `LoginThrottle`: per-account login guessing. `RateLimitFilter` (60s window, in-memory, max 10000 keys): `POST /orders` 30/min, `POST /auth/login` 10/min; key = JWT user else client IP (X-Forwarded-For trusted only if peer is private/loopback).
 
 ## Collections (@Document)
-`orders` (unique sparse index on idempotency key; compound `status_createdAt`), `users` (unique username), `menu_items`, `other_essentials`, `categories`, `dormitories`, `order_status_config`, `audit_logs`, `idempotency_keys` (TTL 3600 s).
+`orders` (unique sparse index on idempotency key; compound `status_createdAt`), `users` (unique username), `menu_items`, `other_essentials`, `categories`, `dormitories`, `order_status_config`, `audit_logs`, `idempotency_keys` (TTL 3600 s), `pms_write_claims` (below).
 
 ## Category rename
 Items store their category by name: `CategoryService` update (:72-82) `updateMulti`s the new name into `menu_items` or `other_essentials` (by category type), then renumbers `showOrder`. Test: `CategoryRenameCascadeTest`.
@@ -43,6 +44,12 @@ Items store their category by name: `CategoryService` update (:72-82) `updateMul
 - Stale claims: `OrderService.recoverStaleChargePosts` (:408, every 60 s, claim older than 15 min) marks FAILED with `UNCONFIRMED:interrupted`.
 - Posting stops sending after 5 min. `ezee.mock=true` switches `EzeeClient` to `EzeeMockResponses`.
 - Deeper detail: backend AGENTS "eZee PMS integration", workspace skill `backend-ezee-integration`.
+
+## Hub eZee calls (`pms/`)
+- Flow: `hub service -> PmsCache (single-flight, stale-while-error) -> EzeeGateway (json()/text()) -> PmsRateLimiter -> PmsTransport`. Gateway routes by `EzeeFamily`, throws `PmsException` subclasses before any I/O when `pms.enabled=false`, caps body size, applies one 15 s exchange deadline, maps eZee's HTTP-200 error bodies (auth 611/301/303/602/612/614/121; not enabled 201/302; 210/"no data" = empty), never logs bodies or credentials.
+- One shared 5 s window: HUB calls admitted while fewer than `hubPer5s` (3); `acquire(CAFE)` allows up to `hubPer5s+cafeReserve`. `ezee/EzeeClient` calls `recordCafeCall()` before every real request: café calls are counted, never refused or delayed.
+- Write guard (`PmsWriteGuard`, collection `pms_write_claims`, `_id` = Idempotency-Key): claim IN_PROGRESS -> DONE, or UNCONFIRMED. Sparse unique `openLockKey` (`feature:targetId`) = one open claim per target; TTL on `doneAt` 24 h; UNCONFIRMED never expires; IN_PROGRESS older than 5 min becomes UNCONFIRMED. Definite failures (Busy/Auth/NotEnabled/FeatureDisabled) delete the claim; ambiguous ones (`PmsUpstreamException`, others) mark UNCONFIRMED, never auto-retried; admin resolves via `/pms/unconfirmed`.
+- `GlobalExceptionHandler.handlePms` -> `{errorCode, message}` with fixed generic text: 502 auth/upstream, 503 busy, 501 not-enabled, 403 feature-disabled, 409 unconfirmed/in-progress/target-busy/idempotency-mismatch. `GET /pms/status` reports eZee OK/AUTH/UPSTREAM/DISABLED (a stale probe reports UPSTREAM).
 
 ## Schedulers
 `OrderService.recoverStaleChargePosts` (60 s), `AuditCleanupTask` (cron `0 0 0 * * *`, retention `audit.retention-days` default 90), `HeartbeatTask` (6 h log line only; does not keep the Space awake).

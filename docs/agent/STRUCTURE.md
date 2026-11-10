@@ -1,5 +1,5 @@
 Read when: you must find where code lives or add a file.
-Verified: 2026-10-29 @ 9e39a6f
+Verified: 2026-11-10 @ a8c6ac6
 Covers: src/main/java/**/*.java, src/main/resources/**, src/test/java/**/*.java, scripts/**, pom.xml
 
 # Structure
@@ -16,6 +16,7 @@ Base package `src/main/java/com/hostel/ordering/` (all paths below relative to i
 | `model/` | Mongo documents (see ARCHITECTURE.md), `ErrorResponse` |
 | `security/` | `AuthTokenFilter`, `JwtUtils`, `LoginThrottle`, `AuthUserDetails`, `UserDetailsServiceImpl` |
 | `ezee/` | `EzeeClient`, `EzeeChargePostService`, `EzeeXmlUtil`, `EzeeMockResponses`, `RoomQueryResult`, `EzeeUnavailableException` |
+| `pms/` | staff-hub eZee foundation: `EzeeGateway` (+`EzeeFamily`, `PmsTransport`, `JdkPmsTransport`), `PmsRateLimiter`/`PmsPriority`, `PmsCache`, `PmsProperties`, `PmsFlags`, `PmsWriteGuard`/`PmsWriteClaim`/`PmsWriteClaimStore` (+`MongoPmsWriteClaimStore`), `PmsStatusController`, `PmsUnconfirmedController`, `Pms*Exception` |
 | `dto/` | `CreateOrderRequest` only |
 | `exception/` | `GlobalExceptionHandler`, `ChargeUnconfirmedException` |
 

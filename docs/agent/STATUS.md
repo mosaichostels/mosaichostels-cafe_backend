@@ -1,10 +1,12 @@
 Read when: always, at the start and end of every task (update after changing code).
-Verified: 2026-10-29 @ 9e39a6f
+Verified: 2026-11-10 @ a8c6ac6
 Covers: src/main/**, src/test/**, docs/agent/**, AGENTS.md
 
 # Status
-- Branch `main` @ 9e39a6f (docs-only commit on top of SuperAdmin merge f20c5f6). Docs refresh is uncommitted.
-- Tests: `JAVA_HOME=<temurin-17> mvn -B -o test` -> 156 tests, 0 failures, BUILD SUCCESS (2026-10-29). `mvn -B verify` not run.
+- Branch `feat/pms-p0-foundation` @ a8c6ac6 (not merged to `main`; `main` was 9e39a6f). Docs refreshed 2026-11-10.
+- Tests: `.superpowers/run-tests.sh` (Java 17 `mvn -q test`) -> 264 tests, 0 failures (2026-11-10). `mvn -B verify` not run.
+- New `pms/` package (staff-hub eZee foundation, spec `2026-11-10-staff-hub-ezee-design.md` in the parent workspace `docs/android/superpowers/specs/`): gateway, rate limiter, cache, write guard, `/pms/status`, `/pms/unconfirmed`. No `pms.writes.*` flag is enabled in prod and there are no hub write endpoints yet (later phases); `application-prod.yml` untouched.
+- DEPLOY GATE: before enabling any `pms.writes.*` flag, check in Mongo `db.pms_write_claims.getIndexes()` shows the sparse unique index on `openLockKey` and the TTL index on `doneAt`.
 - Shipped: SUPERADMIN role (hierarchy `ROLE_SUPERADMIN > ROLE_ADMIN`, `/users` + `/audit` SuperAdmin-only, last-SuperAdmin delete guard, `scripts/promote-superadmin.sh`).
 - Sweep 2026-10-29 (proven unused, 156 tests green): removed `CategoryService.getAllCategories`, `OrderService.logChargePost`, `CategoryRepository.findAllByOrderByShowOrderDesc`, `OrderStatusRepository.findByValue`, 4 unused imports. Backups: `~/.cache/project-context-backups/*backend*`. Lombok is used only by `ErrorResponse` (needed).
 - Known gap (backend AGENTS): chargepost idempotency check-then-save is not atomic.

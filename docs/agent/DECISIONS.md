@@ -1,5 +1,5 @@
 Read when: about to change auth, idempotency, eZee posting, rate limits or notifications.
-Verified: 2026-10-29 @ 9e39a6f. Source: backend AGENTS (`../docs/backend/AGENTS.md`) plus code comments where cited.
+Verified: 2026-11-10 @ a8c6ac6. Source: backend AGENTS (`../docs/backend/AGENTS.md`) plus code comments where cited.
 Covers: -
 
 # Decisions
@@ -17,3 +17,7 @@ Covers: -
 | App-version-check feature removed | do not resurrect without explicit requirement |
 | ntfy notifications removed | commit 16af0aa |
 | Agents/skills/rules moved to shared workspace folder | commit e95ae6b |
+| Café eZee calls are counted by `PmsRateLimiter`, never refused or delayed | charge posting must gain no new failure mode; hub calls yield instead |
+| One open write claim per `feature:targetId` via sparse unique `openLockKey` | atomic in Mongo, no check-then-save race (unlike the old chargepost gap) |
+| Ambiguous hub write outcome = UNCONFIRMED, never auto-retried; admin resolves | eZee writes cannot be undone; same reasoning as `UNCONFIRMED:` charges |
+| `pms.*` defaults live in code; `application-prod.yml` not edited | file is guarded; prod overrides via env vars (relaxed binding) |

@@ -1,7 +1,7 @@
 # Agent context router
 
 Read when: starting any task in this repo (read this first, then only the files your task row lists).
-Verified: 2026-10-29 @ 9e39a6f (branch `main`; code lives only here, no other worktrees/branches: `git worktree list`, `git branch -a`).
+Verified: 2026-11-10 @ a8c6ac6 (branch `feat/pms-p0-foundation`, unmerged; `main` is 9e39a6f).
 
 | Task | Read |
 | --- | --- |
