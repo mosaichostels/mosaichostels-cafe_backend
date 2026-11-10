@@ -369,6 +369,65 @@ class PmsReconcileServiceTest {
         assertEquals(List.of("UNKNOWN", "UNKNOWN"), statuses("2026-11-10"));
     }
 
+    private static Order twoFifties(String id) {
+        Order x = order(id, "QUEUED", "F100", 100.0);
+        x.setItems(new ArrayList<>(List.of(item("m1", 50), item("m1", 50))));
+        x.setChargePostedItems(new ArrayList<>(List.of("m1#0", "m1#1")));
+        return x;
+    }
+
+    @Test
+    void repeatedItemAmountsWeighOneRowEach() {
+        Order z = order("z", "QUEUED", "F100", 50.0);
+        orders(twoFifties("x"), z);
+        csv(HEADER + row("F100", "2026-11-10", "50.00") + row("F100", "2026-11-10", "50.00"));
+        assertEquals(List.of("UNKNOWN", "UNKNOWN"), statuses("2026-11-10"));
+        cacheClock.addAndGet(61_000);
+        csv(HEADER + row("F100", "2026-11-10", "50.00") + row("F100", "2026-11-10", "50.00")
+                + row("F100", "2026-11-10", "50.00"));
+        assertEquals(List.of("FOUND", "FOUND"), statuses("2026-11-10"));
+    }
+
+    @Test
+    void aLoneOrderWithTwoIdenticalItemsNeedsTwoRows() {
+        orders(twoFifties("x"));
+        csv(HEADER + row("F100", "2026-11-10", "50.00") + row("F100", "2026-11-10", "50.00"));
+        assertEquals(List.of("FOUND"), statuses("2026-11-10"));
+        cacheClock.addAndGet(61_000);
+        csv(HEADER + row("F100", "2026-11-10", "50.00"));
+        assertEquals(List.of("UNKNOWN"), statuses("2026-11-10"));
+        cacheClock.addAndGet(61_000);
+        csv(HEADER + row("F100", "2026-11-10", "100.00"));
+        assertEquals(List.of("FOUND"), statuses("2026-11-10"));
+    }
+
+    @Test
+    void duplicatePostedEntryForOnePositionWeighsOnce() {
+        Order x = order("x", "QUEUED", "F100", 50.0);
+        x.setChargePostedItems(new ArrayList<>(List.of("m1#0", "m1#0")));
+        orders(x);
+        csv(HEADER + row("F100", "2026-11-10", "50.00"));
+        assertEquals(List.of("FOUND"), statuses("2026-11-10"));
+    }
+
+    @Test
+    void anUnsharedAmountProvesTheOrderEvenWhenAnotherIsShortOfRows() {
+        Order a = order("a", "QUEUED", "F100", 130.0);
+        a.setItems(new ArrayList<>(List.of(item("m1", 100), item("m2", 30))));
+        a.setChargePostedItems(new ArrayList<>(List.of("m1#0", "m2#1")));
+        orders(a, order("b", "QUEUED", "F100", 100.0));
+        csv(HEADER + row("F100", "2026-11-10", "100.00") + row("F100", "2026-11-10", "30.00"));
+        assertEquals(List.of("FOUND", "UNKNOWN"), statuses("2026-11-10"));
+    }
+
+    @Test
+    void negativeReversalRowsAreIgnored() {
+        Order neg = order("o1", "QUEUED", "F100", -50.0);
+        orders(neg);
+        csv(HEADER + row("F100", "2026-11-10", "-50.00"));
+        assertEquals(List.of("MISSING"), statuses("2026-11-10"));
+    }
+
     @Test
     void paymentAndRoomRowsWithTheSameAmountDoNotCount() {
         orders(order("o1", "QUEUED", "F100", 250.0));

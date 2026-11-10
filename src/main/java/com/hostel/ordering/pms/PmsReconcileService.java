@@ -38,8 +38,11 @@ import org.springframework.stereotype.Service;
  * <p>Match rule (Rulings P1-5, P1-6, P1-13), conservative so a charge is never falsely FOUND: FOUND only when a
  * charge row has the order's chargePostFolio, the IST day of chargePostAt, and an Amount equal to the order total or
  * one confirmed posted item's subtotal. FOUND means at least one charge line of the order was found. Rows are
- * consumed: when several orders on one folio and day claim the same amount, that amount proves FOUND only if there
- * are at least as many rows as claimants; fewer (but some) rows make those claimants UNKNOWN. MISSING when the CSV
+ * consumed: each order claims an amount with a weight, max(number of its confirmed posted items with that subtotal,
+ * 1 if its total equals it), since eZee holds one row per posted item. An amount on a folio and day proves FOUND
+ * only if its rows are at least the summed weight of every order claiming it; fewer (but some) rows make those
+ * claimants UNKNOWN. Claimants are limited to the orders listed for the day (selected by createdAt, capped at
+ * 500), and negative (reversal) café rows are ignored because their shape was not probed. MISSING when the CSV
  * was valid and no such row exists. UNKNOWN when the CSV is unavailable or has an unexpected header, no row's date
  * parses, the order has no folio, or an undated charge row could be the charge.
  * Only folio numbers, days and amounts are kept from the CSV; names, rooms and folios are never logged.
@@ -144,9 +147,7 @@ public class PmsReconcileService {
         Map<String, Integer> claimants = new HashMap<>();
         for (Order o : list) {
             if (checkable(o)) {
-                for (BigDecimal a : candidates(o)) {
-                    claimants.merge(claimKey(o, a), 1, Integer::sum);
-                }
+                candidates(o).forEach((a, w) -> claimants.merge(claimKey(o, a), w, Integer::sum));
             }
         }
         List<ChargeCheck> items = new ArrayList<>(list.size());
@@ -191,13 +192,13 @@ public class PmsReconcileService {
                 || day.isAfter(last)) {
             return UNKNOWN;
         }
-        Set<BigDecimal> wanted = candidates(o);
+        Set<BigDecimal> wanted = candidates(o).keySet();
         String folio = o.getChargePostFolio().strip();
         Map<BigDecimal, Integer> onDay = bills.dated().getOrDefault(folio, Map.of()).getOrDefault(day, Map.of());
         boolean shared = false;
         for (BigDecimal a : wanted) {
             int rows = onDay.getOrDefault(a, 0);
-            if (rows > 0 && rows >= claimants.getOrDefault(claimKey(o, a), 1)) {
+            if (rows > 0 && rows >= claimants.get(claimKey(o, a))) {
                 return FOUND;
             }
             shared |= rows > 0;
@@ -208,12 +209,13 @@ public class PmsReconcileService {
         return bills.undated().getOrDefault(folio, Set.of()).stream().anyMatch(wanted::contains) ? UNKNOWN : MISSING;
     }
 
-    /** The order total and the subtotals of items confirmed posted ("menuItemId#index" entries). */
-    static Set<BigDecimal> candidates(Order o) {
-        Set<BigDecimal> out = new HashSet<>();
-        if (o.getTotalAmount() != null) {
-            out.add(money(o.getTotalAmount()));
-        }
+    /**
+     * Amount -> claim weight: the subtotals of items confirmed posted ("menuItemId#index" entries, one eZee row each,
+     * counted per distinct position) and the order total, which weighs max(item count, 1) for its amount.
+     */
+    static Map<BigDecimal, Integer> candidates(Order o) {
+        Map<BigDecimal, Integer> out = new HashMap<>();
+        Set<Integer> seen = new HashSet<>();
         List<OrderItem> items = o.getItems() == null ? List.of() : o.getItems();
         for (String entry : o.getChargePostedItems() == null ? List.<String>of() : o.getChargePostedItems()) {
             if (entry == null || entry.startsWith(EzeeChargePostService.UNCONFIRMED_PREFIX)) {
@@ -221,12 +223,15 @@ public class PmsReconcileService {
             }
             try {
                 int idx = Integer.parseInt(entry.substring(entry.lastIndexOf('#') + 1));
-                if (idx >= 0 && idx < items.size() && items.get(idx).getSubtotal() != null) {
-                    out.add(money(items.get(idx).getSubtotal()));
+                if (idx >= 0 && idx < items.size() && items.get(idx).getSubtotal() != null && seen.add(idx)) {
+                    out.merge(money(items.get(idx).getSubtotal()), 1, Integer::sum);
                 }
             } catch (NumberFormatException e) {
                 // not an indexed entry: nothing to match on
             }
+        }
+        if (o.getTotalAmount() != null) {
+            out.putIfAbsent(money(o.getTotalAmount()), 1); // max, not sum: the total is not a row of its own
         }
         return out;
     }
@@ -293,7 +298,7 @@ public class PmsReconcileService {
                 datedCount++;
             }
             String particular = PmsCsv.headerName(cell(row, particularCol));
-            if (amt == null || !CHARGE_TYPE.equals(PmsCsv.headerName(cell(row, typeCol)))
+            if (amt == null || amt.signum() < 0 || !CHARGE_TYPE.equals(PmsCsv.headerName(cell(row, typeCol)))
                     || !(FOOD_PARTICULAR.equals(particular) || ESSENTIAL_PARTICULAR.equals(particular))) {
                 continue;
             }
