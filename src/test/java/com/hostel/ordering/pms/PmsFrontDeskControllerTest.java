@@ -84,7 +84,7 @@ class PmsFrontDeskControllerTest {
                  "End":"2026-11-12","CurrentStatus":"Confirmed","Phone":"5550003","Email":"t@guest.test"}]}]}}"""));
         when(GATEWAY.json(any(), eq("InhouseRoomStatus"), any(), any())).thenReturn(
                 PmsFrontDeskServiceTest.json("{\"checkinguestlist\":[{\"reservationno\":\"7\",\"guestname\":\"R K\","
-                        + "\"guestmobile\":\"5550009\",\"guestemail\":\"r@guest.test\"}]}"));
+                        + "\"email\":\"r@guest.test\",\"address\":\"Secret Lane\"}]}"));
     }
 
     @AfterEach

@@ -19,6 +19,7 @@ public class PmsHousekeepingFeed {
         this.props = props;
     }
 
+    /** The returned JsonNode is shared across callers and must be treated read-only. */
     public Cached<JsonNode> inhouseStatus() {
         return PmsReads.load(cache, "hk:inhouse", props.ttl("hk", Duration.ofSeconds(30)),
                 () -> gateway.json(EzeeFamily.HOUSEKEEPING, "InhouseRoomStatus", Map.of(), PmsPriority.HUB));
