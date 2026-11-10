@@ -40,16 +40,18 @@ public class EzeeGateway {
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
             .build();
 
+    private final PmsProperties props;
     private final PmsRateLimiter limiter;
     private final PmsTransport transport;
     private final String baseUrl;
     private final String authCode;
     private final String hotelCode;
 
-    public EzeeGateway(PmsRateLimiter limiter, PmsTransport transport,
+    public EzeeGateway(PmsProperties props, PmsRateLimiter limiter, PmsTransport transport,
             @Value("${ezee.base-url:https://live.ipms247.com}") String baseUrl,
             @Value("${ezee.auth-code:}") String authCode,
             @Value("${ezee.hotel-code:}") String hotelCode) {
+        this.props = props;
         this.limiter = limiter;
         this.transport = transport;
         this.baseUrl = baseUrl;
@@ -93,6 +95,10 @@ public class EzeeGateway {
     }
 
     private String exchange(EzeeFamily family, String requestType, Map<String, Object> params, PmsPriority priority) {
+        // Kill switch: checked before the limiter so a disabled gateway spends no slot and does no I/O.
+        if (!props.isEnabled()) {
+            throw new PmsUpstreamException("PMS integration disabled");
+        }
         limiter.acquire(priority);
         Request req = build(family, requestType, params);
         int maxBytes = family.maxBytesFor(requestType);

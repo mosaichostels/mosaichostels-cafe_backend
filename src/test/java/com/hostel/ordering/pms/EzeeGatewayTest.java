@@ -1,5 +1,6 @@
 package com.hostel.ordering.pms;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -13,11 +14,18 @@ import ch.qos.logback.core.read.ListAppender;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InterruptedIOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.LoggerFactory;
 
 class EzeeGatewayTest {
@@ -51,8 +59,9 @@ class EzeeGatewayTest {
     }
 
     private final FakeTransport transport = new FakeTransport();
-    private final PmsRateLimiter limiter = new PmsRateLimiter(props());
-    private final EzeeGateway gateway = new EzeeGateway(limiter, transport, BASE, KEY, HOTEL);
+    private final PmsProperties props = props();
+    private final PmsRateLimiter limiter = new PmsRateLimiter(props);
+    private final EzeeGateway gateway = new EzeeGateway(props, limiter, transport, BASE, KEY, HOTEL);
     private final ObjectMapper mapper = new ObjectMapper();
 
     private static PmsProperties props() {
@@ -307,12 +316,97 @@ class EzeeGatewayTest {
     void limiterBusyPropagatesAndNoIoHappens() {
         PmsProperties p = new PmsProperties();
         p.setHubPer5s(0);
-        EzeeGateway starved = new EzeeGateway(new PmsRateLimiter(p), transport, BASE, KEY, HOTEL);
+        EzeeGateway starved = new EzeeGateway(p, new PmsRateLimiter(p), transport, BASE, KEY, HOTEL);
         assertThrows(PmsBusyException.class,
                 () -> starved.json(EzeeFamily.KIOSK, "FetchBookingRecord", Map.of(), PmsPriority.HUB));
         assertThrows(PmsBusyException.class,
                 () -> starved.text(EzeeFamily.FINANCE, "RetrieveBills", Map.of(), PmsPriority.HUB));
         assertTrue(transport.calls.isEmpty());
+    }
+
+    @Test
+    void killSwitchStopsCallsBeforeLimiterAndIo() {
+        props.setEnabled(false);
+        PmsUpstreamException e = assertThrows(PmsUpstreamException.class,
+                () -> gateway.json(EzeeFamily.KIOSK, "FetchBookingRecord", Map.of(), PmsPriority.HUB));
+        assertEquals("PMS integration disabled", e.getMessage());
+        assertThrows(PmsUpstreamException.class,
+                () -> gateway.text(EzeeFamily.FINANCE, "RetrieveBills", Map.of(), PmsPriority.CAFE));
+        assertEquals(0, limiter.usedInWindow());
+        assertTrue(transport.calls.isEmpty());
+
+        props.setEnabled(true);
+        gateway.json(EzeeFamily.KIOSK, "FetchBookingRecord", Map.of(), PmsPriority.HUB);
+        assertEquals(1, limiter.usedInWindow());
+        assertEquals(1, transport.calls.size());
+    }
+
+    /** Blocks in read() until interrupted, like the JDK body stream when eZee stalls after the headers. */
+    static class StallingStream extends InputStream {
+        final CountDownLatch readEnded = new CountDownLatch(1);
+        volatile boolean closed;
+
+        @Override
+        public int read() throws IOException {
+            try {
+                new CountDownLatch(1).await();
+                return -1;
+            } catch (InterruptedException e) {
+                throw new InterruptedIOException();
+            } finally {
+                readEnded.countDown();
+            }
+        }
+
+        @Override
+        public void close() {
+            closed = true;
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void stalledBodyFailsWithinDeadlineAndUnblocksReader() throws Exception {
+        JdkPmsTransport jdk = new JdkPmsTransport(Duration.ofMillis(300));
+        StallingStream stalled = new StallingStream();
+        long start = System.nanoTime();
+        PmsUpstreamException e = assertThrows(PmsUpstreamException.class,
+                () -> jdk.exchange(() -> new JdkPmsTransport.Opened(200, stalled), 2 * MB));
+        assertTrue(Duration.ofNanos(System.nanoTime() - start).toMillis() < 3_000);
+        assertEquals("PMS request timed out", e.getMessage());
+        assertNull(e.getCause());
+        assertTrue(stalled.readEnded.await(5, TimeUnit.SECONDS), "reader thread must be unblocked");
+        assertTrue(stalled.closed);
+    }
+
+    @Test
+    @Timeout(10)
+    void stalledHeadersFailWithinDeadline() {
+        JdkPmsTransport jdk = new JdkPmsTransport(Duration.ofMillis(300));
+        CountDownLatch openEnded = new CountDownLatch(1);
+        assertThrows(PmsUpstreamException.class, () -> jdk.exchange(() -> {
+            try {
+                new CountDownLatch(1).await();
+                return null;
+            } finally {
+                openEnded.countDown();
+            }
+        }, 2 * MB));
+        assertDoesNotThrow(() -> assertTrue(openEnded.await(5, TimeUnit.SECONDS)));
+    }
+
+    @Test
+    @Timeout(10)
+    void exchangeKeepsCapAndReturnsReply() {
+        JdkPmsTransport jdk = new JdkPmsTransport(Duration.ofSeconds(5));
+        PmsTransport.Reply ok = jdk.exchange(() -> new JdkPmsTransport.Opened(201,
+                new ByteArrayInputStream("ok".getBytes(StandardCharsets.UTF_8))), 2 * MB);
+        assertEquals(new PmsTransport.Reply(201, "ok"), ok);
+        PmsUpstreamException e = assertThrows(PmsUpstreamException.class, () -> jdk.exchange(
+                () -> new JdkPmsTransport.Opened(200, new ByteArrayInputStream(new byte[3 * MB])), 2 * MB));
+        assertEquals("PMS reply too large", e.getMessage());
+        assertThrows(PmsUpstreamException.class,
+                () -> jdk.exchange(() -> { throw new IOException("https://x?APIKey=" + KEY); }, 2 * MB));
     }
 
     @Test
