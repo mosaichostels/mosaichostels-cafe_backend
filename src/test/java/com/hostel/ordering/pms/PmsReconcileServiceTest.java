@@ -420,6 +420,45 @@ class PmsReconcileServiceTest {
         assertEquals(List.of("FOUND", "UNKNOWN"), statuses("2026-11-10"));
     }
 
+    private static Order posted(String id, String status, String... entries) {
+        Order f = order(id, status, "F100", 80.0);
+        f.setItems(new ArrayList<>(List.of(item("m1", 50), item("m2", 30))));
+        f.setChargePostedItems(new ArrayList<>(List.of(entries)));
+        return f;
+    }
+
+    @Test
+    void aFailedOrdersPostedItemClaimsItsRow() {
+        orders(posted("f", "FAILED", "m1#0"), order("z", "QUEUED", "F100", 50.0));
+        csv(HEADER + row("F100", "2026-11-10", "50.00"));
+        assertEquals(List.of("N/A", "UNKNOWN"), statuses("2026-11-10"));
+        cacheClock.addAndGet(61_000);
+        csv(HEADER + row("F100", "2026-11-10", "50.00") + row("F100", "2026-11-10", "50.00"));
+        assertEquals(List.of("N/A", "FOUND"), statuses("2026-11-10"));
+    }
+
+    @Test
+    void aVoidedOrderClaimsItsItemsAndTotal() {
+        orders(posted("v", "VOIDED", "m1#0", "m2#1"), order("z", "QUEUED", "F100", 50.0),
+                order("y", "QUEUED", "F100", 80.0));
+        csv(HEADER + row("F100", "2026-11-10", "50.00") + row("F100", "2026-11-10", "80.00"));
+        assertEquals(List.of("N/A", "UNKNOWN", "UNKNOWN"), statuses("2026-11-10"));
+    }
+
+    @Test
+    void anUnconfirmedItemCountsAsAPossibleRow() {
+        orders(posted("f", "FAILED", "UNCONFIRMED:m1#0"), order("z", "QUEUED", "F100", 50.0));
+        csv(HEADER + row("F100", "2026-11-10", "50.00"));
+        assertEquals(List.of("N/A", "UNKNOWN"), statuses("2026-11-10"));
+    }
+
+    @Test
+    void failedAndVoidedOnlyDayMakesNoGatewayCall() {
+        orders(posted("f", "FAILED", "m1#0", "UNCONFIRMED:m2#1"), posted("v", "VOIDED", "m1#0"));
+        assertEquals(List.of("N/A", "N/A"), statuses("2026-11-10"));
+        verifyNoInteractions(GATEWAY);
+    }
+
     @Test
     void negativeReversalRowsAreIgnored() {
         Order neg = order("o1", "QUEUED", "F100", -50.0);

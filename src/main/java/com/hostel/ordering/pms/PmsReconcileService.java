@@ -42,7 +42,12 @@ import org.springframework.stereotype.Service;
  * 1 if its total equals it), since eZee holds one row per posted item. An amount on a folio and day proves FOUND
  * only if its rows are at least the summed weight of every order claiming it; fewer (but some) rows make those
  * claimants UNKNOWN. Claimants are limited to the orders listed for the day (selected by createdAt, capped at
- * 500), and negative (reversal) café rows are ignored because their shape was not probed. MISSING when the CSV
+ * 500), and negative (reversal) café rows are ignored because their shape was not probed, so a reversed (voided)
+ * charge can still read FOUND: only its negative row is dropped, the positive one stays. Every listed order with a
+ * folio and chargePostAt claims rows, whatever its chargePostStatus (a FAILED post can leave earlier items on the
+ * folio, an UNCONFIRMED item may be there, a VOIDED order's positive rows stay), but only QUEUED/CHECKED orders are
+ * looked up. A retry on a later day resets chargePostAt, so rows an earlier attempt posted on an earlier day are
+ * claimed by nobody on that day (rare; can cause a false FOUND for another order on that folio and day). MISSING when the CSV
  * was valid and no such row exists. UNKNOWN when the CSV is unavailable or has an unexpected header, no row's date
  * parses, the order has no folio, or an undated charge row could be the charge.
  * Only folio numbers, days and amounts are kept from the CSV; names, rooms and folios are never logged.
@@ -146,8 +151,8 @@ public class PmsReconcileService {
         // How many checked orders claim each folio/day/amount, so one row cannot prove two orders.
         Map<String, Integer> claimants = new HashMap<>();
         for (Order o : list) {
-            if (checkable(o)) {
-                candidates(o).forEach((a, w) -> claimants.merge(claimKey(o, a), w, Integer::sum));
+            if (o.getChargePostFolio() != null && !o.getChargePostFolio().isBlank() && o.getChargePostAt() != null) {
+                claims(o).forEach((a, w) -> claimants.merge(claimKey(o, a), w, Integer::sum));
             }
         }
         List<ChargeCheck> items = new ArrayList<>(list.size());
@@ -214,11 +219,26 @@ public class PmsReconcileService {
      * counted per distinct position) and the order total, which weighs max(item count, 1) for its amount.
      */
     static Map<BigDecimal, Integer> candidates(Order o) {
+        return weights(o, false, true);
+    }
+
+    /**
+     * Rows an order may have left on its folio, as amount -> weight: confirmed items, and UNCONFIRMED ones as possible
+     * rows; the total too (max with items) for QUEUED/CHECKED, which match on it, and VOIDED, conservatively.
+     * FAILED and IN_PROGRESS orders claim their items only.
+     */
+    static Map<BigDecimal, Integer> claims(Order o) {
+        String st = o.getChargePostStatus();
+        return weights(o, true, "VOIDED".equals(st) || (st != null && CHECKED.contains(st)));
+    }
+
+    // chargePostedItems holds "menuItemId#index" for an ok post and "UNCONFIRMED:menuItemId#index" for no reply.
+    private static Map<BigDecimal, Integer> weights(Order o, boolean unconfirmed, boolean total) {
         Map<BigDecimal, Integer> out = new HashMap<>();
         Set<Integer> seen = new HashSet<>();
         List<OrderItem> items = o.getItems() == null ? List.of() : o.getItems();
         for (String entry : o.getChargePostedItems() == null ? List.<String>of() : o.getChargePostedItems()) {
-            if (entry == null || entry.startsWith(EzeeChargePostService.UNCONFIRMED_PREFIX)) {
+            if (entry == null || (!unconfirmed && entry.startsWith(EzeeChargePostService.UNCONFIRMED_PREFIX))) {
                 continue;
             }
             try {
@@ -230,7 +250,7 @@ public class PmsReconcileService {
                 // not an indexed entry: nothing to match on
             }
         }
-        if (o.getTotalAmount() != null) {
+        if (total && o.getTotalAmount() != null) {
             out.putIfAbsent(money(o.getTotalAmount()), 1); // max, not sum: the total is not a row of its own
         }
         return out;
