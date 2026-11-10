@@ -3,7 +3,7 @@
     {
       "file": "ARCHITECTURE.md",
       "read_when": "tracing a request, changing auth, orders, eZee posting, schedulers or data.",
-      "verified_commit": "2026-11-10 @ d3b129c",
+      "verified_commit": "2026-11-11 @ 27745ef",
       "covers": [
         "src/main/java/com/hostel/ordering/pms/**/*.java",
         "src/main/java/com/hostel/ordering/controller/**/*.java",
@@ -12,7 +12,7 @@
         "src/main/java/com/hostel/ordering/model/**/*.java",
         "src/main/java/com/hostel/ordering/repository/**/*.java"
       ],
-      "tokens_est": 1622
+      "tokens_est": 2267
     },
     {
       "file": "COMMANDS.md",
@@ -42,20 +42,20 @@
     {
       "file": "DECISIONS.md",
       "read_when": "about to change auth, idempotency, eZee posting, rate limits or notifications.",
-      "verified_commit": "2026-11-10 @ d3b129c. Source: backend AGENTS (`../docs/backend/AGENTS.md`) plus code comments where cited.",
+      "verified_commit": "2026-11-11 @ 27745ef. Source: backend AGENTS (`../docs/backend/AGENTS.md`) plus code comments where cited.",
       "covers": [],
-      "tokens_est": 511
+      "tokens_est": 1039
     },
     {
       "file": "ENVIRONMENT.md",
       "read_when": "configuring, deploying, or debugging startup. Names only; no values read.",
-      "verified_commit": "2026-11-10 @ d3b129c (source: application-prod.yml and `@Value`/`getenv` in src/main)",
+      "verified_commit": "2026-11-11 @ 27745ef (source: application-prod.yml and `@Value`/`getenv` in src/main)",
       "covers": [
         "src/main/resources/application-prod.yml",
         "src/main/java/**/*.java",
         "Dockerfile"
       ],
-      "tokens_est": 728
+      "tokens_est": 856
     },
     {
       "file": "EXTERNAL.md",
@@ -67,7 +67,7 @@
     {
       "file": "GOTCHAS.md",
       "read_when": "debugging, deploying, editing hooks, or before touching prod config.",
-      "verified_commit": "2026-11-10 @ d3b129c",
+      "verified_commit": "2026-11-11 @ 27745ef",
       "covers": [
         "../AGENTS.md",
         "../docs/backend/AGENTS.md",
@@ -75,7 +75,7 @@
         ".codex/hooks.json",
         "src/main/java/com/hostel/ordering/service/OrderService.java"
       ],
-      "tokens_est": 647
+      "tokens_est": 1118
     },
     {
       "file": "OBSERVABILITY.md",
@@ -112,19 +112,19 @@
     {
       "file": "STATUS.md",
       "read_when": "always, at the start and end of every task (update after changing code).",
-      "verified_commit": "2026-11-10 @ d3b129c",
+      "verified_commit": "2026-11-11 @ 27745ef",
       "covers": [
         "src/main/**",
         "src/test/**",
         "docs/agent/**",
         "AGENTS.md"
       ],
-      "tokens_est": 520
+      "tokens_est": 767
     },
     {
       "file": "STRUCTURE.md",
       "read_when": "you must find where code lives or add a file.",
-      "verified_commit": "2026-11-10 @ a8c6ac6",
+      "verified_commit": "2026-11-11 @ 27745ef",
       "covers": [
         "src/main/java/**/*.java",
         "src/main/resources/**",
@@ -132,18 +132,18 @@
         "scripts/**",
         "pom.xml"
       ],
-      "tokens_est": 626
+      "tokens_est": 761
     },
     {
       "file": "TESTING.md",
       "read_when": "adding/running tests or judging whether a change is covered.",
-      "verified_commit": "2026-11-10 @ a8c6ac6. `.superpowers/run-tests.sh` (Java 17): 264 tests, 0 failures.",
+      "verified_commit": "2026-11-11 @ 27745ef. `.superpowers/run-tests.sh` (Java 17): 396 tests, 0 failures (sum of `target/surefire-reports/*.txt`).",
       "covers": [
         "src/test/java/**/*.java",
         "pom.xml",
         ".github/workflows/**"
       ],
-      "tokens_est": 578
+      "tokens_est": 697
     }
   ],
   "nested": []

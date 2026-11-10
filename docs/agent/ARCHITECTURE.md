@@ -1,5 +1,5 @@
 Read when: tracing a request, changing auth, orders, eZee posting, schedulers or data.
-Verified: 2026-11-10 @ d3b129c
+Verified: 2026-11-11 @ 27745ef
 Covers: src/main/java/com/hostel/ordering/pms/**/*.java, src/main/java/com/hostel/ordering/controller/**/*.java, src/main/java/com/hostel/ordering/service/**/*.java, src/main/java/com/hostel/ordering/config/**/*.java, src/main/java/com/hostel/ordering/model/**/*.java, src/main/java/com/hostel/ordering/repository/**/*.java
 
 # Architecture
@@ -18,6 +18,9 @@ Flow: `request -> RateLimitFilter / AuthTokenFilter (SecurityConfig) -> controll
 | `/notifications/subscribe`, `/unsubscribe` | ADMIN, STAFF |
 | `POST /users/me/register-fcm` | any authenticated |
 | `/users` CRUD, `/audit`, `GET /pms/status` | SUPERADMIN only (Admin gets 403) |
+| `GET /pms/arrivals?from&to`, `/pms/departures?from&to`, `/pms/inhouse`, `/pms/bookings/{bookingId}`, `/pms/guests?q=`, `/pms/housekeeping/rooms` | ADMIN, STAFF (class-level `@PreAuthorize`; SUPERADMIN via hierarchy) |
+| `GET /pms/reconcile/charges?date=` | ADMIN (shows guest names) |
+| `GET /app/android-version` | any authenticated (`anyRequest().authenticated()`; `AppVersionController`) |
 | `GET /pms/unconfirmed`, `POST /pms/unconfirmed/{idempotencyKey}/resolve` (body `{outcome: APPLIED\|NOT_APPLIED}`) | ADMIN (`@PreAuthorize`) |
 | POST/PUT/DELETE on `/config/categories`, `/config/dormitories`, `/config/statuses`, menu-items and other-essentials writes | ADMIN only |
 | everything else | authenticated |
@@ -47,9 +50,17 @@ Items store their category by name: `CategoryService` update (:72-82) `updateMul
 
 ## Hub eZee calls (`pms/`)
 - Flow: `hub service -> PmsCache (single-flight, stale-while-error) -> EzeeGateway (json()/text()) -> PmsRateLimiter -> PmsTransport`. Gateway routes by `EzeeFamily`, throws `PmsException` subclasses before any I/O when `pms.enabled=false`, caps body size, applies one 15 s exchange deadline, maps eZee's HTTP-200 error bodies (auth 611/301/303/602/612/614/121; not enabled 201/302; 210/"no data" = empty), never logs bodies or credentials.
-- One shared 5 s window: HUB calls admitted while fewer than `hubPer5s` (3); `acquire(CAFE)` allows up to `hubPer5s+cafeReserve`. `ezee/EzeeClient` calls `recordCafeCall()` before every real request: café calls are counted, never refused or delayed.
+- One shared 5 s window: HUB calls admitted while fewer than `hubPer5s` (2); `acquire(CAFE)` allows up to `hubPer5s+cafeReserve`. `ezee/EzeeClient` calls `recordCafeCall()` before every real request: café calls are counted, never refused or delayed.
 - Write guard (`PmsWriteGuard`, collection `pms_write_claims`, `_id` = Idempotency-Key): claim IN_PROGRESS -> DONE, or UNCONFIRMED. Sparse unique `openLockKey` (`feature:targetId`) = one open claim per target; TTL on `doneAt` 24 h; UNCONFIRMED never expires; IN_PROGRESS older than 5 min becomes UNCONFIRMED. Definite failures (Busy/Auth/NotEnabled/FeatureDisabled, and `PmsUpstreamException` with `isSent()==false`: kill switch, unknown request type, request/URI build failure, all before I/O) delete the claim; ambiguous ones (`PmsUpstreamException` sent, others) mark UNCONFIRMED, never auto-retried; admin resolves via `/pms/unconfirmed`. A store or audit failure after the eZee call surfaces as `PmsUnconfirmedException`, never a raw 500.
 - `GlobalExceptionHandler.handlePms` -> `{errorCode, message}` with fixed generic text: 502 auth/upstream, 503 busy, 501 not-enabled, 403 feature-disabled, 409 unconfirmed/in-progress/target-busy/idempotency-mismatch. `GET /pms/status` reports eZee OK/AUTH/UPSTREAM/DISABLED (a stale probe reports UPSTREAM).
+
+## Hub reads (`pms/`, P1, read-only)
+- Envelopes: lists `{items, asOf, stale}` (`asOf` = `Cached.fetchedAtMs()`); booking `{item, asOf, stale}`; reconcile `{items, asOf, stale, truncated}`. Dates are Asia/Kolkata `yyyy-MM-dd`, default today, range over 30 days or `from` after `to` = 400 (`PmsDates`); booking id must match `[0-9]{1,20}(-[0-9]{1,3})?` (`PmsIds`). List DTOs carry no phone/email; only `BookingDetail` does.
+- `PmsReads.load` wraps `PmsCache.getOrLoad` (checked exceptions become `PmsUpstreamException`). Cache names (`pms.ttl.<name>`, defaults): `arrivals` 60 s (arrivals and departures share it; keys `arrivals:|departures:<from>:<to>`), `booking` 30 s (keys `booking:<id>`, `folios:<id>`), `guests` 10 min (`guests:list`), `gueststays` 30 min (`guests:stays`), `bills` 60 s (`bills:<first>:<last>`), `hk` 30 s (`hk:inhouse`).
+- `PmsHousekeepingFeed` caches one eZee HOUSEKEEPING `InhouseRoomStatus` call (`{roomlist, checkinguestlist}`); `/pms/inhouse` (from `checkinguestlist`, `bookingId` = `reservationno`) and `/pms/housekeeping/rooms` (from `roomlist`, guest joined by room name) both read it, so one eZee request serves both. `hkstatus` is passed through raw.
+- Sources: arrivals/departures = CONNECTIVITY `ArrivalList`/`DepartureList` (one row per `BookingTran`); booking = CONNECTIVITY `FetchSingleBooking` + KIOSK `RetrieveListofBills` (folio failure still returns the booking, `stale=true`, `folios=[]`); guests = CONNECTIVITY `GuestList` (name contains, 2-60 chars, max 20 hits) + GUEST_DB `GuestDatabase` CSV for stay counts.
+- Reconcile (`PmsReconcileService`): orders of one IST day (`OrderRepositoryCustom.findForChargeReconcile`: `createdAt` in the day AND (`status` DELIVERED OR `chargePostStatus` set), oldest first, capped at 500 -> `truncated`) vs FINANCE `RetrieveBills` CSV; each item `{orderId, bookingName, room, amount, ours, theirs}` with `theirs` FOUND/MISSING/UNKNOWN/N/A. See DECISIONS.md for the match policy.
+- Hub limiter (P1 Task 0): HUB is refused for `pms.cafe-quiet-ms` (3000) after any café eZee call and `hubPer5s` defaults to 2, so a hub read gets `PmsBusyException` (503) during a café burst; clients must show a retry state.
 
 ## Schedulers
 `OrderService.recoverStaleChargePosts` (60 s), `AuditCleanupTask` (cron `0 0 0 * * *`, retention `audit.retention-days` default 90), `HeartbeatTask` (6 h log line only; does not keep the Space awake).

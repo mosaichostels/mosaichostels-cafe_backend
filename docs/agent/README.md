@@ -1,7 +1,7 @@
 # Agent context router
 
 Read when: starting any task in this repo (read this first, then only the files your task row lists).
-Verified: 2026-11-10 @ a8c6ac6 (branch `feat/pms-p0-foundation`, unmerged; `main` is 9e39a6f).
+Verified: 2026-11-11 @ 27745ef (branch `feat/pms-p1-backend`, stacked on `feat/pms-p0-foundation`, unmerged, unpushed; `main` is 9e39a6f).
 
 | Task | Read |
 | --- | --- |

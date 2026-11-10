@@ -1,12 +1,15 @@
 Read when: always, at the start and end of every task (update after changing code).
-Verified: 2026-11-10 @ d3b129c
+Verified: 2026-11-11 @ 27745ef
 Covers: src/main/**, src/test/**, docs/agent/**, AGENTS.md
 
 # Status
-- Branch `feat/pms-p0-foundation` @ a8c6ac6 (not merged to `main`; `main` was 9e39a6f). Docs refreshed 2026-11-10.
-- Tests: `.superpowers/run-tests.sh` (Java 17 `mvn -q test`) -> 264 tests, 0 failures (2026-11-10). `mvn -B verify` not run.
-- New `pms/` package (staff-hub eZee foundation, spec `2026-11-10-staff-hub-ezee-design.md` in the parent workspace `docs/android/superpowers/specs/`): gateway, rate limiter, cache, write guard, `/pms/status`, `/pms/unconfirmed`. No `pms.writes.*` flag is enabled in prod and there are no hub write endpoints yet (later phases); `application-prod.yml` untouched.
-- Hub reads yield `pms.cafe-quiet-ms` (3000) after any café eZee call and the hub budget defaults to 2 per 5 s, so hub reads yield to an in-progress café burst. Hub calls made just before a burst still count against the shared window: this reduces, not eliminates, the chance of exceeding eZee's limit.
+- Branch `feat/pms-p1-backend` @ 27745ef, stacked on `feat/pms-p0-foundation` (a8c6ac6). Neither is merged to `main` (9e39a6f) and nothing is pushed. Docs refreshed 2026-11-11.
+- Tests: `.superpowers/run-tests.sh` (Java 17 `mvn -q test`) -> 396 tests, 0 failures (2026-11-11). `mvn -B verify` not run.
+- P0 (`pms/` foundation, spec `2026-11-10-staff-hub-ezee-design.md` in the parent workspace `docs/android/superpowers/specs/`): gateway, rate limiter, cache, write guard, `/pms/status`, `/pms/unconfirmed`. No `pms.writes.*` flag is enabled in prod and there are no hub write endpoints; `application-prod.yml` untouched.
+- P1 backend (plan `2026-11-10-staff-hub-p1-read-only-hub.md`, Tasks 0, 1, 2, 3, 5, 6, 8) done: `GET /pms/arrivals|departures|inhouse|bookings/{id}|guests|housekeeping/rooms` (ADMIN, STAFF), `GET /pms/reconcile/charges` (ADMIN), `GET /app/android-version` (any authenticated). Read-only; write features untouched, flags off. Routes, envelopes, cache names: ARCHITECTURE.md; decisions: DECISIONS.md; carried limits: GOTCHAS.md.
+- Open items (unverified live): in-house date format, `GuestDatabase` stay-count CSV, sub-booking id on `RetrieveListofBills`, Retrieve Bills `Amount` for qty>1, night-audit date; reconcile FOUND/MISSING tuning against real data; booking detail may open the wrong sub-booking for dorm in-house rows.
+- Remaining: Android P1 run (plan Tasks 9-16, android repo); P3-P6 later; plan Task 4 (calendar, availability, catalogue) deferred to P4; Task 7 dropped. P1 is not deployed: merging to `main` deploys.
+- Hub reads yield `pms.cafe-quiet-ms` (3000) after any café eZee call and the hub budget defaults to 2 per 5 s, so hub reads yield to an in-progress café burst. Hub calls made just before a burst still count against the shared window: this reduces, not eliminates, the chance of exceeding eZee's limit (watch the gateway's HTTP 429 log line).
 - DEPLOY GATE: before enabling any `pms.writes.*` flag, check in Mongo `db.pms_write_claims.getIndexes()` shows the sparse unique index on `openLockKey` and the TTL index on `doneAt`.
 - Shipped: SUPERADMIN role (hierarchy `ROLE_SUPERADMIN > ROLE_ADMIN`, `/users` + `/audit` SuperAdmin-only, last-SuperAdmin delete guard, `scripts/promote-superadmin.sh`).
 - Sweep 2026-10-29 (proven unused, 156 tests green): removed `CategoryService.getAllCategories`, `OrderService.logChargePost`, `CategoryRepository.findAllByOrderByShowOrderDesc`, `OrderStatusRepository.findByValue`, 4 unused imports. Backups: `~/.cache/project-context-backups/*backend*`. Lombok is used only by `ErrorResponse` (needed).

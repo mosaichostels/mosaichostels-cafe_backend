@@ -1,5 +1,5 @@
 Read when: configuring, deploying, or debugging startup. Names only; no values read.
-Verified: 2026-11-10 @ d3b129c (source: application-prod.yml and `@Value`/`getenv` in src/main)
+Verified: 2026-11-11 @ 27745ef (source: application-prod.yml and `@Value`/`getenv` in src/main)
 Covers: src/main/resources/application-prod.yml, src/main/java/**/*.java, Dockerfile
 
 # Environment
@@ -29,7 +29,9 @@ Properties with no env mapping in the yml (set elsewhere or defaults):
 | `pms.cafe-quiet-ms` | hub reads yield this long after any café eZee call (default 3000); env `PMS_CAFE_QUIET_MS` |
 | `pms.writes.<feature>` | write flag per feature, default off; NOT settable by a per-feature env var (see below) |
 | `pms.canary.<feature>` | canary list per feature |
-| `pms.ttl.<name>` | cache TTL seconds; env `PMS_TTL_<NAME>` for single-word names |
+| `pms.ttl.<name>` | cache TTL seconds; env `PMS_TTL_<NAME>` for single-word names. Names in use: `hk` (30), `arrivals` (60, shared by arrivals and departures), `booking` (30), `guests` (600), `gueststays` (1800), `bills` (60) |
+| `app.android.latest-version-code`, `app.android.min-version-code` | `AppVersionController` `@Value`, default 0; env `APP_ANDROID_LATEST_VERSION_CODE`, `APP_ANDROID_MIN_VERSION_CODE`; not in `application-prod.yml` |
+| `app.android.apk-url` | default empty; env `APP_ANDROID_APK_URL`; not in `application-prod.yml` (all three unset = `{0,0,""}`, no update prompt) |
 | `ezee.base-url` | optional; gateway also reads existing `ezee.auth-code`, `ezee.hotel-code` (`PmsProperties`, `EzeeGateway`) |
 
 Per-feature maps (`pms.writes.<feature>`, `pms.canary.<feature>`): env var names cannot produce hyphenated or camel-case
