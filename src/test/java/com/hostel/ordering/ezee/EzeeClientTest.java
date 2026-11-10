@@ -8,7 +8,11 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import com.hostel.ordering.pms.PmsProperties;
+import com.hostel.ordering.pms.PmsRateLimiter;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -175,5 +179,88 @@ class EzeeClientTest {
         Map<String, String> result = client.postExtraCharge("1547", "711", "id", "70.00", "1", "Butter Maggi");
 
         assertEquals("ok", result.get("status"));
+    }
+
+    // Counts calls; the server handler snapshots the count when a request arrives.
+    private static class CountingLimiter extends PmsRateLimiter {
+        final AtomicInteger calls = new AtomicInteger();
+        CountingLimiter() { super(new PmsProperties()); }
+        @Override public void recordCafeCall() { calls.incrementAndGet(); }
+    }
+
+    private String serve(String path, String body, AtomicInteger callsAtArrival, CountingLimiter limiter) throws IOException {
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext(path, exchange -> {
+            callsAtArrival.set(limiter.calls.get());
+            byte[] bytes = body.getBytes();
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
+        });
+        server.start();
+        return "http://127.0.0.1:" + server.getAddress().getPort() + path;
+    }
+
+    private static final String XML_OK = "<response><status>ok</status></response>";
+
+    @Test
+    void postExtraCharge_recordsOneCafeCallBeforeTheRequestIsSent() throws IOException {
+        CountingLimiter limiter = new CountingLimiter();
+        AtomicInteger atArrival = new AtomicInteger(-1);
+        String kiosk = serve("/kiosk", "{\"Errors\":[{\"ErrorCode\":\"0\"}]}", atArrival, limiter);
+        EzeeClient client = new EzeeClient("http://unused.invalid", kiosk, "a", "h", false);
+        client.setRateLimiter(limiter);
+
+        client.postExtraCharge("1", "2", "c", "1.00", "1", "x");
+
+        assertEquals(1, atArrival.get());
+        assertEquals(1, limiter.calls.get());
+    }
+
+    @Test
+    void roomQueryPaths_recordOneCafeCallPerRequestBeforeSending() throws IOException {
+        CountingLimiter limiter = new CountingLimiter();
+        AtomicInteger atArrival = new AtomicInteger(-1);
+        String ep = serve("/pos2pms", XML_OK, atArrival, limiter);
+        EzeeClient client = new EzeeClient(ep, "http://unused.invalid", "a", "h", false);
+        client.setRateLimiter(limiter);
+        LinkedHashMap<String, String> f = new LinkedHashMap<>();
+        f.put("oprn", "roomquery");
+
+        client.post(f);
+        assertEquals(1, atArrival.get());
+        client.postForRoomRows(f);
+        assertEquals(2, limiter.calls.get());
+        client.postRoomQuery(f);
+        assertEquals(3, limiter.calls.get());
+        assertEquals(3, atArrival.get());
+    }
+
+    @Test
+    void mockMode_neverRecordsCafeCalls() {
+        CountingLimiter limiter = new CountingLimiter();
+        EzeeClient client = new EzeeClient("http://unused.invalid", "http://unused.invalid", "a", "h", true);
+        client.setRateLimiter(limiter);
+        LinkedHashMap<String, String> f = new LinkedHashMap<>();
+        f.put("oprn", "roomquery");
+
+        client.postExtraCharge("1", "2", "c", "1.00", "1", "x");
+        client.post(f);
+        client.postForRoomRows(f);
+        client.postRoomQuery(f);
+
+        assertEquals(0, limiter.calls.get());
+    }
+
+    @Test
+    void withoutLimiter_requestsStillWork() throws IOException {
+        CountingLimiter unused = new CountingLimiter();
+        String ep = serve("/pos2pms", XML_OK, new AtomicInteger(), unused);
+        EzeeClient client = new EzeeClient(ep, "http://unused.invalid", "a", "h", false);
+        LinkedHashMap<String, String> f = new LinkedHashMap<>();
+        f.put("oprn", "roomquery");
+
+        assertEquals("ok", client.post(f).get("status"));
     }
 }

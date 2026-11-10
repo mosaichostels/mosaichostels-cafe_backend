@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.hostel.ordering.pms.PmsRateLimiter;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -33,6 +35,7 @@ public class EzeeClient {
     private final boolean mock;
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private PmsRateLimiter rateLimiter;
 
     public EzeeClient(
             @Value("${ezee.endpoint:https://live.ipms247.com/index.php/page/service.pos2pms}") String endpoint,
@@ -49,6 +52,18 @@ public class EzeeClient {
         if (mock) {
             log.warn("EzeeClient running in MOCK mode — chargepost/roomquery calls will NOT reach live eZee PMS");
         }
+    }
+
+    // Optional: lets café calls count against the window shared with the staff-hub gateway.
+    @Autowired(required = false)
+    void setRateLimiter(PmsRateLimiter rateLimiter) {
+        this.rateLimiter = rateLimiter;
+    }
+
+    // Counts only, never refuses or delays: a posted charge cannot be voided, so the café
+    // must never be turned away. Called just before a real request, never in mock mode.
+    private void countAgainstLimiter() {
+        if (rateLimiter != null) rateLimiter.recordCafeCall();
     }
 
     public String getAuthCode() {
@@ -90,6 +105,7 @@ public class EzeeClient {
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(json))
                     .build();
+            countAgainstLimiter();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             log.debug("eZee AddExtraCharge raw response: {}", response.body());
             log.info("eZee AddExtraCharge request completed");
@@ -133,6 +149,7 @@ public class EzeeClient {
                     .header("Content-Type", "application/xml")
                     .POST(HttpRequest.BodyPublishers.ofString(requestXml))
                     .build();
+            countAgainstLimiter();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             return response.body();
         } catch (IOException | InterruptedException e) {
