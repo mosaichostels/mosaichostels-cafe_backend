@@ -15,7 +15,7 @@ public class PmsProperties {
     private boolean enabled = true;
     private int hubPer5s = 2;
     private int cafeReserve = 2;
-    /** Hub reads yield this long after any café eZee call, so a charge burst is never squeezed by hub traffic. */
+    /** Hub reads yield this long after any café eZee call, so hub reads yield to an in-progress café burst. Hub calls made just before a burst still count against the shared window. */
     private long cafeQuietMs = 3000;
     /** Per-feature write flags; a missing feature means writes are off. */
     private Map<String, Boolean> writes = new HashMap<>();

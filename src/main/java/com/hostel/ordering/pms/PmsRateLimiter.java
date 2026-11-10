@@ -12,7 +12,8 @@ import org.springframework.stereotype.Component;
  * {@code hubPer5s} entries, a CAFE acquire while it holds fewer than {@code hubPer5s + cafeReserve}.
  * The café's live charge path does not acquire: {@code recordCafeCall} records each café request without any
  * limit (Ruling 8), so the window can briefly exceed the cap and hub reads then wait. HUB is also refused for
- * {@code cafeQuietMs} after the last café call, so a charge burst (roomquery + one AddExtraCharge per item) is not squeezed.
+ * {@code cafeQuietMs} after the last café call, so hub reads yield to an in-progress café burst (roomquery + one AddExtraCharge per item). Hub calls made just before a
+ * burst still count against the window, so this reduces but does not eliminate the chance of exceeding eZee's limit.
  */
 @Component
 public class PmsRateLimiter {
