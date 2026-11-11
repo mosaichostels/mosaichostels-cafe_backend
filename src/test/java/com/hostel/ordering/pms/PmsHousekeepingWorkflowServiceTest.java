@@ -104,8 +104,8 @@ class PmsHousekeepingWorkflowServiceTest {
         });
         UserRepository users = mock(UserRepository.class);
         when(users.findByUsername(anyString())).thenReturn(Optional.empty());
-        when(users.findByUsername("sam")).thenReturn(Optional.of(new User("sam", "x", java.util.Set.of("ROLE_STAFF"))));
-        when(users.findByUsername("alex")).thenReturn(Optional.of(new User("alex", "x", java.util.Set.of("ROLE_STAFF"))));
+        when(users.findByUsername("sam")).thenReturn(Optional.of(new User("sam", "x", java.util.Set.of("ROLE_HOUSEKEEPING"))));
+        when(users.findByUsername("alex")).thenReturn(Optional.of(new User("alex", "x", java.util.Set.of("ROLE_HOUSEKEEPING"))));
         audit = mock(AuditService.class);
         PmsHousekeepingFeed feed = new PmsHousekeepingFeed(gateway, cache, props);
         service = new PmsHousekeepingWorkflowService(new PmsFrontDeskService(gateway, cache, props, feed), feed, repo,
@@ -321,6 +321,7 @@ class PmsHousekeepingWorkflowServiceTest {
         UserRepository u2 = mock(UserRepository.class);
         when(u2.findByUsername("guestuser")).thenReturn(Optional.of(new User("guestuser", "x", java.util.Set.of("ROLE_GUEST"))));
         when(u2.findByUsername("nobody")).thenReturn(Optional.empty());
+        when(u2.findByUsername("cook")).thenReturn(Optional.of(new User("cook", "x", java.util.Set.of("ROLE_KITCHEN"))));
         PmsHousekeepingFeed feed = new PmsHousekeepingFeed(gateway, cache, new PmsProperties());
         var svc = new PmsHousekeepingWorkflowService(new PmsFrontDeskService(gateway, cache, new PmsProperties(), feed),
                 feed, repo, u2, new IdempotencyService(mock(IdempotencyRepository.class)), audit, CLOCK);
@@ -328,7 +329,10 @@ class PmsHousekeepingWorkflowServiceTest {
                 new PmsHousekeepingWorkflowService.AssignRequest("guestuser", null), "a")).getMessage();
         String m2 = assertThrows(IllegalArgumentException.class, () -> svc.assign("2026-11-10|11",
                 new PmsHousekeepingWorkflowService.AssignRequest("nobody", null), "b")).getMessage();
+        String m3 = assertThrows(IllegalArgumentException.class, () -> svc.assign("2026-11-10|11",
+                new PmsHousekeepingWorkflowService.AssignRequest("cook", null), "c")).getMessage();
         assertEquals(m1, m2);
+        assertEquals(m1, m3);
         assertEquals("Assignee is not available", m1);
     }
 

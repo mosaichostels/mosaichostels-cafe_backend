@@ -99,7 +99,7 @@ class PmsFrontDeskControllerTest {
 
     @Test
     void staffAdminAndSuperAdminAreServed() {
-        for (String role : new String[] {"ROLE_STAFF", "ROLE_ADMIN", "ROLE_SUPERADMIN"}) {
+        for (String role : new String[] {"ROLE_ADMIN", "ROLE_SUPERADMIN"}) {
             as(role);
             PmsFrontDeskController.Listing l = controller.arrivals(null, null);
             assertEquals(1, l.items().size());
@@ -119,7 +119,7 @@ class PmsFrontDeskControllerTest {
 
     @Test
     void defaultRangeIsTodayInIst() {
-        as("ROLE_STAFF");
+        as("ROLE_ADMIN");
         controller.arrivals(null, null);
         verify(GATEWAY).json(eq(EzeeFamily.CONNECTIVITY), eq("ArrivalList"),
                 eq(Map.of("Date", Map.of("from_date", "2026-11-10", "to_date", "2026-11-10"))),
@@ -165,7 +165,7 @@ class PmsFrontDeskControllerTest {
         assertThrows(AuthenticationCredentialsNotFoundException.class, () -> controller.booking("9001-1"));
         as("ROLE_GUEST");
         assertThrows(AccessDeniedException.class, () -> controller.booking("9001-1"));
-        for (String role : new String[] {"ROLE_STAFF", "ROLE_ADMIN", "ROLE_SUPERADMIN"}) {
+        for (String role : new String[] {"ROLE_ADMIN", "ROLE_SUPERADMIN"}) {
             as(role);
             PmsFrontDeskController.Detail d = controller.booking("9001-1");
             assertEquals(2, d.item().folios().size());
@@ -193,7 +193,7 @@ class PmsFrontDeskControllerTest {
         assertThrows(AuthenticationCredentialsNotFoundException.class, () -> controller.guests("asha"));
         as("ROLE_GUEST");
         assertThrows(AccessDeniedException.class, () -> controller.guests("asha"));
-        for (String role : new String[] {"ROLE_STAFF", "ROLE_ADMIN", "ROLE_SUPERADMIN"}) {
+        for (String role : new String[] {"ROLE_ADMIN", "ROLE_SUPERADMIN"}) {
             as(role);
             assertEquals(1, controller.guests("asha").items().size());
         }

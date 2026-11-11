@@ -16,7 +16,7 @@ public class NotificationController {
     }
 
     @PostMapping("/subscribe")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KITCHEN', 'STAFF')")
     public void subscribe(@RequestBody Map<String, String> payload) {
         String token = payload.get("token");
         if (token != null) {
@@ -25,7 +25,7 @@ public class NotificationController {
     }
 
     @PostMapping("/unsubscribe")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KITCHEN', 'STAFF')")
     public void unsubscribe(@RequestBody Map<String, String> payload) {
         String token = payload.get("token");
         if (token != null) {

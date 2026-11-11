@@ -41,14 +41,14 @@ public class OrderController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KITCHEN', 'STAFF')")
     public ResponseEntity<Order> getOrder(@PathVariable String id) {
         Order order = orderService.getOrder(id);
         return order != null ? ResponseEntity.ok(order) : ResponseEntity.notFound().build();
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KITCHEN', 'STAFF')")
     public ResponseEntity<List<Order>> getAllOrders(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String dormitory,
@@ -64,7 +64,7 @@ public class OrderController {
     @PutMapping("/{id}/status")
     // Staff serve the orders, so they mark them delivered or cancelled. Deleting
     // orders and posting charges stay admin-only below.
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KITCHEN', 'STAFF')")
     public ResponseEntity<Order> updateOrderStatus(@PathVariable String id,
             @RequestBody Map<String, String> payload,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,

@@ -13,10 +13,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Cleaning to-do and assignments. Staff and admins; SuperAdmin passes via the role hierarchy. */
+/** Cleaning to-do and assignments. Housekeeping and admins; SuperAdmin passes via the role hierarchy. */
 @RestController
 @RequestMapping("/pms")
-@PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+@PreAuthorize("hasAnyRole('ADMIN','HOUSEKEEPING')")
 public class PmsHousekeepingWorkflowController {
 
     private final PmsHousekeepingWorkflowService service;

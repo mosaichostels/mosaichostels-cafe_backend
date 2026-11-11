@@ -13,10 +13,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Front desk reads over live eZee data. Staff and admins; SuperAdmin passes via the role hierarchy. */
+/** Front desk reads over live eZee data. Admins; SuperAdmin passes via the role hierarchy. */
 @RestController
 @RequestMapping("/pms")
-@PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+@PreAuthorize("hasRole('ADMIN')")
 public class PmsFrontDeskController {
 
     public record Listing(List<BookingSummary> items, long asOf, boolean stale) {

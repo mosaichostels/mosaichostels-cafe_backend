@@ -31,7 +31,7 @@ public class UserService {
         return userRepository.findById(id).orElse(null);
     }
 
-    private static final Set<String> ALLOWED_ROLES = Set.of("ROLE_SUPERADMIN", "ROLE_ADMIN", "ROLE_STAFF");
+    private static final Set<String> ALLOWED_ROLES = Set.of("ROLE_SUPERADMIN", "ROLE_ADMIN", "ROLE_KITCHEN", "ROLE_HOUSEKEEPING", "ROLE_STAFF");
     private static final int MIN_PASSWORD_LENGTH = 8;
 
     // Accepts "STAFF" as well as "ROLE_STAFF"; anything else is refused rather than stored, since

@@ -12,7 +12,7 @@ class NotificationControllerSecurityTest {
         for (String name : new String[] {"subscribe", "unsubscribe"}) {
             PreAuthorize pre = NotificationController.class.getMethod(name, java.util.Map.class)
                     .getAnnotation(PreAuthorize.class);
-            assertTrue(pre != null && pre.value().contains("STAFF"), name);
+            assertTrue(pre != null && pre.value().contains("STAFF") && pre.value().contains("KITCHEN"), name);
         }
     }
 }

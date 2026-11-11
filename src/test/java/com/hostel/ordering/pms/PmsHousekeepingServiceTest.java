@@ -204,7 +204,7 @@ class PmsHousekeepingServiceTest {
         SecurityContextHolder.getContext().setAuthentication(new TestingAuthenticationToken("u", "p", "ROLE_GUEST"));
         assertThrows(AccessDeniedException.class, () -> controller.rooms());
         verifyNoInteractions(GATEWAY);
-        for (String role : new String[] {"ROLE_STAFF", "ROLE_ADMIN", "ROLE_SUPERADMIN"}) {
+        for (String role : new String[] {"ROLE_HOUSEKEEPING", "ROLE_ADMIN", "ROLE_SUPERADMIN"}) {
             SecurityContextHolder.getContext().setAuthentication(new TestingAuthenticationToken("u", "p", role));
             PmsHousekeepingController.Rooms body = controller.rooms();
             assertEquals(1, body.items().size());

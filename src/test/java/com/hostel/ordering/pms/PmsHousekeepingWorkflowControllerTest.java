@@ -85,7 +85,7 @@ class PmsHousekeepingWorkflowControllerTest {
 
     @Test
     void staffAdminAndSuperAdminPass() {
-        for (String role : new String[] {"ROLE_STAFF", "ROLE_ADMIN", "ROLE_SUPERADMIN"}) {
+        for (String role : new String[] {"ROLE_HOUSEKEEPING", "ROLE_ADMIN", "ROLE_SUPERADMIN"}) {
             as(role);
             assertEquals(false, controller.tasks(null).stale());
             controller.assign("2026-11-10|11", "k", ASSIGN);

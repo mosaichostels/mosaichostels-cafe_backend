@@ -305,7 +305,7 @@ public class PmsHousekeepingWorkflowService {
         }
         // one generic message for unknown users and non-staff accounts: do not reveal which usernames exist
         boolean ok = users.findByUsername(u).map(x -> x.getRoles() != null && x.getRoles().stream()
-                .anyMatch(r -> r.equals("ROLE_STAFF") || r.equals("ROLE_ADMIN") || r.equals("ROLE_SUPERADMIN")))
+                .anyMatch(r -> r.equals("ROLE_HOUSEKEEPING") || r.equals("ROLE_ADMIN") || r.equals("ROLE_SUPERADMIN")))
                 .orElse(false);
         if (!ok) {
             throw new IllegalArgumentException("Assignee is not available");

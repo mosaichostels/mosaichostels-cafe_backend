@@ -13,10 +13,10 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Housekeeping board read and the guarded clean/dirty write (flag off by default). Staff and admins; SuperAdmin passes via the role hierarchy. */
+/** Housekeeping board read and the guarded clean/dirty write (flag off by default). Housekeeping and admins; SuperAdmin passes via the role hierarchy. */
 @RestController
 @RequestMapping("/pms/housekeeping")
-@PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+@PreAuthorize("hasAnyRole('ADMIN','HOUSEKEEPING')")
 public class PmsHousekeepingController {
 
     public record Rooms(List<RoomStatus> items, long asOf, boolean stale) {}
