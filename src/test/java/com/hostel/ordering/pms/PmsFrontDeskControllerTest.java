@@ -98,7 +98,7 @@ class PmsFrontDeskControllerTest {
     }
 
     @Test
-    void staffAdminAndSuperAdminAreServed() {
+    void adminAndSuperAdminAreServed() {
         for (String role : new String[] {"ROLE_ADMIN", "ROLE_SUPERADMIN"}) {
             as(role);
             PmsFrontDeskController.Listing l = controller.arrivals(null, null);

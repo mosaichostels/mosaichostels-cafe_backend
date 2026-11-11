@@ -84,7 +84,7 @@ class PmsHousekeepingWorkflowControllerTest {
     }
 
     @Test
-    void staffAdminAndSuperAdminPass() {
+    void housekeepingAdminAndSuperAdminPass() {
         for (String role : new String[] {"ROLE_HOUSEKEEPING", "ROLE_ADMIN", "ROLE_SUPERADMIN"}) {
             as(role);
             assertEquals(false, controller.tasks(null).stale());

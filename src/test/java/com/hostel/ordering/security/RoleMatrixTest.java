@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import com.hostel.ordering.config.SecurityConfig;
 import com.hostel.ordering.controller.NotificationController;
 import com.hostel.ordering.controller.OrderController;
+import com.hostel.ordering.dto.CreateOrderRequest;
 import com.hostel.ordering.pms.PmsBookingService;
 import com.hostel.ordering.pms.PmsFrontDeskController;
 import com.hostel.ordering.pms.PmsFrontDeskService;
@@ -60,13 +61,21 @@ class RoleMatrixTest {
 
         @Bean
         PmsFrontDeskController frontDesk() {
-            return new PmsFrontDeskController(mock(PmsFrontDeskService.class), mock(PmsBookingService.class),
-                    mock(PmsGuestService.class));
+            var empty = new com.hostel.ordering.pms.Cached<>(java.util.List.<com.hostel.ordering.pms.dto.BookingSummary>of(), 0L, false);
+            PmsFrontDeskService fd = mock(PmsFrontDeskService.class);
+            org.mockito.Mockito.when(fd.arrivals(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenReturn(empty);
+            org.mockito.Mockito.when(fd.inHouse()).thenReturn(empty);
+            PmsGuestService gs = mock(PmsGuestService.class);
+            org.mockito.Mockito.when(gs.search(org.mockito.ArgumentMatchers.any()))
+                    .thenReturn(new com.hostel.ordering.pms.Cached<>(java.util.List.of(), 0L, false));
+            return new PmsFrontDeskController(fd, mock(PmsBookingService.class), gs);
         }
 
         @Bean
         PmsHousekeepingController housekeeping() {
-            return new PmsHousekeepingController(mock(PmsHousekeepingService.class), mock(PmsRoomStatusWriteService.class));
+            PmsHousekeepingService svc = mock(PmsHousekeepingService.class);
+            org.mockito.Mockito.when(svc.rooms()).thenReturn(new com.hostel.ordering.pms.Cached<>(java.util.List.of(), 0L, false));
+            return new PmsHousekeepingController(svc, mock(PmsRoomStatusWriteService.class));
         }
 
         @Bean
@@ -92,13 +101,12 @@ class RoleMatrixTest {
             return true;
         } catch (AccessDeniedException e) {
             return false;
-        } catch (RuntimeException e) {
-            return true; // passed the security check, then hit the mocked service
         }
     }
 
     private Map<String, Runnable> routes() {
         Map<String, Runnable> m = new LinkedHashMap<>();
+        m.put("POST /orders", () -> orders.createOrder(new CreateOrderRequest(), null, null));
         m.put("GET /orders", () -> orders.getAllOrders(null, null, null, null, null, null, "createdAt_desc"));
         m.put("GET /orders/{id}", () -> orders.getOrder("x"));
         m.put("PUT /orders/{id}/status", () -> orders.updateOrderStatus("x", Map.of("status", "DELIVERED"), null, null));
@@ -117,7 +125,8 @@ class RoleMatrixTest {
 
     private void expect(String role, String... allowedRoutes) {
         SecurityContextHolder.getContext().setAuthentication(new TestingAuthenticationToken("u", "p", role));
-        java.util.Set<String> ok = java.util.Set.of(allowedRoutes);
+        java.util.Set<String> ok = new java.util.HashSet<>(java.util.Arrays.asList(allowedRoutes));
+        ok.add("POST /orders"); // guest ordering is open to every role
         routes().forEach((name, call) -> assertEquals(ok.contains(name), allowed(call), role + " " + name));
     }
 
@@ -148,7 +157,22 @@ class RoleMatrixTest {
     }
 
     @Test
-    void staffKeepsOrdersAndPushButHasNoPms() {
+    void legacyStaffRoleKeepsOrdersAndPushButHasNoPms() {
         expect("ROLE_STAFF", ORDER_AND_PUSH);
+    }
+
+    @Test
+    void guestsCanStillPlaceOrdersWithoutLoggingIn() {
+        SecurityContextHolder.clearContext();
+        assertEquals(true, allowedWithoutLogin(() -> orders.createOrder(new CreateOrderRequest(), null, null)));
+    }
+
+    private static boolean allowedWithoutLogin(Runnable call) {
+        try {
+            call.run();
+            return true;
+        } catch (AccessDeniedException | org.springframework.security.authentication.AuthenticationCredentialsNotFoundException e) {
+            return false;
+        }
     }
 }

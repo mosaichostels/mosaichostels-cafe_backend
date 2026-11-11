@@ -137,13 +137,13 @@
     {
       "file": "TESTING.md",
       "read_when": "adding/running tests or judging whether a change is covered.",
-      "verified_commit": "2026-11-11 @ 2626fed + final review fixes. `.superpowers/run-tests.sh` (Java 17): 396 tests, 0 failures (sum of `target/surefire-reports/*.txt`).",
+      "verified_commit": "2026-11-11 @ 2626fed + final review fixes. `.superpowers/run-tests.sh` (Java 17): 456 tests, 0 failures (sum of `target/surefire-reports/TEST-*.xml`).",
       "covers": [
         "src/test/java/**/*.java",
         "pom.xml",
         ".github/workflows/**"
       ],
-      "tokens_est": 702
+      "tokens_est": 714
     }
   ],
   "nested": []

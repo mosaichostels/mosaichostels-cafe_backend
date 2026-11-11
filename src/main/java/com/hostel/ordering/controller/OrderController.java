@@ -29,7 +29,7 @@ public class OrderController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF') or isAnonymous()")
+    @PreAuthorize("permitAll()")
     public ResponseEntity<Order> createOrder(@Valid @RequestBody CreateOrderRequest request,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             Authentication authentication) {

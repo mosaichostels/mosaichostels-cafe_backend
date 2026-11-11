@@ -78,7 +78,7 @@ class PmsHousekeepingControllerTest {
     }
 
     @Test
-    void staffAdminAndSuperAdminPass() {
+    void housekeepingAdminAndSuperAdminPass() {
         for (String role : new String[] {"ROLE_HOUSEKEEPING", "ROLE_ADMIN", "ROLE_SUPERADMIN"}) {
             as(role);
             assertEquals(RESULT, controller.setStatus("11", "k", BODY));
