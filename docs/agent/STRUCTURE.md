@@ -24,7 +24,7 @@ Other paths:
 - `src/main/resources/`: `application-prod.yml` (only config; no base `application.yml`), `mongodb-init.js` (manual seed script: categories, dormitories; run by hand, not by the app)
 - `src/test/java/com/hostel/ordering/`: mirrors packages; no `src/test/resources`
 - `scripts/promote-superadmin.sh`: sets one user to `ROLE_SUPERADMIN` and bumps `tokensValidFrom` (needs `MONGODB_URI`, `mongosh`)
-- `scripts/migrate-staff-to-kitchen.sh`: rewrites `ROLE_STAFF`/`STAFF` to `ROLE_KITCHEN` in every user's roles, `--dry-run` supported (needs `MONGODB_URI`, `mongosh`)
+- `scripts/migrate-staff-to-kitchen.sh`: rewrites `ROLE_STAFF`/`STAFF` to `ROLE_KITCHEN` in every user's roles, also drops the unused `cleaning_assignments` collection, `--dry-run` supported (needs `MONGODB_URI`, `mongosh`)
 - `.github/workflows/sync_to_hf.yml`: CI + deploy. `Dockerfile`, `pom.xml`, `README.md` (HF front matter)
 - `.claude/settings.json`: tracked hooks (GOTCHAS.md). `.codex/hooks.json`: gitignored, local. `target/`: build output, ignored
 

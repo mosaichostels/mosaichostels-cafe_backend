@@ -32,7 +32,7 @@ Flow: `request -> RateLimitFilter / AuthTokenFilter (SecurityConfig) -> controll
 - `LoginThrottle`: per-account login guessing. `RateLimitFilter` (60s window, in-memory, max 10000 keys): `POST /orders` 30/min, `POST /auth/login` 10/min; key = JWT user else client IP (X-Forwarded-For trusted only if peer is private/loopback).
 
 ## Collections (@Document)
-`orders` (unique sparse index on idempotency key; compound `status_createdAt`), `users` (unique username), `menu_items`, `other_essentials`, `categories`, `dormitories`, `order_status_config`, `audit_logs`, `idempotency_keys` (TTL 3600 s), `pms_write_claims` (below). The old `cleaning_assignments` collection is no longer read or written by the code and is left in place (the owner may drop it).
+`orders` (unique sparse index on idempotency key; compound `status_createdAt`), `users` (unique username), `menu_items`, `other_essentials`, `categories`, `dormitories`, `order_status_config`, `audit_logs`, `idempotency_keys` (TTL 3600 s), `pms_write_claims` (below). The old `cleaning_assignments` collection is no longer read or written by the code; `scripts/migrate-staff-to-kitchen.sh` drops it (`--dry-run` only counts it; back up first).
 
 ## Category rename
 Items store their category by name: `CategoryService` update (:72-82) `updateMulti`s the new name into `menu_items` or `other_essentials` (by category type), then renumbers `showOrder`. Test: `CategoryRenameCascadeTest`.
@@ -82,7 +82,7 @@ Items store their category by name: `CategoryService` update (:72-82) `updateMul
 
 ## Role rollout (owner-run, role-based tabs)
 1. Push the backend first: it accepts old and new roles (`ROLE_STAFF` still allowed on orders and notifications for the window).
-2. Run `MONGODB_URI=... scripts/migrate-staff-to-kitchen.sh --dry-run`, compare its "matched" count with a manual `db.users.countDocuments({roles: {$in: ["ROLE_STAFF","STAFF"]}})` on the same database, then run it without `--dry-run`. Sessions survive (roles load from the DB per request).
+2. Run `MONGODB_URI=... scripts/migrate-staff-to-kitchen.sh --dry-run`, compare its "matched" count with a manual `db.users.countDocuments({roles: {$in: ["ROLE_STAFF","STAFF"]}})` on the same database, then run it without `--dry-run` (this also drops the unused `cleaning_assignments` collection). Sessions survive (roles load from the DB per request).
 3. Push the web admin. 4. Hand out the Android APK (1.7.0, versionCode 15). 5. Set the Space env value `APP_ANDROID_MIN_VERSION_CODE` (`app.android.min-version-code`) to 15 so 1.6.0 installs get the required-update prompt (1.6.0 joins the `new_orders` topic for any role, so a Housekeeping login on it would ring with guest names). 6. Create housekeeping accounts (ROLE_HOUSEKEEPING). 7. A follow-up change drops `ROLE_STAFF` from the allowed roles and rules.
 - Until step 2 is done, an old `ROLE_STAFF` account loses every `/pms/**` endpoint (403) and Android treats it as no access.
 - Reverse: edit the script's `rewrite()` to map `ROLE_KITCHEN` to `ROLE_STAFF` and re-run; it also flips accounts that were KITCHEN before the migration, so dry-run first. There is no separate rollback script.

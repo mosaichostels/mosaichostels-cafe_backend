@@ -12,7 +12,7 @@
         "src/main/java/com/hostel/ordering/model/**/*.java",
         "src/main/java/com/hostel/ordering/repository/**/*.java"
       ],
-      "tokens_est": 4045
+      "tokens_est": 4072
     },
     {
       "file": "COMMANDS.md",
@@ -26,7 +26,7 @@
         ".claude/**",
         ".codex/**"
       ],
-      "tokens_est": 424
+      "tokens_est": 433
     },
     {
       "file": "CONVENTIONS.md",
@@ -44,7 +44,7 @@
       "read_when": "about to change auth, idempotency, eZee posting, rate limits or notifications.",
       "verified_commit": "2026-11-11 @ 2626fed + final review fixes. Source: backend AGENTS (`../docs/backend/AGENTS.md`) plus code comments where cited.",
       "covers": [],
-      "tokens_est": 1040
+      "tokens_est": 1045
     },
     {
       "file": "ENVIRONMENT.md",
@@ -119,7 +119,7 @@
         "docs/agent/**",
         "AGENTS.md"
       ],
-      "tokens_est": 1121
+      "tokens_est": 1125
     },
     {
       "file": "STRUCTURE.md",
@@ -132,7 +132,7 @@
         "scripts/**",
         "pom.xml"
       ],
-      "tokens_est": 827
+      "tokens_est": 841
     },
     {
       "file": "TESTING.md",
