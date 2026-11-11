@@ -31,9 +31,11 @@ function rewrite(roles) {
 const dry = process.env.DRY_RUN === "1";
 const users = db.getCollection("users");
 let matched = 0, changed = 0;
-users.find({ roles: { $in: ["ROLE_STAFF", "STAFF"] } }, { roles: 1 }).forEach(u => {
+const hit = ["ROLE_STAFF", "STAFF"];
+users.find({ roles: { $type: "array", $in: hit } }, { roles: 1 }).forEach(u => {
   matched++;
-  if (!dry) { users.updateOne({ _id: u._id }, { $set: { roles: rewrite(u.roles) } }); changed++; }
+  if (!dry) changed += users.updateOne({ _id: u._id, roles: u.roles }, { $set: { roles: rewrite(u.roles) } }).modifiedCount;
 });
-print((dry ? "dry-run: matched " + matched + ", would modify " + matched : "matched " + matched + ", modified " + changed));
+const skipped = users.countDocuments({ roles: { $not: { $type: "array" }, $in: hit } }); // non-array roles are never rewritten
+print((dry ? "dry-run: matched " + matched + ", would modify " + matched : "matched " + matched + ", modified " + changed) + ", skipped non-array " + skipped);
 '
