@@ -26,7 +26,7 @@
         ".claude/**",
         ".codex/**"
       ],
-      "tokens_est": 374
+      "tokens_est": 424
     },
     {
       "file": "CONVENTIONS.md",
@@ -119,7 +119,7 @@
         "docs/agent/**",
         "AGENTS.md"
       ],
-      "tokens_est": 1149
+      "tokens_est": 1206
     },
     {
       "file": "STRUCTURE.md",
@@ -132,7 +132,7 @@
         "scripts/**",
         "pom.xml"
       ],
-      "tokens_est": 851
+      "tokens_est": 893
     },
     {
       "file": "TESTING.md",

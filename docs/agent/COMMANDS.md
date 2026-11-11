@@ -15,6 +15,7 @@ Covers: scripts/**, pom.xml, Dockerfile, .github/workflows/**, .claude/**, .code
 | Health | `GET /health` | HealthController |
 | Seed config data | `mongo hostel_ordering mongodb-init.js` (manual, idempotent inserts) | src/main/resources/mongodb-init.js:4 |
 | Promote SuperAdmin | `MONGODB_URI=... scripts/promote-superadmin.sh <username>` (re-runnable; user must log in again; not run) | scripts/promote-superadmin.sh:3 |
+| Migrate STAFF to KITCHEN | `MONGODB_URI=... scripts/migrate-staff-to-kitchen.sh [--dry-run]` (idempotent; counts only; keeps sessions; not run against a DB) | scripts/migrate-staff-to-kitchen.sh:2 |
 | Deploy | push to `main`; needs GitHub secret `HF_TOKEN` | sync_to_hf.yml |
 
 - Local dev run / dev profile: unknown (no `application.yml`; only `application-prod.yml`; `ezee.mock` flag exists, see ENVIRONMENT.md).

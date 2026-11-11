@@ -17,6 +17,7 @@ Covers: src/main/**, src/test/**, docs/agent/**, AGENTS.md
 - DEPLOY GATE: before enabling any `pms.writes.*` flag, check in Mongo `db.pms_write_claims.getIndexes()` shows the sparse unique index on `openLockKey` and the TTL index on `doneAt`.
 - Shipped: SUPERADMIN role (hierarchy `ROLE_SUPERADMIN > ROLE_ADMIN`, `/users` + `/audit` SuperAdmin-only, last-SuperAdmin delete guard, `scripts/promote-superadmin.sh`).
 - Sweep 2026-10-29 (proven unused, 156 tests green): removed `CategoryService.getAllCategories`, `OrderService.logChargePost`, `CategoryRepository.findAllByOrderByShowOrderDesc`, `OrderStatusRepository.findByValue`, 4 unused imports. Backups: `~/.cache/project-context-backups/*backend*`. Lombok is used only by `ErrorResponse` (needed).
+- Role-based tabs Task 2: `scripts/migrate-staff-to-kitchen.sh` written; rewrite logic checked with node, script not run against any Mongo (no mongod here). Run `--dry-run` first on the real DB, after the KITCHEN backend is live.
 - Known gap (backend AGENTS): chargepost idempotency check-then-save is not atomic.
 - Unknown: local run instructions, deployed version, where prod secrets are managed.
 - Admin "post charge" push text: "Ready to post" / "<name> delivered. Post charge?" (OrderService); deployment state not verified.
