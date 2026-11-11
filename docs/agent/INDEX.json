@@ -12,7 +12,7 @@
         "src/main/java/com/hostel/ordering/model/**/*.java",
         "src/main/java/com/hostel/ordering/repository/**/*.java"
       ],
-      "tokens_est": 3950
+      "tokens_est": 4045
     },
     {
       "file": "COMMANDS.md",
@@ -119,7 +119,7 @@
         "docs/agent/**",
         "AGENTS.md"
       ],
-      "tokens_est": 1094
+      "tokens_est": 1121
     },
     {
       "file": "STRUCTURE.md",
@@ -137,13 +137,13 @@
     {
       "file": "TESTING.md",
       "read_when": "adding/running tests or judging whether a change is covered.",
-      "verified_commit": "2026-11-11 @ 2626fed + final review fixes. `.superpowers/run-tests.sh` (Java 17): 456 tests, 0 failures (sum of `target/surefire-reports/TEST-*.xml`).",
+      "verified_commit": "2026-11-11 @ 2626fed + final review fixes. `.superpowers/run-tests.sh` (Java 17): 405 tests, 0 failures (sum of `target/surefire-reports/TEST-*.xml`).",
       "covers": [
         "src/test/java/**/*.java",
         "pom.xml",
         ".github/workflows/**"
       ],
-      "tokens_est": 724
+      "tokens_est": 752
     }
   ],
   "nested": []

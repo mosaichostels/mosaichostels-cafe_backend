@@ -98,7 +98,7 @@ public class PmsHousekeepingWorkflowService {
         for (Map.Entry<String, Integer> e : turnovers.entrySet()) {
             JsonNode r = roomById.get(e.getKey());
             items.add(new CleaningTask(taskKey(date, e.getKey()), e.getKey(), text(r, "unitid"), text(r, "roomname"),
-                    text(r, "roomtypename"), date.toString(), e.getValue()));
+                    text(r, "roomtypename"), date.toString(), e.getValue(), text(r, "hkstatus")));
         }
         items.sort(Comparator.comparing(CleaningTask::roomName, PmsHousekeepingService::natural)
                 .thenComparing(CleaningTask::roomId));

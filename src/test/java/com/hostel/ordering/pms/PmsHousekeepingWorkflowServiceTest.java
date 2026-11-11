@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -132,5 +133,53 @@ class PmsHousekeepingWorkflowServiceTest {
         assertTrue(bunk.ambiguous());
         assertEquals(1, bunk.count());
         assertTrue(l.unmatched().stream().filter(u -> u.roomName().isEmpty()).noneMatch(u -> u.ambiguous()));
+    }
+
+    @Test
+    void hkStatusComesFromTheRoomsHkstatusByRoomAndUnit() throws Exception {
+        when(gateway.json(any(), eq("InhouseRoomStatus"), any(), any())).thenReturn(PmsTestJson.json("""
+                {"roomlist":[
+                  {"roomid":"11","unitid":"21","roomname":"D1","roomtypename":"Dorm","hkstatus":"Clean"},
+                  {"roomid":"12","unitid":"22","roomname":"9O9-9","roomtypename":"Private","hkstatus":" Dirty "}],
+                 "checkinguestlist":[]}"""));
+        CleaningTaskList l = service.tasks("2026-11-10");
+        assertEquals("Dirty", l.items().get(0).hkStatus()); // 9O9-9
+        assertEquals("Clean", l.items().get(1).hkStatus()); // D1
+    }
+
+    @Test
+    void hkStatusIsEmptyWhenTheFeedHasNoStatusForTheRoom() {
+        assertTrue(service.tasks("2026-11-10").items().stream().allMatch(t -> t.hkStatus().isEmpty()));
+    }
+
+    @Test
+    void feedFailureServesStaleTasksWithTheirLastStatus() throws Exception {
+        PmsProperties props = new PmsProperties();
+        var clock = new java.util.concurrent.atomic.AtomicLong(1000);
+        PmsCache c = new PmsCache(clock::get);
+        when(gateway.json(any(), eq("InhouseRoomStatus"), any(), any())).thenReturn(PmsTestJson.json("""
+                {"roomlist":[{"roomid":"11","unitid":"21","roomname":"D1","roomtypename":"Dorm","hkstatus":"Clean"}],
+                 "checkinguestlist":[]}"""));
+        var svc = new PmsHousekeepingWorkflowService(gateway, c, props, new PmsHousekeepingFeed(gateway, c, props), CLOCK);
+        svc.tasks("2026-11-10");
+        clock.addAndGet(10 * 60_000);
+        when(gateway.json(any(), eq("InhouseRoomStatus"), any(), any())).thenThrow(new PmsUpstreamException("x"));
+        CleaningTaskList l = svc.tasks("2026-11-10");
+        assertTrue(l.stale());
+        assertEquals(1, l.items().size());
+        assertEquals("Clean", l.items().get(0).hkStatus());
+    }
+
+    @Test
+    void unmatchedListIsUnchangedByStatus() throws Exception {
+        CleaningTaskList l = service.tasks("2026-11-10");
+        assertEquals(List.of("909-9", "ZZ9"), l.unmatched().stream().map(CleaningTaskList.Unmatched::roomName).toList());
+    }
+
+    @Test
+    void aCachedFeedCostsNoExtraGatewayCall() {
+        service.tasks("2026-11-10");
+        service.tasks("2026-11-10");
+        verify(gateway, times(1)).json(any(), eq("InhouseRoomStatus"), any(), any());
     }
 }
