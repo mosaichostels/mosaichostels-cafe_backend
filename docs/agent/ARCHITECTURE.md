@@ -11,7 +11,7 @@ Flow: `request -> RateLimitFilter / AuthTokenFilter (SecurityConfig) -> controll
 | --- | --- |
 | `/auth/login`, `/auth/refresh`, `/auth/logout` | public (permitAll) |
 | `GET /health` | public |
-| `POST /orders` | public in HTTP; method rule `hasAnyRole('ADMIN','STAFF') or isAnonymous()` (unchanged) (OrderController:32) |
+| `POST /orders` | public in HTTP; method rule `permitAll()` (OrderController:32) |
 | `GET /config`, `GET /menu-items/**`, `GET /other-essentials/**` | public |
 | `GET /orders`, `/orders/{id}`, `PUT /orders/{id}/status` | ADMIN, KITCHEN, STAFF (STAFF only for the rollout window) |
 | `DELETE /orders`, `/orders/{id}`; `POST /orders/{id}/chargepost`; `GET /orders/{id}/ezee-candidates` | ADMIN only (OrderController:93,108,175,202) |
@@ -86,7 +86,7 @@ Items store their category by name: `CategoryService` update (:72-82) `updateMul
 ## Role rollout (owner-run, role-based tabs)
 1. Push the backend first: it accepts old and new roles (`ROLE_STAFF` still allowed on orders and notifications for the window).
 2. Run `MONGODB_URI=... scripts/migrate-staff-to-kitchen.sh --dry-run`, compare its "matched" count with a manual `db.users.countDocuments({roles: {$in: ["ROLE_STAFF","STAFF"]}})` on the same database, then run it without `--dry-run`. Sessions survive (roles load from the DB per request).
-3. Push the web admin. 4. Hand out the Android APK (1.7.0, versionCode 15). 5. Create housekeeping accounts (ROLE_HOUSEKEEPING). 6. A follow-up change drops `ROLE_STAFF` from the allowed roles and rules.
+3. Push the web admin. 4. Hand out the Android APK (1.7.0, versionCode 15). 5. Set the Space env value `APP_ANDROID_MIN_VERSION_CODE` (`app.android.min-version-code`) to 15 so 1.6.0 installs get the required-update prompt (1.6.0 joins the `new_orders` topic for any role, so a Housekeeping login on it would ring with guest names). 6. Create housekeeping accounts (ROLE_HOUSEKEEPING). 7. A follow-up change drops `ROLE_STAFF` from the allowed roles and rules.
 - Until step 2 is done, an old `ROLE_STAFF` account loses every `/pms/**` endpoint (403) and Android treats it as no access.
 - Reverse: edit the script's `rewrite()` to map `ROLE_KITCHEN` to `ROLE_STAFF` and re-run; it also flips accounts that were KITCHEN before the migration, so dry-run first. There is no separate rollback script.
 - The script has never been run on a real mongod (no mongod available when written); only its rewrite function was tested with node. Treat the first dry-run as the test.
