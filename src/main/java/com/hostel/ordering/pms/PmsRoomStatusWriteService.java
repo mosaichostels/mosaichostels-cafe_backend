@@ -75,18 +75,20 @@ public class PmsRoomStatusWriteService {
         // Switch and canary come before the first eZee read: off or out of scope means zero eZee calls.
         flags.requireWrite(FEATURE);
         List<String> canary = flags.canary(FEATURE);
-        if (!canary.isEmpty() && !canary.contains(roomId)) {
+        // Fail closed: unlike the guard (empty = any target), a missing canary list refuses every room.
+        if (!canary.contains(roomId)) {
             throw new PmsFeatureDisabledException("PMS write target is outside the canary");
         }
 
-        JsonNode room = findRoom(feed.freshInhouseStatus().value(), roomId, unitId);
+        JsonNode room = findRoom(feed.freshInhouseStatus(), roomId, unitId);
         if (room == null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "This room no longer matches eZee. Refresh the board and try again.");
         }
         String current = norm(room.path("hkstatus").asText(""));
         String label = target.equals("CLEAN") ? "Clean" : "Dirty";
-        if (current.equals(norm(label))) {
+        // Remarks make the request different from "already there", so they go through the write path.
+        if (remarks.isEmpty() && current.equals(norm(label))) {
             return new PmsWriteResult<>(new RoomStatusWriteResult(roomId, unitId, target, label, true), true);
         }
 
@@ -99,7 +101,7 @@ public class PmsRoomStatusWriteService {
                 "ROOM_STATUS", details, RoomStatusWriteResult.class,
                 () -> write(roomId, unitId, target, label, remarks),
                 v -> {
-                    JsonNode now = findRoom(feed.freshInhouseStatus().value(), roomId, unitId);
+                    JsonNode now = findRoom(feed.freshInhouseStatus(), roomId, unitId);
                     String hk = now == null ? "" : now.path("hkstatus").asText("");
                     observed.set(hk);
                     return norm(hk).equals(norm(label));
@@ -117,9 +119,10 @@ public class PmsRoomStatusWriteService {
         Map<String, Object> row = Map.of("hotel_code", hotelCode, "roomid", roomId, "unitid", unitId,
                 "hkstatus", label, "hkremarks", remarks);
         JsonNode reply = gateway.json(EzeeFamily.HOUSEKEEPING, "UpdateRoomStatus",
-                Map.of("updatehkdata", List.of(row)), PmsPriority.HUB);
-        // The gateway does not know this endpoint's {"errorcode":"1"} shape, so the reply is checked here.
-        if (!reply.isObject() || !"0".equals(text(reply, "status")) || reply.has("errorcode")) {
+                Map.of("updatehkdata", List.of(row)), PmsPriority.HUB, PmsHousekeepingFeed.WRITE_WAIT);
+        // The gateway does not know this endpoint's {"errorcode":"1"} shape, so it is checked here. Only an explicit
+        // error or warning stops us; any other reply (even status != "0") is judged by the read-back.
+        if (reply.has("errorcode") || (reply.path("warning").isTextual() && !text(reply, "warning").isEmpty())) {
             throw new PmsUpstreamException("PMS returned an error");
         }
         return new RoomStatusWriteResult(roomId, unitId, target, label, true);

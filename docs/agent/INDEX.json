@@ -12,7 +12,7 @@
         "src/main/java/com/hostel/ordering/model/**/*.java",
         "src/main/java/com/hostel/ordering/repository/**/*.java"
       ],
-      "tokens_est": 3363
+      "tokens_est": 3718
     },
     {
       "file": "COMMANDS.md",
@@ -55,7 +55,7 @@
         "src/main/java/**/*.java",
         "Dockerfile"
       ],
-      "tokens_est": 966
+      "tokens_est": 978
     },
     {
       "file": "EXTERNAL.md",

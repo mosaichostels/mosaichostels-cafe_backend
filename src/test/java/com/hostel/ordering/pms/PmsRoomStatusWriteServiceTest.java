@@ -40,11 +40,12 @@ class PmsRoomStatusWriteServiceTest {
     @BeforeEach
     void setUp() {
         props.getWrites().put("room-status", true);
+        props.getCanary().put("room-status", List.of("11"));
         PmsFlags flags = new PmsFlags(props);
         guard = new PmsWriteGuard(flags, new InMemoryPmsWriteClaimStore(), audit, new ObjectMapper());
         service = new PmsRoomStatusWriteService(new PmsHousekeepingFeed(gateway, cache, props), gateway, flags, guard,
                 "H1");
-        when(gateway.json(eq(EzeeFamily.HOUSEKEEPING), eq(UPDATE), any(), eq(PmsPriority.HUB)))
+        when(gateway.json(eq(EzeeFamily.HOUSEKEEPING), eq(UPDATE), any(), eq(PmsPriority.HUB), any()))
                 .thenReturn(PmsFrontDeskServiceTest.json(OK));
     }
 
@@ -57,7 +58,7 @@ class PmsRoomStatusWriteServiceTest {
     }
 
     private void inhouse(JsonNode first, JsonNode... more) {
-        when(gateway.json(eq(EzeeFamily.HOUSEKEEPING), eq(INHOUSE), any(), eq(PmsPriority.HUB)))
+        when(gateway.json(eq(EzeeFamily.HOUSEKEEPING), eq(INHOUSE), any(), eq(PmsPriority.HUB), any()))
                 .thenReturn(first, more);
     }
 
@@ -70,13 +71,14 @@ class PmsRoomStatusWriteServiceTest {
     }
 
     private void updates(int n) {
-        verify(gateway, times(n)).json(eq(EzeeFamily.HOUSEKEEPING), eq(UPDATE), any(), any());
+        verify(gateway, times(n)).json(eq(EzeeFamily.HOUSEKEEPING), eq(UPDATE), any(), any(), any());
     }
 
     @Test
     void flagOffMakesZeroEzeeCalls() {
         props.getWrites().clear();
         assertThrows(PmsFeatureDisabledException.class, () -> clean("k1"));
+        verify(gateway, times(0)).json(any(), any(), any(), any(), any());
         verify(gateway, times(0)).json(any(), any(), any(), any());
     }
 
@@ -84,6 +86,7 @@ class PmsRoomStatusWriteServiceTest {
     void canaryExcludingTheRoomMakesZeroEzeeCalls() {
         props.getCanary().put("room-status", List.of("99"));
         assertThrows(PmsFeatureDisabledException.class, () -> clean("k1"));
+        verify(gateway, times(0)).json(any(), any(), any(), any(), any());
         verify(gateway, times(0)).json(any(), any(), any(), any());
     }
 
@@ -92,6 +95,7 @@ class PmsRoomStatusWriteServiceTest {
         for (String key : new String[] {null, "", "  ", "a b", "x+y="}) {
             assertThrows(IllegalArgumentException.class, () -> clean(key));
         }
+        verify(gateway, times(0)).json(any(), any(), any(), any(), any());
         verify(gateway, times(0)).json(any(), any(), any(), any());
     }
 
@@ -106,11 +110,13 @@ class PmsRoomStatusWriteServiceTest {
         assertThrows(IllegalArgumentException.class, () -> service.setStatus("11", req("21", "CLEAN", "x".repeat(201)), "k"));
         assertThrows(IllegalArgumentException.class, () -> service.setStatus("11", req("21", "CLEAN", "a\nb"), "k"));
         assertThrows(IllegalArgumentException.class, () -> service.setStatus("11", null, "k"));
+        verify(gateway, times(0)).json(any(), any(), any(), any(), any());
         verify(gateway, times(0)).json(any(), any(), any(), any());
     }
 
     @Test
     void staleOrMismatchedUnitIsRejectedWithoutWrite() {
+        props.getCanary().put("room-status", List.of("11", "77"));
         inhouse(feed("Dirty", "No"));
         assertThrows(ResponseStatusException.class, () -> service.setStatus("11", req("22", "CLEAN", null), "k1"));
         assertThrows(ResponseStatusException.class, () -> service.setStatus("77", req("21", "CLEAN", null), "k2"));
@@ -128,24 +134,101 @@ class PmsRoomStatusWriteServiceTest {
 
     @Test
     void writeWithMatchingReadBackIsConfirmedAndSendsDocBody() {
-        JsonNode warm = feed("Dirty", "No");
-        inhouse(warm, warm, feed("Clean", "No"));
-        feedWarmUp();
+        // a stale cached board (room already "Clean") must not be used for the pre-check or the read-back
+        when(gateway.json(eq(EzeeFamily.HOUSEKEEPING), eq(INHOUSE), any(), eq(PmsPriority.HUB)))
+                .thenReturn(feed("Clean", "No"));
+        new PmsHousekeepingFeed(gateway, cache, props).inhouseStatus();
+        inhouse(feed("Dirty", "No"), feed("Clean", "No"));
         PmsWriteResult<RoomStatusWriteResult> r = service.setStatus("11", req("21", "CLEAN", " Mopped "), "k1");
         assertTrue(r.confirmed());
         assertEquals(new RoomStatusWriteResult("11", "21", "CLEAN", "Clean", true), r.value());
-        // warm-up + pre-check + read-back: the cached reply was dropped each time
-        verify(gateway, times(3)).json(eq(EzeeFamily.HOUSEKEEPING), eq(INHOUSE), any(), any());
+        verify(gateway, times(2)).json(eq(EzeeFamily.HOUSEKEEPING), eq(INHOUSE), any(), any(), any());
+        verify(gateway, times(1)).json(eq(EzeeFamily.HOUSEKEEPING), eq(INHOUSE), any(), any()); // the warm-up only
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> params = ArgumentCaptor.forClass(Map.class);
-        verify(gateway).json(eq(EzeeFamily.HOUSEKEEPING), eq(UPDATE), params.capture(), eq(PmsPriority.HUB));
+        verify(gateway).json(eq(EzeeFamily.HOUSEKEEPING), eq(UPDATE), params.capture(), eq(PmsPriority.HUB), any());
         assertEquals(Map.of("updatehkdata", List.of(Map.of("hotel_code", "H1", "roomid", "11", "unitid", "21",
                 "hkstatus", "Clean", "hkremarks", "Mopped"))), params.getValue());
         assertTrue(guard.unconfirmed().isEmpty());
+        // the cache entry was dropped, so a P1 read reloads instead of serving the pre-write board
+        new PmsHousekeepingFeed(gateway, cache, props).inhouseStatus();
+        verify(gateway, times(2)).json(eq(EzeeFamily.HOUSEKEEPING), eq(INHOUSE), any(), any());
     }
 
-    private void feedWarmUp() {
-        new PmsHousekeepingFeed(gateway, cache, props).inhouseStatus();
+    @Test
+    void remarksSkipTheNoOpShortcut() {
+        inhouse(feed("Clean", "No"), feed("Clean", "No"));
+        assertTrue(service.setStatus("11", req("21", "CLEAN", "again"), "k1").confirmed());
+        updates(1);
+    }
+
+    @Test
+    void canaryMissingOrEmptyFailsClosed() {
+        props.getCanary().remove("room-status");
+        assertThrows(PmsFeatureDisabledException.class, () -> clean("k1"));
+        props.getCanary().put("room-status", List.of());
+        assertThrows(PmsFeatureDisabledException.class, () -> clean("k1"));
+        verify(gateway, times(0)).json(any(), any(), any(), any(), any());
+        verify(gateway, times(0)).json(any(), any(), any(), any());
+    }
+
+    @Test
+    void canaryContainingTheRoomProceeds() {
+        props.getCanary().put("room-status", List.of("5", "11"));
+        inhouse(feed("Dirty", "No"), feed("Clean", "No"));
+        assertTrue(clean("k1").confirmed());
+    }
+
+    @Test
+    void statusOneBodyIsJudgedByReadBack() {
+        inhouse(feed("Dirty", "No"), feed("Clean", "No"));
+        when(gateway.json(eq(EzeeFamily.HOUSEKEEPING), eq(UPDATE), any(), any(), any()))
+                .thenReturn(PmsFrontDeskServiceTest.json("{\"status\":\"1\",\"message\":\"Success\"}"));
+        assertTrue(clean("k1").confirmed());
+    }
+
+    @Test
+    void warningBodyIsUnconfirmed() {
+        inhouse(feed("Dirty", "No"), feed("Clean", "No"));
+        when(gateway.json(eq(EzeeFamily.HOUSEKEEPING), eq(UPDATE), any(), any(), any())).thenReturn(
+                PmsFrontDeskServiceTest.json("{\"status\":\"0\",\"warning\":\"hotel_code is invalid\"}"));
+        assertThrows(PmsUnconfirmedException.class, () -> clean("k1"));
+    }
+
+    @Test
+    void readBackBusyIsUnconfirmed() {
+        when(gateway.json(eq(EzeeFamily.HOUSEKEEPING), eq(INHOUSE), any(), any(), any()))
+                .thenReturn(feed("Dirty", "No")).thenThrow(new PmsBusyException("busy"));
+        PmsWriteResult<RoomStatusWriteResult> r = clean("k1");
+        assertFalse(r.confirmed());
+        assertEquals(1, guard.unconfirmed().size());
+        updates(1);
+    }
+
+    @Test
+    void secondKeyOnSameRoomWhileFirstInProgressIsTargetBusy() {
+        inhouse(feed("Dirty", "No"));
+        when(gateway.json(eq(EzeeFamily.HOUSEKEEPING), eq(UPDATE), any(), any(), any())).thenAnswer(inv -> {
+            assertThrows(PmsTargetBusyException.class, () -> clean("k2"));
+            return PmsFrontDeskServiceTest.json(OK);
+        });
+        clean("k1");
+        updates(1);
+    }
+
+    @Test
+    void writePathConfirmsUnderRealDefaultLimiter() {
+        String dirty = "{\"roomlist\":[{\"roomid\":\"11\",\"unitid\":\"21\",\"hkstatus\":\"Dirty\"}]}";
+        String clean = dirty.replace("Dirty", "Clean");
+        java.util.concurrent.atomic.AtomicInteger inhouseCalls = new java.util.concurrent.atomic.AtomicInteger();
+        PmsTransport transport = (method, url, headers, body, max) -> new PmsTransport.Reply(200,
+                url.contains("hkupdatestatus") ? OK : inhouseCalls.incrementAndGet() == 1 ? dirty : clean);
+        EzeeGateway real = new EzeeGateway(props, new PmsRateLimiter(props), transport, "https://x", "A", "H1");
+        PmsFlags flags = new PmsFlags(props);
+        PmsRoomStatusWriteService svc = new PmsRoomStatusWriteService(new PmsHousekeepingFeed(real, cache, props),
+                real, flags, new PmsWriteGuard(flags, new InMemoryPmsWriteClaimStore(), audit, new ObjectMapper()),
+                "H1");
+        assertTrue(svc.setStatus("11", req("21", "CLEAN", null), "k1").confirmed());
     }
 
     @Test
@@ -164,7 +247,7 @@ class PmsRoomStatusWriteServiceTest {
     @Test
     void timeoutAfterSendIsUnconfirmedAndNotRetried() {
         inhouse(feed("Dirty", "No"));
-        when(gateway.json(eq(EzeeFamily.HOUSEKEEPING), eq(UPDATE), any(), any()))
+        when(gateway.json(eq(EzeeFamily.HOUSEKEEPING), eq(UPDATE), any(), any(), any()))
                 .thenThrow(new PmsUpstreamException("PMS request failed"));
         assertThrows(PmsUnconfirmedException.class, () -> clean("k1"));
         assertEquals(1, guard.unconfirmed().size());
@@ -175,7 +258,7 @@ class PmsRoomStatusWriteServiceTest {
     @Test
     void errorBodyIsNeverReportedAsSuccess() {
         inhouse(feed("Dirty", "No"));
-        when(gateway.json(eq(EzeeFamily.HOUSEKEEPING), eq(UPDATE), any(), any())).thenReturn(
+        when(gateway.json(eq(EzeeFamily.HOUSEKEEPING), eq(UPDATE), any(), any(), any())).thenReturn(
                 PmsFrontDeskServiceTest.json("{\"errorcode\":\"1\",\"message\":\"Unauthorized Request\"}"));
         assertThrows(PmsUnconfirmedException.class, () -> clean("k1"));
         updates(1);
@@ -184,7 +267,7 @@ class PmsRoomStatusWriteServiceTest {
     @Test
     void definiteRefusalBeforeSendFreesTheTarget() {
         inhouse(feed("Dirty", "No"));
-        when(gateway.json(eq(EzeeFamily.HOUSEKEEPING), eq(UPDATE), any(), any()))
+        when(gateway.json(eq(EzeeFamily.HOUSEKEEPING), eq(UPDATE), any(), any(), any()))
                 .thenThrow(PmsUpstreamException.notSent("PMS integration disabled"));
         assertThrows(PmsUpstreamException.class, () -> clean("k1"));
         assertTrue(guard.unconfirmed().isEmpty());
@@ -203,8 +286,7 @@ class PmsRoomStatusWriteServiceTest {
 
     @Test
     void sameKeyDifferentPayloadIsAMismatch() {
-        JsonNode dirty = feed("Dirty", "No");
-        inhouse(dirty, feed("Clean", "No"), dirty);
+        inhouse(feed("Dirty", "No"), feed("Clean", "No"));
         service.setStatus("11", req("21", "CLEAN", "a"), "k1");
         assertThrows(PmsIdempotencyMismatchException.class,
                 () -> service.setStatus("11", req("21", "CLEAN", "b"), "k1"));

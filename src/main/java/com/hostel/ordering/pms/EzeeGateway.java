@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.node.NullNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -61,7 +62,13 @@ public class EzeeGateway {
 
     /** A JSON reply; {@link NullNode} when eZee says there is no data. */
     public JsonNode json(EzeeFamily family, String requestType, Map<String, Object> params, PmsPriority priority) {
-        String body = exchange(family, requestType, params, priority).strip();
+        return json(family, requestType, params, priority, null);
+    }
+
+    /** As above, but may wait up to {@code maxWait} for a rate-limit slot (null = the limiter's default 2 s). */
+    public JsonNode json(EzeeFamily family, String requestType, Map<String, Object> params, PmsPriority priority,
+            Duration maxWait) {
+        String body = exchange(family, requestType, params, priority, maxWait).strip();
         if (body.isEmpty() || NO_DATA_REPLY.matcher(body).matches()) {
             return NullNode.instance;
         }
@@ -74,7 +81,7 @@ public class EzeeGateway {
 
     /** A CSV, XML or plain reply returned untouched; empty string when eZee says there is no data. */
     public String text(EzeeFamily family, String requestType, Map<String, Object> params, PmsPriority priority) {
-        String body = exchange(family, requestType, params, priority);
+        String body = exchange(family, requestType, params, priority, null);
         String trimmed = body.strip();
         if (trimmed.isEmpty() || NO_DATA_REPLY.matcher(trimmed).matches()) {
             return "";
@@ -94,7 +101,8 @@ public class EzeeGateway {
         return body;
     }
 
-    private String exchange(EzeeFamily family, String requestType, Map<String, Object> params, PmsPriority priority) {
+    private String exchange(EzeeFamily family, String requestType, Map<String, Object> params, PmsPriority priority,
+            Duration maxWait) {
         // Kill switch: checked before the limiter so a disabled gateway spends no slot and does no I/O.
         if (!props.isEnabled()) {
             throw PmsUpstreamException.notSent("PMS integration disabled");
@@ -107,7 +115,11 @@ public class EzeeGateway {
         } catch (RuntimeException e) {
             throw PmsUpstreamException.notSent("PMS request could not be built");
         }
-        limiter.acquire(priority);
+        if (maxWait == null) {
+            limiter.acquire(priority);
+        } else {
+            limiter.acquire(priority, maxWait);
+        }
         int maxBytes = family.maxBytesFor(requestType);
         long start = System.nanoTime();
         PmsTransport.Reply reply;

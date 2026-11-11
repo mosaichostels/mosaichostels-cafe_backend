@@ -74,7 +74,8 @@ public class PmsRateLimiter {
     }
 
     // The deadline uses the real clock (not the injected one) so a stalled test clock cannot hang the wait.
-    void acquire(PmsPriority priority, Duration maxWait) {
+    /** Same wait loop with a caller-chosen bound; the 5 s window itself is unchanged, so this only waits longer. */
+    public void acquire(PmsPriority priority, Duration maxWait) {
         long deadline = System.nanoTime() + maxWait.toNanos();
         while (!tryAcquire(priority)) {
             if (System.nanoTime() >= deadline) {

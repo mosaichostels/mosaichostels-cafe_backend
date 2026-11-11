@@ -27,10 +27,20 @@ public class PmsHousekeepingFeed {
                 () -> gateway.json(EzeeFamily.HOUSEKEEPING, "InhouseRoomStatus", Map.of(), PmsPriority.HUB));
     }
 
-    /** Drops the cached reply and reads eZee again; a write's pre-check and read-back must not see stale data. */
-    public Cached<JsonNode> freshInhouseStatus() {
+    /** A write's pre-check and read-back may wait this long for a slot: 3 hub calls in ~1 s exceed 2 per 5 s. */
+    static final Duration WRITE_WAIT = Duration.ofSeconds(7);
+
+    /**
+     * Reads eZee directly: never the cache and never another caller's in-flight load, so the value cannot be stale.
+     * The cache entry is dropped before and after so later P1 reads reload instead of serving the pre-write board.
+     */
+    public JsonNode freshInhouseStatus() {
         cache.evict(CACHE_KEY);
-        return inhouseStatus();
+        try {
+            return gateway.json(EzeeFamily.HOUSEKEEPING, "InhouseRoomStatus", Map.of(), PmsPriority.HUB, WRITE_WAIT);
+        } finally {
+            cache.evict(CACHE_KEY);
+        }
     }
 
     /** Live InhouseRoomStatus also lists guests already "Checked Out" and not-yet-arrived "Confirmed Reservation"s. */
