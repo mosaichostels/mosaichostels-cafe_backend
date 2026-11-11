@@ -12,7 +12,7 @@
         "src/main/java/com/hostel/ordering/model/**/*.java",
         "src/main/java/com/hostel/ordering/repository/**/*.java"
       ],
-      "tokens_est": 2756
+      "tokens_est": 2812
     },
     {
       "file": "COMMANDS.md",
@@ -119,7 +119,7 @@
         "docs/agent/**",
         "AGENTS.md"
       ],
-      "tokens_est": 877
+      "tokens_est": 947
     },
     {
       "file": "STRUCTURE.md",

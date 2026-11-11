@@ -135,7 +135,7 @@ class PmsHousekeepingWorkflowServiceTest {
         assertEquals("9O9-9", l.items().get(0).roomName()); // "9o9-9" matched case-insensitively
         List<String> names = l.unmatched().stream().map(CleaningTaskList.Unmatched::roomName).toList();
         assertEquals(List.of("909-9", "ZZ9"), names); // digit zero does not match letter O
-        assertTrue(l.unmatched().stream().allMatch(u -> u.count() == 1));
+        assertTrue(l.unmatched().stream().allMatch(u -> u.count() == 1 && !u.ambiguous()));
         assertFalse(l.toString().toLowerCase().contains("asha"));
     }
 
@@ -223,28 +223,28 @@ class PmsHousekeepingWorkflowServiceTest {
     @Test
     void updateChangesStatusAndRejectsBadInput() {
         CleaningAssignment a = service.assign("2026-11-10|11", new PmsHousekeepingWorkflowService.AssignRequest("sam", null), "k1");
-        CleaningAssignment u = service.update(a.getId(), new PmsHousekeepingWorkflowService.UpdateRequest("in_progress", "x", null, null), "k2");
+        CleaningAssignment u = service.update(a.getId(), new PmsHousekeepingWorkflowService.UpdateRequest("in_progress", "x", null, 0L), "k2");
         assertEquals(CleaningAssignment.Status.IN_PROGRESS, u.getStatus());
         assertEquals(CleaningAssignment.Status.DONE, service.update(a.getId(),
-                new PmsHousekeepingWorkflowService.UpdateRequest("DONE", null, null, null), "k3").getStatus());
+                new PmsHousekeepingWorkflowService.UpdateRequest("DONE", null, null, 1L), "k3").getStatus());
         assertEquals(CleaningAssignment.Status.ASSIGNED, service.update(a.getId(),
-                new PmsHousekeepingWorkflowService.UpdateRequest("ASSIGNED", null, null, null), "k4").getStatus());
-        var empty = new PmsHousekeepingWorkflowService.UpdateRequest(null, null, null, null);
+                new PmsHousekeepingWorkflowService.UpdateRequest("ASSIGNED", null, null, 2L), "k4").getStatus());
+        var empty = new PmsHousekeepingWorkflowService.UpdateRequest(null, null, null, 3L);
         assertThrows(IllegalArgumentException.class, () -> service.update(a.getId(), empty, "k5"));
         assertThrows(IllegalArgumentException.class, () -> service.update(a.getId(),
-                new PmsHousekeepingWorkflowService.UpdateRequest("NOPE", null, null, null), "k6"));
+                new PmsHousekeepingWorkflowService.UpdateRequest("NOPE", null, null, 3L), "k6"));
         assertThrows(IllegalArgumentException.class, () -> service.update(a.getId(),
-                new PmsHousekeepingWorkflowService.UpdateRequest(null, "n".repeat(301), null, null), "k7"));
+                new PmsHousekeepingWorkflowService.UpdateRequest(null, "n".repeat(301), null, 3L), "k7"));
         assertThrows(IllegalArgumentException.class, () -> service.update("../x", empty, "k8"));
         assertThrows(IllegalArgumentException.class, () -> service.update(a.getId(),
-                new PmsHousekeepingWorkflowService.UpdateRequest(null, null, "ghost", null), "k9"));
+                new PmsHousekeepingWorkflowService.UpdateRequest(null, null, "ghost", 3L), "k9"));
         assertThrows(ResponseStatusException.class, () -> service.update("f".repeat(24),
-                new PmsHousekeepingWorkflowService.UpdateRequest("DONE", null, null, null), "k10"));
+                new PmsHousekeepingWorkflowService.UpdateRequest("DONE", null, null, 0L), "k10"));
         CleaningAssignment cleared = service.update(a.getId(),
-                new PmsHousekeepingWorkflowService.UpdateRequest("UNASSIGNED", null, null, null), "k11");
+                new PmsHousekeepingWorkflowService.UpdateRequest("UNASSIGNED", null, null, 3L), "k11");
         assertNull(cleared.getAssigneeUsername());
         assertThrows(IllegalArgumentException.class, () -> service.update(a.getId(),
-                new PmsHousekeepingWorkflowService.UpdateRequest("DONE", null, null, null), "k12"));
+                new PmsHousekeepingWorkflowService.UpdateRequest("DONE", null, null, 4L), "k12"));
     }
 
     @Test
@@ -255,7 +255,7 @@ class PmsHousekeepingWorkflowServiceTest {
         assertEquals(409, e.getStatusCode().value());
         org.mockito.Mockito.doThrow(new OptimisticLockingFailureException("race")).when(repo).save(any());
         e = assertThrows(ResponseStatusException.class, () -> service.update(a.getId(),
-                new PmsHousekeepingWorkflowService.UpdateRequest("DONE", null, null, null), "k3"));
+                new PmsHousekeepingWorkflowService.UpdateRequest("DONE", null, null, 1L), "k3"));
         assertEquals(409, e.getStatusCode().value());
     }
 
@@ -277,5 +277,72 @@ class PmsHousekeepingWorkflowServiceTest {
         var svc2 = new PmsHousekeepingWorkflowService(new PmsFrontDeskService(gateway, fresh, props, f2), f2, repo,
                 mock(UserRepository.class), mock(IdempotencyService.class), audit, CLOCK);
         assertThrows(PmsUpstreamException.class, () -> svc2.tasks("2026-11-10"));
+    }
+
+    @Test
+    void duplicateAndBlankRoomNamesAreNotAttributed() throws Exception {
+        when(gateway.json(any(), eq("InhouseRoomStatus"), any(), any())).thenReturn(PmsFrontDeskServiceTest.json("""
+                {"roomlist":[{"roomid":"31","unitid":"1","roomname":"Bunk","roomtypename":"Dorm"},
+                 {"roomid":"32","unitid":"2","roomname":" bunk ","roomtypename":"Dorm"},
+                 {"roomid":"33","unitid":"3","roomname":"","roomtypename":"X"},
+                 {"roomid":"34","unitid":"4","roomname":"   ","roomtypename":"X"},
+                 {"roomid":"35","unitid":"5","roomname":"Solo","roomtypename":"X"}],"checkinguestlist":[]}"""));
+        stubDepartures(departures("BUNK", "", " ", "Solo"));
+        CleaningTaskList l = service.tasks("2026-11-10");
+        assertEquals(1, l.items().size());
+        assertEquals("35", l.items().get(0).roomId());
+        assertEquals(2, l.unmatched().size()); // BUNK and the merged blank
+        var bunk = l.unmatched().stream().filter(u -> u.roomName().equals("BUNK")).findFirst().orElseThrow();
+        assertTrue(bunk.ambiguous());
+        assertEquals(1, bunk.count());
+        assertTrue(l.unmatched().stream().filter(u -> u.roomName().isEmpty()).noneMatch(u -> u.ambiguous()));
+    }
+
+    @Test
+    void assigneeMustBeStaffAndErrorsDoNotRevealUsernames() {
+        UserRepository u2 = mock(UserRepository.class);
+        when(u2.findByUsername("guestuser")).thenReturn(Optional.of(new User("guestuser", "x", java.util.Set.of("ROLE_GUEST"))));
+        when(u2.findByUsername("nobody")).thenReturn(Optional.empty());
+        PmsHousekeepingFeed feed = new PmsHousekeepingFeed(gateway, cache, new PmsProperties());
+        var svc = new PmsHousekeepingWorkflowService(new PmsFrontDeskService(gateway, cache, new PmsProperties(), feed),
+                feed, repo, u2, new IdempotencyService(mock(IdempotencyRepository.class)), audit, CLOCK);
+        String m1 = assertThrows(IllegalArgumentException.class, () -> svc.assign("2026-11-10|11",
+                new PmsHousekeepingWorkflowService.AssignRequest("guestuser", null), "a")).getMessage();
+        String m2 = assertThrows(IllegalArgumentException.class, () -> svc.assign("2026-11-10|11",
+                new PmsHousekeepingWorkflowService.AssignRequest("nobody", null), "b")).getMessage();
+        assertEquals(m1, m2);
+        assertEquals("Assignee is not available", m1);
+    }
+
+    @Test
+    void idempotencyKeysAreScopedPerCaller() {
+        var req = new PmsHousekeepingWorkflowService.AssignRequest("sam", null);
+        try {
+            as("alice");
+            CleaningAssignment a = service.assign("2026-11-10|11", req, "same");
+            as("bob");
+            service.assign("2026-11-10|12", req, "same"); // not a mismatch and not alice's replay
+            assertEquals(2, saves.get());
+            as("alice");
+            assertEquals(a.getId(), service.assign("2026-11-10|11", req, "same").getId());
+            assertEquals(2, saves.get());
+        } finally {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        }
+    }
+
+    @Test
+    void updateRequiresAVersionAndAssignKeepsDone() {
+        CleaningAssignment a = service.assign("2026-11-10|11", new PmsHousekeepingWorkflowService.AssignRequest("sam", null), "k1");
+        assertEquals("version is required", assertThrows(IllegalArgumentException.class, () -> service.update(a.getId(),
+                new PmsHousekeepingWorkflowService.UpdateRequest("DONE", null, null, null), "k2")).getMessage());
+        service.update(a.getId(), new PmsHousekeepingWorkflowService.UpdateRequest("DONE", null, null, 0L), "k3");
+        CleaningAssignment again = service.assign("2026-11-10|11", new PmsHousekeepingWorkflowService.AssignRequest("sam", "n"), "k4");
+        assertEquals(CleaningAssignment.Status.DONE, again.getStatus());
+    }
+
+    private static void as(String name) {
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                new org.springframework.security.authentication.TestingAuthenticationToken(name, "p", "ROLE_STAFF"));
     }
 }

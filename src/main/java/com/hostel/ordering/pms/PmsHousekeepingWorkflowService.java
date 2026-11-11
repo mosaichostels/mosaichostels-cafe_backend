@@ -85,22 +85,30 @@ public class PmsHousekeepingWorkflowService {
         Cached<JsonNode> hk = feed.inhouseStatus();
 
         Map<String, JsonNode> roomsByName = new HashMap<>();
+        Map<String, Integer> nameCount = new HashMap<>();
         for (JsonNode r : elements(hk.value().path("roomlist"))) {
-            if (!text(r, "roomid").isEmpty()) {
-                roomsByName.putIfAbsent(nameKey(text(r, "roomname")), r); // first wins; O and 0 stay distinct
+            String k = nameKey(text(r, "roomname"));
+            if (!text(r, "roomid").isEmpty() && !k.isEmpty()) { // blank names never match; O and 0 stay distinct
+                roomsByName.putIfAbsent(k, r);
+                nameCount.merge(k, 1, Integer::sum);
             }
         }
         Map<String, Integer> turnovers = new LinkedHashMap<>(); // roomId -> departures
         Map<String, Integer> unmatched = new LinkedHashMap<>(); // trimmed name -> departures
+        java.util.Set<String> ambiguous = new java.util.HashSet<>();
         Map<String, JsonNode> roomById = new HashMap<>();
         for (BookingSummary b : deps.value()) {
             if (PmsDates.leadingDate(b.departure()).filter(d -> !d.equals(date)).isPresent()) {
                 continue;
             }
             String name = b.room() == null ? "" : b.room().strip();
-            JsonNode room = roomsByName.get(nameKey(name));
-            if (room == null) {
+            String k = nameKey(name);
+            JsonNode room = k.isEmpty() ? null : roomsByName.get(k);
+            if (room == null || nameCount.get(k) > 1) { // a shared name cannot be pinned to one bed
                 unmatched.merge(name, 1, Integer::sum);
+                if (room != null) {
+                    ambiguous.add(name);
+                }
             } else {
                 String id = text(room, "roomid");
                 roomById.put(id, room);
@@ -123,7 +131,7 @@ public class PmsHousekeepingWorkflowService {
         items.sort(Comparator.comparing(CleaningTask::roomName, PmsHousekeepingService::natural)
                 .thenComparing(CleaningTask::roomId));
         List<CleaningTaskList.Unmatched> um = new ArrayList<>();
-        unmatched.forEach((n, c) -> um.add(new CleaningTaskList.Unmatched(n, c)));
+        unmatched.forEach((n, c) -> um.add(new CleaningTaskList.Unmatched(n, c, ambiguous.contains(n))));
         return new CleaningTaskList(items, um, Math.min(deps.fetchedAtMs(), hk.fetchedAtMs()),
                 deps.stale() || hk.stale());
     }
@@ -153,7 +161,7 @@ public class PmsHousekeepingWorkflowService {
                 a = newAssignment(canonical, parts[0], parts[1]);
             }
             a.setAssigneeUsername(assignee);
-            if (a.getStatus() == Status.UNASSIGNED) {
+            if (a.getStatus() == Status.UNASSIGNED) { // an existing DONE/IN_PROGRESS task keeps its status; only the assignee changes
                 a.setStatus(Status.ASSIGNED);
             }
             if (notes != null) {
@@ -178,13 +186,16 @@ public class PmsHousekeepingWorkflowService {
         Status status = parseStatus(req.status());
         String assignee = req.assignee() == null ? null : requireAssignee(req.assignee());
         String notes = checkNotes(req.notes());
+        if (req.version() == null) {
+            throw new IllegalArgumentException("version is required");
+        }
         if (status == null && assignee == null && notes == null) {
             throw new IllegalArgumentException("Nothing to update");
         }
         return once(key, "update|" + id + "|" + status + "|" + assignee + "|" + notes + "|" + req.version(), () -> {
             CleaningAssignment a = repo.findById(id)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Assignment not found"));
-            if (req.version() != null && !req.version().equals(a.getVersion())) {
+            if (!req.version().equals(a.getVersion())) {
                 throw conflict();
             }
             if (assignee != null) {
@@ -215,8 +226,11 @@ public class PmsHousekeepingWorkflowService {
     // shortcut: check-then-put is not atomic; two identical in-flight requests can both write (the unique
     // taskKey index and @Version still keep the data consistent). Upgrade to an atomic claim if that matters.
     private CleaningAssignment once(String key, String fingerprint, Supplier<CleaningAssignment> op) {
-        String fpKey = "cleaning-fp:" + key;
-        String resKey = "cleaning-res:" + key;
+        String caller = org.springframework.security.core.context.SecurityContextHolder.getContext()
+                .getAuthentication() == null ? "-" : org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication().getName(); // keys are per caller: no cross-user replay
+        String fpKey = "cleaning-fp:" + caller + ":" + key;
+        String resKey = "cleaning-res:" + caller + ":" + key;
         String seen = idempotency.getIfPresent(fpKey, String.class);
         if (seen != null) {
             if (!seen.equals(fingerprint)) {
@@ -283,10 +297,14 @@ public class PmsHousekeepingWorkflowService {
     private String requireAssignee(String username) {
         String u = username == null ? "" : username.strip();
         if (u.isEmpty() || u.length() > MAX_USERNAME) {
-            throw new IllegalArgumentException("A valid assignee is required");
+            throw new IllegalArgumentException("Assignee is not available");
         }
-        if (users.findByUsername(u).isEmpty()) {
-            throw new IllegalArgumentException("Assignee not found");
+        // one generic message for unknown users and non-staff accounts: do not reveal which usernames exist
+        boolean ok = users.findByUsername(u).map(x -> x.getRoles() != null && x.getRoles().stream()
+                .anyMatch(r -> r.equals("ROLE_STAFF") || r.equals("ROLE_ADMIN") || r.equals("ROLE_SUPERADMIN")))
+                .orElse(false);
+        if (!ok) {
+            throw new IllegalArgumentException("Assignee is not available");
         }
         return u;
     }
