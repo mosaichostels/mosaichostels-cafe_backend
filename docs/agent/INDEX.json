@@ -12,7 +12,7 @@
         "src/main/java/com/hostel/ordering/model/**/*.java",
         "src/main/java/com/hostel/ordering/repository/**/*.java"
       ],
-      "tokens_est": 2277
+      "tokens_est": 2756
     },
     {
       "file": "COMMANDS.md",
@@ -37,7 +37,7 @@
         "src/main/java/**/*.java",
         "src/main/resources/**"
       ],
-      "tokens_est": 367
+      "tokens_est": 373
     },
     {
       "file": "DECISIONS.md",
@@ -119,7 +119,7 @@
         "docs/agent/**",
         "AGENTS.md"
       ],
-      "tokens_est": 809
+      "tokens_est": 877
     },
     {
       "file": "STRUCTURE.md",
@@ -132,7 +132,7 @@
         "scripts/**",
         "pom.xml"
       ],
-      "tokens_est": 766
+      "tokens_est": 823
     },
     {
       "file": "TESTING.md",

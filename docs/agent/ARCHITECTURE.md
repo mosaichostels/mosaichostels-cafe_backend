@@ -19,6 +19,7 @@ Flow: `request -> RateLimitFilter / AuthTokenFilter (SecurityConfig) -> controll
 | `POST /users/me/register-fcm` | any authenticated |
 | `/users` CRUD, `/audit`, `GET /pms/status` | SUPERADMIN only (Admin gets 403) |
 | `GET /pms/arrivals?from&to`, `/pms/departures?from&to`, `/pms/inhouse`, `/pms/bookings/{bookingId}`, `/pms/guests?q=`, `/pms/housekeeping/rooms` | ADMIN, STAFF (class-level `@PreAuthorize`; SUPERADMIN via hierarchy) |
+| `GET /pms/cleaning-tasks?date=`, `POST /pms/cleaning-tasks/{taskKey}/assign`, `PUT /pms/cleaning-assignments/{id}` | ADMIN, STAFF (class-level `@PreAuthorize`; SUPERADMIN via hierarchy). Mutations need `Idempotency-Key` (400 if missing) |
 | `GET /pms/reconcile/charges?date=` | ADMIN (shows guest names) |
 | `GET /app/android-version` | any authenticated (`anyRequest().authenticated()`; `AppVersionController`) |
 | `GET /pms/unconfirmed`, `POST /pms/unconfirmed/{idempotencyKey}/resolve` (body `{outcome: APPLIED\|NOT_APPLIED}`) | ADMIN (`@PreAuthorize`) |
@@ -31,7 +32,7 @@ Flow: `request -> RateLimitFilter / AuthTokenFilter (SecurityConfig) -> controll
 - `LoginThrottle`: per-account login guessing. `RateLimitFilter` (60s window, in-memory, max 10000 keys): `POST /orders` 30/min, `POST /auth/login` 10/min; key = JWT user else client IP (X-Forwarded-For trusted only if peer is private/loopback).
 
 ## Collections (@Document)
-`orders` (unique sparse index on idempotency key; compound `status_createdAt`), `users` (unique username), `menu_items`, `other_essentials`, `categories`, `dormitories`, `order_status_config`, `audit_logs`, `idempotency_keys` (TTL 3600 s), `pms_write_claims` (below).
+`orders` (unique sparse index on idempotency key; compound `status_createdAt`), `users` (unique username), `menu_items`, `other_essentials`, `categories`, `dormitories`, `order_status_config`, `audit_logs`, `idempotency_keys` (TTL 3600 s), `pms_write_claims` (below), `cleaning_assignments` (unique `taskKey` = `yyyy-MM-dd|roomId`, index on `departureDate`, `@Version`; ids, room-name snapshots, assignee username, status, notes only; no booking or guest data).
 
 ## Category rename
 Items store their category by name: `CategoryService` update (:72-82) `updateMulti`s the new name into `menu_items` or `other_essentials` (by category type), then renumbers `showOrder`. Test: `CategoryRenameCascadeTest`.
@@ -67,3 +68,8 @@ Items store their category by name: `CategoryService` update (:72-82) `updateMul
 
 ## Notifications / startup
 `FCMNotificationService`; `FirebaseConfig` throws at startup without credentials. Initial admin created/re-hashed at startup from `config.admin.*`.
+
+## Cleaning workflow (`pms/`, P3, Mongo writes only)
+- `PmsHousekeepingWorkflowService`: `GET /pms/cleaning-tasks?date=` (default today IST; invalid or >31 days from today = 400) merges P1 departures for that date with `cleaning_assignments`: one task per `date|room`, `turnovers` = departures in that room. Departure room NAME is mapped to `roomId`/`unitId` through the `InhouseRoomStatus` roomlist (trimmed, case-insensitive, letter O never equals 0); no match goes to `unmatched` (`{roomName, count}`, no guest data). Stored assignments with no current departure stay listed with `turnovers` 0. Envelope `{items, unmatched, asOf, stale}`.
+- `POST .../assign` (assignee must be an existing user of any role; `User` has no active flag) upserts by `taskKey`; `PUT /pms/cleaning-assignments/{id}` takes `{status, notes, assignee, version}`; any status transition is allowed (DONE is not final); a non-UNASSIGNED status needs an assignee; notes <=300; stale `version` or a racing save = 409; invalid input = 400.
+- Idempotency: header required, pattern `[A-Za-z0-9._:-]{1,128}`; `IdempotencyService` stores a request fingerprint (`cleaning-fp:<key>`) and the first result (`cleaning-res:<key>`, 1 h TTL): same key + same request replays with no write and no audit; same key + different request = `PmsIdempotencyMismatchException` (409). Check-then-put is not atomic. Audit actions `CLEANING_ASSIGN` / `CLEANING_UPDATE` carry ids, status and assignee only. No eZee write is made.
