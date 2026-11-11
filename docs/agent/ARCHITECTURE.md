@@ -87,3 +87,8 @@ Items store their category by name: `CategoryService` update (:72-82) `updateMul
 - Until step 2 is done, an old `ROLE_STAFF` account loses every `/pms/**` endpoint (403) and Android treats it as no access.
 - Reverse: edit the script's `rewrite()` to map `ROLE_KITCHEN` to `ROLE_STAFF` and re-run; it also flips accounts that were KITCHEN before the migration, so dry-run first. There is no separate rollback script.
 - The script has never been run on a real mongod (no mongod available when written); only its rewrite function was tested with node. Treat the first dry-run as the test.
+
+## Release note: dropped routes (2026-11-11, drop-features)
+- The front desk routes (`/pms/arrivals`, `/pms/departures`, `/pms/inhouse`, `/pms/bookings/{id}`, `/pms/guests`) and the cleaning write routes (`POST /pms/cleaning-tasks/{taskKey}/assign`, `PUT /pms/cleaning-assignments/{id}`) are gone. An unmapped path falls into `GlobalExceptionHandler` and returns HTTP 500 (with an ERROR stack trace in the log), not 404.
+- Hand out the Android 1.8.0 (versionCode 16) APK before or together with this backend deploy. An older 1.7.0 app shows the front desk error state with a retry that never succeeds, its cleaning "Take it" fails with a server-error toast, and a cleaning action already in its offline queue replays into a 500, is kept for retry and can delay queued order updates behind it for up to 30 minutes.
+- On the Space set `APP_ANDROID_MIN_VERSION_CODE=16`, plus `APP_ANDROID_LATEST_VERSION_CODE` and `APP_ANDROID_APK_URL` (see ENVIRONMENT.md). The old app's update dialog has never been checked on a device.

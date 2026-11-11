@@ -12,7 +12,7 @@
         "src/main/java/com/hostel/ordering/model/**/*.java",
         "src/main/java/com/hostel/ordering/repository/**/*.java"
       ],
-      "tokens_est": 3695
+      "tokens_est": 3950
     },
     {
       "file": "COMMANDS.md",
