@@ -32,6 +32,9 @@ public class PmsHousekeepingService {
         JsonNode reply = c.value();
         Map<String, String> guestByRoom = new HashMap<>();
         for (JsonNode g : elements(reply.path("checkinguestlist"))) {
+            if (!PmsHousekeepingFeed.isInHouse(g)) {
+                continue;
+            }
             // first guest in list order wins (dorm rooms hold several)
             guestByRoom.putIfAbsent(key(text(g, "room")), text(g, "guestname"));
         }

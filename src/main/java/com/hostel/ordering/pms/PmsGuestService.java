@@ -20,7 +20,8 @@ public class PmsGuestService {
     static final int MAX_QUERY = 60;
     static final int MAX_HITS = 20;
     private static final Set<String> VIP = Set.of("yes", "1", "true", "vip");
-    private static final Set<String> NAME_COLUMNS = Set.of("guest name", "name", "contact_person");
+    private static final String NAME_COLUMN = "guest name";
+    private static final String STAYS_COLUMN = "total number of stays";
 
     /** Only what search needs; phone, email and address are dropped before caching. */
     record Guest(String id, String name, String lower, boolean vip) {}
@@ -86,30 +87,41 @@ public class PmsGuestService {
     }
 
     /**
-     * Counts CSV rows per trimmed lower-cased guest name. The stay-count CSV shape was never probed, so the name
-     * column is found by header ("Guest Name", "Name" or "Contact_person"); no such header gives an empty map.
+     * Sums the "Total Number of stays" column per trimmed lower-cased "Guest Name" (live-verified header, one row per
+     * guest profile; some names repeat across profiles). A missing column or a non-numeric cell counts nothing.
      */
     static Map<String, Integer> countStays(String csv) {
         List<List<String>> rows = PmsCsv.parse(csv);
-        int col = -1;
         int start = PmsCsv.firstNonBlank(rows);
         if (start == rows.size()) {
             return Map.of();
         }
         List<String> header = rows.get(start);
-        for (int i = 0; i < header.size() && col < 0; i++) {
-            if (NAME_COLUMNS.contains(PmsCsv.headerName(header.get(i)))) {
-                col = i;
+        int name = -1;
+        int stays = -1;
+        for (int i = 0; i < header.size(); i++) {
+            String h = PmsCsv.headerName(header.get(i));
+            if (name < 0 && NAME_COLUMN.equals(h)) {
+                name = i;
+            } else if (stays < 0 && STAYS_COLUMN.equals(h)) {
+                stays = i;
             }
         }
-        if (col < 0) {
+        if (name < 0 || stays < 0) {
             return Map.of();
         }
         Map<String, Integer> counts = new HashMap<>();
         for (int r = start + 1; r < rows.size(); r++) {
             List<String> row = rows.get(r);
-            if (col < row.size() && !row.get(col).isBlank()) {
-                counts.merge(row.get(col).strip().toLowerCase(Locale.ROOT), 1, Integer::sum);
+            if (name < row.size() && stays < row.size() && !row.get(name).isBlank()) {
+                try {
+                    int n = Integer.parseInt(row.get(stays).strip());
+                    if (n > 0) {
+                        counts.merge(row.get(name).strip().toLowerCase(Locale.ROOT), n, Integer::sum);
+                    }
+                } catch (NumberFormatException ignored) {
+                    // unreadable cell: no count rather than a guess
+                }
             }
         }
         return counts;

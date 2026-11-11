@@ -155,6 +155,19 @@ class PmsFrontDeskServiceTest {
     }
 
     @Test
+    void inHouseDropsCheckedOutAndNotYetArrived() {
+        when(gateway.json(any(), eq("InhouseRoomStatus"), any(), any())).thenReturn(json("""
+                {"checkinguestlist":[
+                 {"reservationno":"1","bookingstatus":"Checked Out"},
+                 {"reservationno":"2","bookingstatus":"Confirmed Reservation"},
+                 {"reservationno":"3","bookingstatus":"Stayover"},
+                 {"reservationno":"4","bookingstatus":"Due Out"},
+                 {"reservationno":"5","bookingstatus":"Arrived"}]}"""));
+        assertEquals(List.of("3", "4", "5"),
+                service.inHouse().value().stream().map(BookingSummary::bookingId).toList());
+    }
+
+    @Test
     void inHouseWithNoGuestsIsEmpty() {
         when(gateway.json(any(), eq("InhouseRoomStatus"), any(), any())).thenReturn(NullNode.instance);
         assertTrue(service.inHouse().value().isEmpty());

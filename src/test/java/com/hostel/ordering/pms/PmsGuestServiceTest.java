@@ -38,7 +38,7 @@ class PmsGuestServiceTest {
         stubGuests(PmsFrontDeskServiceTest.json(guests("Asha Rao:1:Yes", "asha rao:2:No", "Bram Quill:3:",
                 "Chen (Wu):4:No", "A.B*[x:5:No", "Zed Asha:6:1")));
         when(gateway.text(eq(EzeeFamily.GUEST_DB), any(), any(), any())).thenReturn(
-                "\"Unique id\",\"Guest Name\",\"Mobile\"\n1,\"Rao, Asha\",5\n1,Asha Rao,5\n2,\" ASHA RAO \",6\n3,\"Bram \"\"Q\"\"\",7\n");
+                "\"Guest Name\",\"Guest Email\",\"Total Number of stays\"\n\"Rao, Asha\",x,5\nAsha Rao,x,1\n\" ASHA RAO \",x,1\n\"Bram \"\"Q\"\"\",x,7\n");
     }
 
     private void stubGuests(JsonNode n) {
@@ -129,9 +129,9 @@ class PmsGuestServiceTest {
     @Test
     void csvFailureDoesNotFailSearchAndIsNotCached() {
         when(gateway.text(eq(EzeeFamily.GUEST_DB), any(), any(), any())).thenThrow(new PmsUpstreamException("down"))
-                .thenReturn("Name\nAsha Rao\n");
+                .thenReturn("Guest Name,Total Number of stays\nAsha Rao,3\n");
         assertEquals(0, service.search("asha rao").value().get(0).stays());
-        assertEquals(1, service.search("asha rao").value().get(0).stays());
+        assertEquals(3, service.search("asha rao").value().get(0).stays());
     }
 
     @Test
@@ -153,8 +153,8 @@ class PmsGuestServiceTest {
 
     @Test
     void parserHandlesQuotedFieldsAndLineBreaks() {
-        Map<String, Integer> m = PmsGuestService.countStays("﻿id,\"Contact_person\"\r\n1,\"Li\nne, \"\"X\"\"\"\r\n2,b\r\n3,B\r\n");
-        assertEquals(Map.of("li\nne, \"x\"", 1, "b", 2), m);
+        Map<String, Integer> m = PmsGuestService.countStays("﻿\"Guest Name\",\"Total Number of stays\"\r\n\"Li\nne, \"\"X\"\"\",1\r\nb,2\r\nB,x\r\nB,3\r\n");
+        assertEquals(Map.of("li\nne, \"x\"", 1, "b", 5), m);
         assertTrue(PmsGuestService.countStays("").isEmpty());
         assertTrue(PmsGuestService.countStays("\n\n").isEmpty());
     }

@@ -189,7 +189,7 @@ class PmsFrontDeskControllerTest {
     void guestSearchRolesBodyAndBadQueries() throws Exception {
         when(GATEWAY.json(eq(EzeeFamily.CONNECTIVITY), eq("GuestList"), any(), any())).thenReturn(
                 PmsFrontDeskServiceTest.json(PmsGuestServiceTest.guests("Asha Rao:1:Yes")));
-        when(GATEWAY.text(eq(EzeeFamily.GUEST_DB), any(), any(), any())).thenReturn("Name\nAsha Rao\n");
+        when(GATEWAY.text(eq(EzeeFamily.GUEST_DB), any(), any(), any())).thenReturn("Guest Name,Total Number of stays\nAsha Rao,1\n");
         assertThrows(AuthenticationCredentialsNotFoundException.class, () -> controller.guests("asha"));
         as("ROLE_GUEST");
         assertThrows(AccessDeniedException.class, () -> controller.guests("asha"));

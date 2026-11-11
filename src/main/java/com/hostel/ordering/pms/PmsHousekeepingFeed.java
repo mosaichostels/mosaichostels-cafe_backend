@@ -24,4 +24,10 @@ public class PmsHousekeepingFeed {
         return PmsReads.load(cache, "hk:inhouse", props.ttl("hk", Duration.ofSeconds(30)),
                 () -> gateway.json(EzeeFamily.HOUSEKEEPING, "InhouseRoomStatus", Map.of(), PmsPriority.HUB));
     }
+
+    /** Live InhouseRoomStatus also lists guests already "Checked Out" and not-yet-arrived "Confirmed Reservation"s. */
+    static boolean isInHouse(JsonNode guest) {
+        String status = guest.path("bookingstatus").asText("").strip();
+        return !status.equalsIgnoreCase("Checked Out") && !status.equalsIgnoreCase("Confirmed Reservation");
+    }
 }

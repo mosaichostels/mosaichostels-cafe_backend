@@ -41,6 +41,9 @@ public class PmsFrontDeskService {
         Cached<JsonNode> c = feed.inhouseStatus();
         List<BookingSummary> items = new ArrayList<>();
         for (JsonNode g : elements(c.value().path("checkinguestlist"))) {
+            if (!PmsHousekeepingFeed.isInHouse(g)) {
+                continue;
+            }
             String in = PmsDates.leadingDate(text(g, "checkindate")).map(LocalDate::toString).orElse("");
             String out = PmsDates.leadingDate(text(g, "checkoutdate")).map(LocalDate::toString).orElse("");
             items.add(new BookingSummary(text(g, "reservationno"), text(g, "guestname"), text(g, "room"),
