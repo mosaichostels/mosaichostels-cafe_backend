@@ -160,6 +160,10 @@ public class PmsHousekeepingWorkflowService {
             if (created) {
                 a = newAssignment(canonical, parts[0], parts[1]);
             }
+            if (!created && a.getStatus() != Status.UNASSIGNED && a.getAssigneeUsername() != null
+                    && !a.getAssigneeUsername().equals(assignee)) {
+                throw conflict(); // never take over someone's task; reassigning goes through update() with a version
+            }
             a.setAssigneeUsername(assignee);
             if (a.getStatus() == Status.UNASSIGNED) { // an existing DONE/IN_PROGRESS task keeps its status; only the assignee changes
                 a.setStatus(Status.ASSIGNED);

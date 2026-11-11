@@ -105,6 +105,7 @@ class PmsHousekeepingWorkflowServiceTest {
         UserRepository users = mock(UserRepository.class);
         when(users.findByUsername(anyString())).thenReturn(Optional.empty());
         when(users.findByUsername("sam")).thenReturn(Optional.of(new User("sam", "x", java.util.Set.of("ROLE_STAFF"))));
+        when(users.findByUsername("alex")).thenReturn(Optional.of(new User("alex", "x", java.util.Set.of("ROLE_STAFF"))));
         audit = mock(AuditService.class);
         PmsHousekeepingFeed feed = new PmsHousekeepingFeed(gateway, cache, props);
         service = new PmsHousekeepingWorkflowService(new PmsFrontDeskService(gateway, cache, props, feed), feed, repo,
@@ -170,6 +171,23 @@ class PmsHousekeepingWorkflowServiceTest {
         verify(audit).logAction(eq("CLEANING_ASSIGN"), details.capture());
         assertEquals("assignmentId=" + a.getId() + " taskKey=2026-11-10|11 assignee=sam", details.getValue());
         verify(gateway, never()).json(any(), eq("UpdateRoomStatus"), any(), any());
+    }
+
+    @Test
+    void assigningATaskHeldByAnotherUserIs409AndChangesNothing() {
+        service.assign("2026-11-10|11", new PmsHousekeepingWorkflowService.AssignRequest("sam", null), "k1");
+        var ex = assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> service.assign(
+                "2026-11-10|11", new PmsHousekeepingWorkflowService.AssignRequest("alex", null), "k2"));
+        assertEquals(409, ex.getStatusCode().value());
+        assertEquals(1, saves.get());
+    }
+
+    @Test
+    void assigningATaskAlreadyYoursWithANewKeyIsAllowed() {
+        service.assign("2026-11-10|11", new PmsHousekeepingWorkflowService.AssignRequest("sam", null), "k1");
+        CleaningAssignment again = service.assign("2026-11-10|11",
+                new PmsHousekeepingWorkflowService.AssignRequest("sam", "note"), "k2");
+        assertEquals("sam", again.getAssigneeUsername());
     }
 
     @Test
