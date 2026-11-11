@@ -9,6 +9,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class PmsHousekeepingFeed {
 
+    static final String CACHE_KEY = "hk:inhouse";
+
     private final EzeeGateway gateway;
     private final PmsCache cache;
     private final PmsProperties props;
@@ -21,8 +23,14 @@ public class PmsHousekeepingFeed {
 
     /** The returned JsonNode is shared across callers and must be treated read-only. */
     public Cached<JsonNode> inhouseStatus() {
-        return PmsReads.load(cache, "hk:inhouse", props.ttl("hk", Duration.ofSeconds(30)),
+        return PmsReads.load(cache, CACHE_KEY, props.ttl("hk", Duration.ofSeconds(30)),
                 () -> gateway.json(EzeeFamily.HOUSEKEEPING, "InhouseRoomStatus", Map.of(), PmsPriority.HUB));
+    }
+
+    /** Drops the cached reply and reads eZee again; a write's pre-check and read-back must not see stale data. */
+    public Cached<JsonNode> freshInhouseStatus() {
+        cache.evict(CACHE_KEY);
+        return inhouseStatus();
     }
 
     /** Live InhouseRoomStatus also lists guests already "Checked Out" and not-yet-arrived "Confirmed Reservation"s. */

@@ -12,7 +12,7 @@
         "src/main/java/com/hostel/ordering/model/**/*.java",
         "src/main/java/com/hostel/ordering/repository/**/*.java"
       ],
-      "tokens_est": 2812
+      "tokens_est": 3363
     },
     {
       "file": "COMMANDS.md",
@@ -55,7 +55,7 @@
         "src/main/java/**/*.java",
         "Dockerfile"
       ],
-      "tokens_est": 877
+      "tokens_est": 966
     },
     {
       "file": "EXTERNAL.md",
@@ -119,7 +119,7 @@
         "docs/agent/**",
         "AGENTS.md"
       ],
-      "tokens_est": 947
+      "tokens_est": 1024
     },
     {
       "file": "STRUCTURE.md",
@@ -132,7 +132,7 @@
         "scripts/**",
         "pom.xml"
       ],
-      "tokens_est": 823
+      "tokens_est": 851
     },
     {
       "file": "TESTING.md",

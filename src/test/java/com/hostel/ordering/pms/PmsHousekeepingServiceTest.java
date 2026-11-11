@@ -58,7 +58,8 @@ class PmsHousekeepingServiceTest {
         @Bean
         PmsHousekeepingController controller() {
             return new PmsHousekeepingController(
-                    new PmsHousekeepingService(new PmsHousekeepingFeed(GATEWAY, new PmsCache(), new PmsProperties())));
+                    new PmsHousekeepingService(new PmsHousekeepingFeed(GATEWAY, new PmsCache(), new PmsProperties())),
+                    null);
         }
     }
 
