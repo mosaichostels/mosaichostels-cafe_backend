@@ -85,7 +85,7 @@ class PmsHousekeepingServiceTest {
 
     private void reply(String json) {
         when(GATEWAY.json(eq(EzeeFamily.HOUSEKEEPING), eq("InhouseRoomStatus"), any(), eq(PmsPriority.HUB)))
-                .thenReturn(PmsFrontDeskServiceTest.json(json));
+                .thenReturn(PmsTestJson.json(json));
     }
 
     private static String room(String id, String name, String hk, String blocked) {
@@ -185,16 +185,6 @@ class PmsHousekeepingServiceTest {
         assertTrue(c.stale());
         assertEquals(1_000, c.fetchedAtMs());
         assertEquals(1, c.value().size());
-    }
-
-    @Test
-    void inhouseAndRoomBoardShareOneGatewayCall() {
-        reply("{\"roomlist\":[" + room("1", "1", "", "No") + "],\"checkinguestlist\":[" + guest("1", "A") + "]}");
-        PmsFrontDeskService fd = new PmsFrontDeskService(GATEWAY, new PmsCache(clock::get), new PmsProperties(), feed);
-        assertEquals(1, fd.inHouse().value().size());
-        assertEquals(1, service.rooms().value().size());
-        verify(GATEWAY, times(1)).json(eq(EzeeFamily.HOUSEKEEPING), eq("InhouseRoomStatus"), eq(Map.of()),
-                eq(PmsPriority.HUB));
     }
 
     @Test

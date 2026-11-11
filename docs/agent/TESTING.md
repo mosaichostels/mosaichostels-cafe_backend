@@ -14,12 +14,12 @@ Covers: src/test/java/**/*.java, pom.xml, .github/workflows/**
 | controller | AppVersionControllerTest, AuthControllerThrottleTest, HealthAndCorsTest, NotificationControllerSecurityTest, OrderControllerDeleteTest, OrderControllerTest, SuperAdminGateTest |
 | dto / model | CreateOrderRequestValidationTest, OrderTest |
 | ezee | EzeeChargePostServiceTest, EzeeClientTest, EzeeXmlUtilTest |
-| pms | EzeeGatewayTest, MongoPmsWriteClaimStoreTest, PmsBookingServiceTest, PmsCacheTest, PmsExceptionMappingTest, PmsFrontDeskControllerTest, PmsFrontDeskServiceTest, PmsGuestServiceTest, PmsHousekeepingServiceTest, PmsPropertiesTest, PmsRateLimiterTest, PmsReconcileServiceTest, PmsStatusControllerTest, PmsUnconfirmedControllerTest, PmsWriteGuardTest; helper `InMemoryPmsWriteClaimStore` |
+| pms | EzeeGatewayTest, MongoPmsWriteClaimStoreTest, PmsCacheTest, PmsExceptionMappingTest, PmsHousekeepingControllerTest, PmsHousekeepingServiceTest, PmsHousekeepingWorkflowControllerTest, PmsHousekeepingWorkflowServiceTest, PmsRoomStatusWriteServiceTest, PmsPropertiesTest, PmsRateLimiterTest, PmsReconcileServiceTest, PmsStatusControllerTest, PmsUnconfirmedControllerTest, PmsWriteGuardTest; helpers `InMemoryPmsWriteClaimStore`, `PmsTestJson` |
 | repository | OrderRepositoryClaimTest |
 | security | RoleMatrixTest (role by route matrix, kitchen/housekeeping/admin/superadmin/staff), AuthTokenFilterTest, JwtUtilsRevocationTest, LoginThrottleTest |
 | service | AuditServiceTest, AuthServiceRevocationTest, CategoryDeleteGuardTest, CategoryRenameCascadeTest, ConfirmTokenServiceTest, DormitoryOrderingTest, OrderCreateIdempotencyTest, OrderServiceTest, OrderStatusSeedingTest, RestoreDeletedItemTest, StaleChargePostRecoveryTest, UserServiceDeleteGuardTest, UserServiceRulesTest |
 
 - `InMemoryPmsWriteClaimStore` is a test twin of `MongoPmsWriteClaimStore` used by the concurrency tests (no embedded Mongo here), so Mongo-level index behaviour is not tested. `ezee/EzeeClientTest` also covers `recordCafeCall`.
-- Hub read tests use stubbed gateways with synthetic values and real field names; Log-capture PII checks exist in the booking, guest, housekeeping and reconcile tests. Role matrix is asserted by exception type, not HTTP status. `AppVersionControllerTest` does not assert 401 at runtime.
+- Hub read tests use stubbed gateways with synthetic values and real field names; Log-capture PII checks exist in the housekeeping and reconcile tests. Role matrix is asserted by exception type, not HTTP status. `AppVersionControllerTest` does not assert 401 at runtime.
 - eZee/charge-post edits: run at least EzeeChargePostServiceTest, StaleChargePostRecoveryTest, OrderRepositoryClaimTest.
 - Coverage tooling (jacoco etc.): none in pom.

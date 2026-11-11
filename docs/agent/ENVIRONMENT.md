@@ -30,7 +30,7 @@ Properties with no env mapping in the yml (set elsewhere or defaults):
 | `pms.writes.<feature>` | write flag per feature, default off; NOT settable by a per-feature env var (see below) |
 | `pms.canary.<feature>` | canary list per feature |
 | `pms.writes.room-status`, `pms.canary.room-status` | clean/dirty write to eZee (`POST /pms/housekeeping/rooms/{roomId}/status`); flag absent = off, no default turns it on; canary = list of eZee ROOM ids (not booking ids). The room-status write FAILS CLOSED: flag on with an empty or missing canary list refuses every room (403), so set the canary first. Set via `SPRING_APPLICATION_JSON` (see below) |
-| `pms.ttl.<name>` | cache TTL seconds; env `PMS_TTL_<NAME>` for single-word names. Names in use: `hk` (30), `arrivals` (60, shared by arrivals and departures), `booking` (30), `guests` (600), `gueststays` (1800), `bills` (60) |
+| `pms.ttl.<name>` | cache TTL seconds; env `PMS_TTL_<NAME>` for single-word names. Names in use: `hk` (30), `departures` (60, cleaning to-do), `bills` (60) |
 | `app.android.latest-version-code`, `app.android.min-version-code` | `AppVersionController` `@Value`, default 0; env `APP_ANDROID_LATEST_VERSION_CODE`, `APP_ANDROID_MIN_VERSION_CODE`; not in `application-prod.yml`; a non-numeric value fails context start (the app does not boot) |
 | `app.android.apk-url` | default empty; env `APP_ANDROID_APK_URL`; not in `application-prod.yml` (all three unset = `{0,0,""}`, no update prompt) |
 | `ezee.base-url` | optional; gateway also reads existing `ezee.auth-code`, `ezee.hotel-code` (`PmsProperties`, `EzeeGateway`) |

@@ -5,7 +5,7 @@ import java.time.Duration;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 
-/** One cached eZee InhouseRoomStatus call ({roomlist, checkinguestlist}) shared by the in-house list and the room board. */
+/** One cached eZee InhouseRoomStatus call ({roomlist, checkinguestlist}) shared by the room board and the cleaning to-do. */
 @Component
 public class PmsHousekeepingFeed {
 

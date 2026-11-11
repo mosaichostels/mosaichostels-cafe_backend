@@ -46,11 +46,11 @@ class PmsRoomStatusWriteServiceTest {
         service = new PmsRoomStatusWriteService(new PmsHousekeepingFeed(gateway, cache, props), gateway, flags, guard,
                 "H1");
         when(gateway.json(eq(EzeeFamily.HOUSEKEEPING), eq(UPDATE), any(), eq(PmsPriority.HUB), any()))
-                .thenReturn(PmsFrontDeskServiceTest.json(OK));
+                .thenReturn(PmsTestJson.json(OK));
     }
 
     private static JsonNode feed(String hk, String blocked) {
-        return PmsFrontDeskServiceTest.json("{\"roomlist\":[{\"roomid\":\"11\",\"unitid\":\"21\",\"roomname\":\"A1\","
+        return PmsTestJson.json("{\"roomlist\":[{\"roomid\":\"11\",\"unitid\":\"21\",\"roomname\":\"A1\","
                 + "\"isblocked\":\"" + blocked + "\",\"hkstatus\":\"" + hk + "\",\"hkremarks\":\"\"},"
                 + "{\"roomid\":\"12\",\"unitid\":\"22\",\"roomname\":\"A2\",\"isblocked\":\"No\",\"hkstatus\":\"Dirty\"}],"
                 + "\"checkinguestlist\":[{\"guestname\":\"Asha Rao\",\"email\":\"q@guest.test\",\"room\":\"A1\","
@@ -183,7 +183,7 @@ class PmsRoomStatusWriteServiceTest {
     void statusOneBodyIsJudgedByReadBack() {
         inhouse(feed("Dirty", "No"), feed("Clean", "No"));
         when(gateway.json(eq(EzeeFamily.HOUSEKEEPING), eq(UPDATE), any(), any(), any()))
-                .thenReturn(PmsFrontDeskServiceTest.json("{\"status\":\"1\",\"message\":\"Success\"}"));
+                .thenReturn(PmsTestJson.json("{\"status\":\"1\",\"message\":\"Success\"}"));
         assertTrue(clean("k1").confirmed());
     }
 
@@ -191,7 +191,7 @@ class PmsRoomStatusWriteServiceTest {
     void warningBodyIsUnconfirmed() {
         inhouse(feed("Dirty", "No"), feed("Clean", "No"));
         when(gateway.json(eq(EzeeFamily.HOUSEKEEPING), eq(UPDATE), any(), any(), any())).thenReturn(
-                PmsFrontDeskServiceTest.json("{\"status\":\"0\",\"warning\":\"hotel_code is invalid\"}"));
+                PmsTestJson.json("{\"status\":\"0\",\"warning\":\"hotel_code is invalid\"}"));
         assertThrows(PmsUnconfirmedException.class, () -> clean("k1"));
     }
 
@@ -210,7 +210,7 @@ class PmsRoomStatusWriteServiceTest {
         inhouse(feed("Dirty", "No"));
         when(gateway.json(eq(EzeeFamily.HOUSEKEEPING), eq(UPDATE), any(), any(), any())).thenAnswer(inv -> {
             assertThrows(PmsTargetBusyException.class, () -> clean("k2"));
-            return PmsFrontDeskServiceTest.json(OK);
+            return PmsTestJson.json(OK);
         });
         clean("k1");
         updates(1);
@@ -259,7 +259,7 @@ class PmsRoomStatusWriteServiceTest {
     void errorBodyIsNeverReportedAsSuccess() {
         inhouse(feed("Dirty", "No"));
         when(gateway.json(eq(EzeeFamily.HOUSEKEEPING), eq(UPDATE), any(), any(), any())).thenReturn(
-                PmsFrontDeskServiceTest.json("{\"errorcode\":\"1\",\"message\":\"Unauthorized Request\"}"));
+                PmsTestJson.json("{\"errorcode\":\"1\",\"message\":\"Unauthorized Request\"}"));
         assertThrows(PmsUnconfirmedException.class, () -> clean("k1"));
         updates(1);
     }
