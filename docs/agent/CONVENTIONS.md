@@ -12,6 +12,6 @@ Covers: ../docs/backend/AGENTS.md, src/main/java/**/*.java, src/main/resources/*
 - New protected endpoint: add `@PreAuthorize`; default is authenticated (SecurityConfig:81).
 - Never edit `application-prod.yml` without the user (hook blocks it; deploys on push).
 - Controllers are the contract source of truth for frontend `js/api.js` and Android `ApiService.java`; changing a route/shape needs sibling-repo follow-up.
-- eZee changes: review with workspace agent `backend-ezee-charge-reviewer`.
+- eZee changes: review double-charge prevention, response parsing and the no-void constraint by hand.
 - Mark deliberate shortcuts with `ponytail:` comments (e.g. RateLimitFilter:24).
 - Tests: JUnit 5 + Mockito, one test class per unit, named for the behaviour (TESTING.md).
