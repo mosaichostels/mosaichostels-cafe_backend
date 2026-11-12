@@ -2,15 +2,20 @@ package com.hostel.ordering.service;
 
 import com.google.firebase.messaging.*;
 import com.hostel.ordering.model.Order;
+import com.hostel.ordering.model.OrderItem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
+
 @Service
 public class FCMNotificationService {
 
     private static final Logger logger = LoggerFactory.getLogger(FCMNotificationService.class);
     private static final String ORDERS_TOPIC = "new_orders";
+    static final String ESSENTIALS_TOPIC = "new_essential_orders";
 
     private final FirebaseMessaging firebaseMessaging;
 
@@ -43,7 +48,7 @@ public class FCMNotificationService {
                     .build();
 
             Message message = Message.builder()
-                    .setTopic(ORDERS_TOPIC)
+                    .setTopic(topicFor(order))
                     .setAndroidConfig(androidConfig)
                     .setWebpushConfig(webpushConfig)
                     .putData("type", "NEW_ORDER")
@@ -85,7 +90,7 @@ public class FCMNotificationService {
                     .build();
 
             Message message = Message.builder()
-                    .setTopic(ORDERS_TOPIC)
+                    .setTopic(topicFor(order))
                     .setAndroidConfig(androidConfig)
                     .setWebpushConfig(webpushConfig)
                     .putData("type", "ORDER_CANCELLED")
@@ -103,6 +108,14 @@ public class FCMNotificationService {
         }
     }
 
+
+    /** Essentials-only orders skip Kitchen. Null type, unknown type or no items counts as a menu order: notify more people, never fewer. */
+    static String topicFor(Order order) {
+        List<OrderItem> items = order.getItems();
+        boolean essentialsOnly = items != null && !items.isEmpty()
+                && items.stream().allMatch(i -> "ESSENTIAL".equals(i.getType()));
+        return essentialsOnly ? ESSENTIALS_TOPIC : ORDERS_TOPIC;
+    }
 
     /** Same short id every client shows: the last 6 characters, which are the part of an ObjectId that differs between orders placed close together. */
     static String shortId(String id) {
