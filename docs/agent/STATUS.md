@@ -3,6 +3,7 @@ Verified: 2026-11-11 @ 2626fed + final review fixes
 Covers: src/main/**, src/test/**, docs/agent/**, AGENTS.md
 
 # Status
+- Order push routing (2026-11-12, branch `feat/notify-routing`, unpushed): `FCMNotificationService.topicFor(order)` sends new-order and cancelled-order pushes to `new_orders` (any menu item, null type, or empty items) or `new_essential_orders` (items non-empty and all `ESSENTIAL`). Delivered push to admins unchanged. 411 tests pass. Release order: APK 1.8.2 to admin phones first, then deploy; old admin phones miss essentials-only pushes.
 - Role-based tabs Task 1 (branch `feat/role-tabs`, unpushed): roles KITCHEN and HOUSEKEEPING added (`UserService.ALLOWED_ROLES`). Orders + notifications: ADMIN, KITCHEN, STAFF (STAFF for the rollout window); `/pms/cleaning-*` and `/pms/housekeeping/**`: ADMIN, HOUSEKEEPING. Existing STAFF accounts lose `/pms/**` access. `RoleMatrixTest` covers the matrix.
 - Branch `feat/pms-p1-backend` @ 27745ef, stacked on `feat/pms-p0-foundation` (a8c6ac6). Neither is merged to `main` (9e39a6f) and nothing is pushed. Docs refreshed 2026-11-11.
 - Tests: `.superpowers/run-tests.sh` (Java 17 `mvn -q test`) -> 405 tests, 0 failures (2026-11-11, after dropping front desk and cleaning actions; was 456). `mvn -B verify` not run.

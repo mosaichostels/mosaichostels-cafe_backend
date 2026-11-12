@@ -4,7 +4,7 @@ Covers: src/main/java/com/hostel/ordering/pms/**/*.java, src/main/java/com/hoste
 
 # Architecture
 
-Flow: `request -> RateLimitFilter / AuthTokenFilter (SecurityConfig) -> controller (@PreAuthorize) -> service -> repository (Mongo)`. Hot path: `OrderController -> OrderService -> EzeeChargePostService -> EzeeClient`, then `FCMNotificationService`. No SQL.
+Flow: `request -> RateLimitFilter / AuthTokenFilter (SecurityConfig) -> controller (@PreAuthorize) -> service -> repository (Mongo)`. Hot path: `OrderController -> OrderService -> EzeeChargePostService -> EzeeClient`, then `FCMNotificationService` (topic `new_orders`, or `new_essential_orders` when every item is ESSENTIAL; Kitchen, Admin, Superadmin subscribe to the first, Admin and Superadmin also to the second). No SQL.
 
 ## Routes and roles (SecurityConfig.java:75-81 + method @PreAuthorize)
 | Route | Access |
