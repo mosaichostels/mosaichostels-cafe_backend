@@ -8,6 +8,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -16,6 +18,8 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/cleaning-list")
 public class CleaningListController {
+
+    private static final Logger log = LoggerFactory.getLogger(CleaningListController.class);
 
     private final CleaningListService service;
     private final AuditService auditService;
@@ -56,7 +60,7 @@ public class CleaningListController {
             beds.add(new BedInput(str(m.get("roomId")), str(m.get("unitId")), str(m.get("roomName"))));
         }
         var r = service.submit(beds, authentication.getName());
-        auditService.logAction("CLEANING_LIST_SUBMITTED", "added " + r.added() + " beds");
+        audit("CLEANING_LIST_SUBMITTED", "added " + r.added() + " beds");
         Map<String, Object> out = new HashMap<>();
         out.put("added", r.added());
         out.put("alreadyListed", r.alreadyListed());
@@ -69,6 +73,7 @@ public class CleaningListController {
         if (!service.remove(id)) {
             return ResponseEntity.status(404).body(Map.of("message", "Bed is not on the list"));
         }
+        audit("CLEANING_BED_REMOVED", "removed a bed from the cleaning list (id " + id + ")");
         return ResponseEntity.noContent().build();
     }
 
@@ -77,13 +82,22 @@ public class CleaningListController {
     public ResponseEntity<?> done(@PathVariable String id, Authentication authentication) {
         var r = service.done(id, authentication.getName());
         if (!r.alreadyDone()) {
-            auditService.logAction("CLEANING_BED_DONE", r.roomName() + " cleaned (eZee " + r.ezee() + ")");
+            audit("CLEANING_BED_DONE", r.roomName() + " cleaned (eZee " + r.ezee() + ")");
         }
         Map<String, Object> out = new HashMap<>();
         out.put("alreadyDone", r.alreadyDone());
         out.put("ezee", r.ezee());
         out.put("roomName", r.roomName());
         return ResponseEntity.ok(out);
+    }
+
+    // The change is already made; an audit failure must not turn it into a 500.
+    private void audit(String action, String details) {
+        try {
+            auditService.logAction(action, details);
+        } catch (RuntimeException e) {
+            log.warn("Audit {} failed: {}", action, e.toString());
+        }
     }
 
     // Non-string ids/names are rejected by the service's validation (null fails every check).
