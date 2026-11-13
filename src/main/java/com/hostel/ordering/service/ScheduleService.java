@@ -80,12 +80,7 @@ public class ScheduleService {
 
     public TickResult tick(String date, String taskKey, String slot, String username) {
         validateKeyAndSlot(taskKey, slot);
-        LocalDate day = parse(date);
-        LocalDate today = today();
-        if (day.isAfter(today) || day.isBefore(today.minusDays(LOOKBACK_DAYS))) {
-            throw new IllegalArgumentException("Date must be within the last " + LOOKBACK_DAYS + " days, not in the future");
-        }
-        String d = day.toString();
+        String d = requireWindow(date);
         if (!days.existsByDate(d)) {
             throw new IllegalArgumentException("That day has not been submitted");
         }
@@ -108,9 +103,9 @@ public class ScheduleService {
         }
     }
 
-    /** Today only. False when the tick does not exist; repeating a confirm keeps the first confirmer. */
+    /** Any date in the tick window. False when the tick does not exist; repeating a confirm keeps the first confirmer. */
     public boolean confirm(String date, String taskKey, String slot, String username) {
-        String d = requireToday(date);
+        String d = requireWindow(date);
         validateKeyAndSlot(taskKey, slot);
         if (ticks.findByDateAndTaskKeyAndSlot(d, taskKey, slot).isEmpty()) {
             return false;
@@ -139,6 +134,16 @@ public class ScheduleService {
 
     private LocalDate today() {
         return LocalDate.now(clock);
+    }
+
+    /** Normalised date; IllegalArgumentException unless within the last LOOKBACK_DAYS days up to today (IST). */
+    private String requireWindow(String date) {
+        LocalDate day = parse(date);
+        LocalDate today = today();
+        if (day.isAfter(today) || day.isBefore(today.minusDays(LOOKBACK_DAYS))) {
+            throw new IllegalArgumentException("Date must be within the last " + LOOKBACK_DAYS + " days, not in the future");
+        }
+        return day.toString();
     }
 
     /** Returns the normalised date; IllegalArgumentException unless it is today (IST). */

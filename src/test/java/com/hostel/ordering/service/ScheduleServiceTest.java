@@ -122,10 +122,20 @@ class ScheduleServiceTest {
     }
 
     @Test
-    void confirmMissingTickIsFalseAndPastDateRejected() {
+    void confirmMissingTickIsFalseAndFutureDateRejected() {
         assertFalse(service.confirm(TODAY, "k", "ONCE", "admin"));
         verify(mongo, never()).updateFirst(any(), any(), eq(ScheduleTick.class));
-        assertThrows(IllegalArgumentException.class, () -> service.confirm("2026-11-15", "k", "ONCE", "admin"));
+        assertThrows(IllegalArgumentException.class, () -> service.confirm("2026-11-17", "k", "ONCE", "admin"));
+    }
+
+    @Test
+    void confirmAcceptsLateTicksWithin31DaysOnly() {
+        for (String d : new String[] {"2026-11-15", "2026-10-16"}) { // yesterday, 31 days back
+            when(ticks.findByDateAndTaskKeyAndSlot(d, "k", "ONCE")).thenReturn(Optional.of(tickOf("h")));
+            assertTrue(service.confirm(d, "k", "ONCE", "admin"));
+        }
+        verify(mongo, times(2)).updateFirst(any(), any(), eq(ScheduleTick.class));
+        assertThrows(IllegalArgumentException.class, () -> service.confirm("2026-10-15", "k", "ONCE", "admin"));
     }
 
     @Test
