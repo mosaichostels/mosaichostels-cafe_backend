@@ -157,8 +157,8 @@ class ScheduleServiceTest {
         d.setSubmittedAt(42L);
         ScheduleTick t = tickOf("h");
         t.setDate("2026-11-15");
-        when(days.findByDateBetweenOrderByDate("2026-11-14", "2026-11-16")).thenReturn(List.of(d));
-        when(ticks.findByDateBetween("2026-11-14", "2026-11-16")).thenReturn(List.of(t));
+        when(days.daysInRange("2026-11-14", "2026-11-16")).thenReturn(List.of(d));
+        when(ticks.ticksInRange("2026-11-14", "2026-11-16")).thenReturn(List.of(t));
         var out = service.days("2026-11-14", "2026-11-16");
         assertEquals(1, out.size());
         assertEquals("2026-11-15", out.get(0).date());

@@ -124,9 +124,9 @@ public class ScheduleService {
         if (f.isAfter(t) || t.toEpochDay() - f.toEpochDay() > LOOKBACK_DAYS) {
             throw new IllegalArgumentException("The date range must be at most " + (LOOKBACK_DAYS + 1) + " days");
         }
-        Map<String, List<ScheduleTick>> byDate = ticks.findByDateBetween(f.toString(), t.toString()).stream()
+        Map<String, List<ScheduleTick>> byDate = ticks.ticksInRange(f.toString(), t.toString()).stream()
                 .collect(Collectors.groupingBy(ScheduleTick::getDate));
-        return days.findByDateBetweenOrderByDate(f.toString(), t.toString()).stream()
+        return days.daysInRange(f.toString(), t.toString()).stream()
                 .map(d -> new DaySummary(d.getDate(), true, d.getSubmittedAt(),
                         byDate.getOrDefault(d.getDate(), List.of())))
                 .toList();
