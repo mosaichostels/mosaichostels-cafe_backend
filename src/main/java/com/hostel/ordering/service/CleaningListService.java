@@ -87,6 +87,13 @@ public class CleaningListService {
                 already++; // another submit won the unique index
             }
         }
+        if (added > 0) {
+            try {
+                notifier.listSubmitted(added);
+            } catch (RuntimeException ex) {
+                logger.warn("Cleaning-list push failed: {}", ex.toString());
+            }
+        }
         return new SubmitResult(added, already);
     }
 
