@@ -20,6 +20,8 @@ Flow: `request -> RateLimitFilter / AuthTokenFilter (SecurityConfig) -> controll
 | `/users` CRUD, `/audit`, `GET /pms/status` | SUPERADMIN only (Admin gets 403) |
 | `/pms/housekeeping/**` (board read and room status write) | ADMIN, HOUSEKEEPING (class-level; SUPERADMIN via hierarchy) |
 | `GET /pms/cleaning-tasks?date=` | ADMIN, HOUSEKEEPING (class-level `@PreAuthorize`; SUPERADMIN via hierarchy). Read-only list |
+| `GET /cleaning-list`, `POST /cleaning-list/{id}/done` | ADMIN, HOUSEKEEPING (Superadmin via hierarchy); Kitchen 403 |
+| `POST /cleaning-list`, `DELETE /cleaning-list/{id}` | ADMIN only (Housekeeping and Kitchen 403) |
 | `GET /pms/reconcile/charges?date=` | ADMIN (shows guest names) |
 | `GET /app/android-version` | any authenticated (`anyRequest().authenticated()`; `AppVersionController`) |
 | `GET /pms/unconfirmed`, `POST /pms/unconfirmed/{idempotencyKey}/resolve` (body `{outcome: APPLIED\|NOT_APPLIED}`) | ADMIN (`@PreAuthorize`) |
@@ -32,7 +34,7 @@ Flow: `request -> RateLimitFilter / AuthTokenFilter (SecurityConfig) -> controll
 - `LoginThrottle`: per-account login guessing. `RateLimitFilter` (60s window, in-memory, max 10000 keys): `POST /orders` 30/min, `POST /auth/login` 10/min; key = JWT user else client IP (X-Forwarded-For trusted only if peer is private/loopback).
 
 ## Collections (@Document)
-`orders` (unique sparse index on idempotency key; compound `status_createdAt`), `users` (unique username), `menu_items`, `other_essentials`, `categories`, `dormitories`, `order_status_config`, `audit_logs`, `idempotency_keys` (TTL 3600 s), `pms_write_claims` (below). The old `cleaning_assignments` collection is no longer read or written by the code; `scripts/migrate-staff-to-kitchen.sh` drops it (`--dry-run` only counts it; back up first).
+`orders` (unique sparse index on idempotency key; compound `status_createdAt`), `users` (unique username), `menu_items`, `other_essentials`, `categories`, `dormitories`, `order_status_config`, `audit_logs`, `idempotency_keys` (TTL 3600 s), `pms_write_claims` (below), `cleaning_list` (one document per bed, unique compound index `room_unit_unique` on `roomId`+`unitId`). The old `cleaning_assignments` collection is no longer read or written by the code; `scripts/migrate-staff-to-kitchen.sh` drops it (`--dry-run` only counts it; back up first).
 
 ## Category rename
 Items store their category by name: `CategoryService` update (:72-82) `updateMulti`s the new name into `menu_items` or `other_essentials` (by category type), then renumbers `showOrder`. Test: `CategoryRenameCascadeTest`.
@@ -92,3 +94,10 @@ Items store their category by name: `CategoryService` update (:72-82) `updateMul
 - The front desk routes (`/pms/arrivals`, `/pms/departures`, `/pms/inhouse`, `/pms/bookings/{id}`, `/pms/guests`) and the cleaning write routes (`POST /pms/cleaning-tasks/{taskKey}/assign`, `PUT /pms/cleaning-assignments/{id}`) are gone. An unmapped path falls into `GlobalExceptionHandler` and returns HTTP 500 (with an ERROR stack trace in the log), not 404.
 - Hand out the Android 1.8.0 (versionCode 16) APK before or together with this backend deploy. An older 1.7.0 app shows the front desk error state with a retry that never succeeds, its cleaning "Take it" fails with a server-error toast, and a cleaning action already in its offline queue replays into a 500, is kept for retry and can delay queued order updates behind it for up to 30 minutes.
 - On the Space set `APP_ANDROID_MIN_VERSION_CODE=16`, plus `APP_ANDROID_LATEST_VERSION_CODE` and `APP_ANDROID_APK_URL` (see ENVIRONMENT.md). The old app's update dialog has never been checked on a device.
+
+## Cleaning list (Android 1.9.0 / code 19, branch `feat/cleaning-list`, unpushed)
+- Classes: `CleaningListController`, `CleaningListService`, `CleaningNotifier`, `CleaningListEntry`, `CleaningListRepository`. Admin submits 1-200 beds (`roomId`/`unitId` `[0-9]{1,20}`, `roomName` non-blank, <=80, no control chars); a bed already listed is skipped, never duplicated.
+- Done order (fixed): (1) atomically remove the document, (2) one eZee write attempt via `PmsRoomStatusWriteService.setStatus(..., CLEAN, "Cleaned by <username>", key "cleaning-done-<entryId>")`, (3) push admins. The bed leaves the list even if eZee is off, refuses or throws. A second Done on the same bed returns `alreadyDone`, with no eZee write and no push.
+- eZee outcome in the response and push: `CONFIRMED`, `NOT_CONFIRMED` (answered, read-back differed), `OFF` (`PmsFeatureDisabledException` / `PmsNotEnabledException`; today's state, flags `pms.writes.room-status` and `pms.canary.room-status` stay off), `FAILED` (any other exception).
+- Push types: `CLEANING_LIST` to every Housekeeping user on submit, only when at least one bed was added; `CLEANING_DONE` to every Admin and Superadmin, one per bed. Payloads carry room names and the cleaner's login only. Housekeeping phones now register FCM tokens (they still subscribe to no topic). Audit: `CLEANING_LIST_SUBMITTED`, `CLEANING_BED_DONE` (not logged when already done).
+- Release: deploy the backend first (harmless: new endpoints, pushes nobody receives yet), then install APK 1.9.0 on every Housekeeping, Admin and Superadmin phone. Old apps ignore the new pushes and have no screen for the list. `GET /pms/cleaning-tasks` is still served for old apps.
