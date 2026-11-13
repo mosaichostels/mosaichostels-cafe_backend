@@ -41,6 +41,7 @@ class CleaningListServiceTest {
     MongoTemplate mongo;
     PmsRoomStatusWriteService ezee;
     CleaningNotifier notifier;
+    ScheduleService schedule;
     CleaningListService service;
 
     @BeforeEach
@@ -49,7 +50,8 @@ class CleaningListServiceTest {
         mongo = mock(MongoTemplate.class);
         ezee = mock(PmsRoomStatusWriteService.class);
         notifier = mock(CleaningNotifier.class);
-        service = new CleaningListService(repo, mongo, ezee, notifier);
+        schedule = mock(ScheduleService.class);
+        service = new CleaningListService(repo, mongo, ezee, notifier, schedule);
     }
 
     private static CleaningListEntry entry(String id, String roomId, String unitId, String name, long at) {
@@ -69,6 +71,53 @@ class CleaningListServiceTest {
 
     private static PmsWriteResult<RoomStatusWriteResult> result(boolean confirmed) {
         return new PmsWriteResult<>(new RoomStatusWriteResult("10", "20", "CLEAN", "Clean", confirmed), confirmed);
+    }
+
+    @Test
+    void submitWithDayAndNoBedsMarksDayAndPushesOnce() {
+        when(schedule.markSubmitted("2026-11-13", "admin")).thenReturn(true);
+        SubmitResult r = service.submit(List.of(), "admin", "2026-11-13", 5);
+        assertEquals(0, r.added());
+        assertTrue(r.daySubmitted());
+        verify(notifier, times(1)).todaySubmitted(0, 5);
+    }
+
+    @Test
+    void repeatedDaySubmitWithNoNewBedsPushesNothing() {
+        when(schedule.markSubmitted("2026-11-13", "admin")).thenReturn(false);
+        SubmitResult r = service.submit(List.of(), "admin", "2026-11-13", 5);
+        assertFalse(r.daySubmitted());
+        verifyNoInteractions(notifier);
+    }
+
+    @Test
+    void newBedsOnAnAlreadySubmittedDayStillPush() {
+        when(repo.findByRoomIdAndUnitId("1", "2")).thenReturn(Optional.empty());
+        when(schedule.markSubmitted("2026-11-13", "admin")).thenReturn(false);
+        service.submit(List.of(new BedInput("1", "2", "A")), "admin", "2026-11-13", null);
+        verify(notifier).todaySubmitted(1, 0);
+    }
+
+    @Test
+    void submitWithoutDayStillRejectsEmptyBeds() {
+        assertThrows(IllegalArgumentException.class, () -> service.submit(List.of(), "admin", null, null));
+        verifyNoInteractions(schedule);
+    }
+
+    @Test
+    void submitWithBadDateSavesNothing() {
+        org.mockito.Mockito.doThrow(new IllegalArgumentException("Only today's date is allowed"))
+                .when(schedule).requireToday("2026-11-01");
+        assertThrows(IllegalArgumentException.class,
+                () -> service.submit(List.of(new BedInput("1", "2", "A")), "admin", "2026-11-01", 1));
+        verify(repo, never()).save(any());
+        verify(schedule, never()).markSubmitted(any(), any());
+    }
+
+    @Test
+    void submitRejectsTaskCountOutOfRange() {
+        assertThrows(IllegalArgumentException.class, () -> service.submit(List.of(), "admin", "2026-11-13", 201));
+        assertThrows(IllegalArgumentException.class, () -> service.submit(List.of(), "admin", "2026-11-13", -1));
     }
 
     @Test

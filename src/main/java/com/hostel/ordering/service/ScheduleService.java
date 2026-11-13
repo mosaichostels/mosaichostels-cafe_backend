@@ -141,7 +141,8 @@ public class ScheduleService {
         return LocalDate.now(clock);
     }
 
-    private String requireToday(String date) {
+    /** Returns the normalised date; IllegalArgumentException unless it is today (IST). */
+    public String requireToday(String date) {
         LocalDate d = parse(date);
         if (!d.equals(today())) {
             throw new IllegalArgumentException("Only today's date is allowed");

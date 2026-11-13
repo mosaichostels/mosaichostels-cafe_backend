@@ -6,6 +6,8 @@ import static org.mockito.Mockito.mock;
 import com.hostel.ordering.config.SecurityConfig;
 import com.hostel.ordering.controller.CleaningListController;
 import com.hostel.ordering.controller.NotificationController;
+import com.hostel.ordering.controller.ScheduleController;
+import com.hostel.ordering.service.ScheduleService;
 import com.hostel.ordering.controller.OrderController;
 import com.hostel.ordering.dto.CreateOrderRequest;
 import com.hostel.ordering.pms.PmsHousekeepingController;
@@ -73,10 +75,19 @@ class RoleMatrixTest {
             CleaningListService svc = mock(CleaningListService.class);
             org.mockito.Mockito.when(svc.done(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
                     .thenReturn(new CleaningListService.DoneResult(true, null, null));
-            org.mockito.Mockito.when(svc.submit(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+            org.mockito.Mockito.when(svc.submit(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
                     .thenReturn(new CleaningListService.SubmitResult(0, 0));
             org.mockito.Mockito.when(svc.remove(org.mockito.ArgumentMatchers.any())).thenReturn(true);
             return new CleaningListController(svc, mock(AuditService.class));
+        }
+
+        @Bean
+        ScheduleController schedule() {
+            ScheduleService svc = mock(ScheduleService.class);
+            org.mockito.Mockito.when(svc.tick(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                    .thenReturn(new ScheduleService.TickResult(false, "u"));
+            org.mockito.Mockito.when(svc.confirm(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenReturn(true);
+            return new ScheduleController(svc, mock(AuditService.class));
         }
 
         @Bean
@@ -100,6 +111,7 @@ class RoleMatrixTest {
     @Autowired PmsHousekeepingController housekeeping;
     @Autowired PmsHousekeepingWorkflowController cleaning;
     @Autowired CleaningListController cleaningList;
+    @Autowired ScheduleController schedule;
     @Autowired PmsReconcileController reconcile;
     @Autowired PmsUnconfirmedController unconfirmed;
 
@@ -133,6 +145,9 @@ class RoleMatrixTest {
         m.put("POST /cleaning-list", () -> cleaningList.submit(Map.of("beds", java.util.List.of()), auth));
         m.put("DELETE /cleaning-list/{id}", () -> cleaningList.remove("x", auth));
         m.put("POST /cleaning-list/{id}/done", () -> cleaningList.done("x", auth));
+        m.put("GET /schedule/days", () -> schedule.days("2026-11-01", "2026-11-13"));
+        m.put("POST /schedule/days/{date}/ticks", () -> schedule.tick("2026-11-13", Map.of("taskKey", "k", "slot", "ONCE"), auth));
+        m.put("POST /schedule/.../confirm", () -> schedule.confirm("2026-11-13", "k", "ONCE", auth));
         m.put("GET /pms/reconcile/charges", () -> reconcile.charges(null));
         m.put("GET /pms/unconfirmed", () -> unconfirmed.list());
         return m;
@@ -151,6 +166,8 @@ class RoleMatrixTest {
             "POST /pms/housekeeping/rooms/{id}/status"};
     private static final String[] LIST_HK = {"GET /cleaning-list", "POST /cleaning-list/{id}/done"};
     private static final String[] LIST_ADMIN = {"POST /cleaning-list", "DELETE /cleaning-list/{id}"};
+    private static final String[] SCHED_HK = {"GET /schedule/days", "POST /schedule/days/{date}/ticks"};
+    private static final String[] SCHED_ADMIN = {"POST /schedule/.../confirm"};
     private static final String[] ADMIN_ONLY = {"GET /pms/reconcile/charges", "GET /pms/unconfirmed"};
 
     private static String[] concat(String[]... parts) {
@@ -164,13 +181,13 @@ class RoleMatrixTest {
 
     @Test
     void housekeepingGetsCleaningAndBoardOnly() {
-        expect("ROLE_HOUSEKEEPING", concat(CLEANING, LIST_HK));
+        expect("ROLE_HOUSEKEEPING", concat(CLEANING, LIST_HK, SCHED_HK));
     }
 
     @Test
     void adminAndSuperAdminGetEverything() {
-        expect("ROLE_ADMIN", concat(ORDER_AND_PUSH, CLEANING, LIST_HK, LIST_ADMIN, ADMIN_ONLY));
-        expect("ROLE_SUPERADMIN", concat(ORDER_AND_PUSH, CLEANING, LIST_HK, LIST_ADMIN, ADMIN_ONLY));
+        expect("ROLE_ADMIN", concat(ORDER_AND_PUSH, CLEANING, LIST_HK, LIST_ADMIN, SCHED_HK, SCHED_ADMIN, ADMIN_ONLY));
+        expect("ROLE_SUPERADMIN", concat(ORDER_AND_PUSH, CLEANING, LIST_HK, LIST_ADMIN, SCHED_HK, SCHED_ADMIN, ADMIN_ONLY));
     }
 
     @Test

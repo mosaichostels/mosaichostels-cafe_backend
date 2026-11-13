@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -42,10 +43,20 @@ class CleaningListControllerAuditTest {
 
     @Test
     void submitStillOkWhenAuditFails() {
-        when(service.submit(anyList(), eq("admin"))).thenReturn(new CleaningListService.SubmitResult(1, 0));
+        when(service.submit(anyList(), eq("admin"), any(), any())).thenReturn(new CleaningListService.SubmitResult(1, 0));
         ResponseEntity<?> res = controller.submit(
                 Map.of("beds", List.of(Map.of("roomId", "1", "unitId", "1", "roomName", "Dorm 1"))), authentication);
         assertEquals(200, res.getStatusCode().value());
+    }
+
+    @Test
+    void daySubmitAuditsAndStaysOkWhenAuditFails() {
+        when(service.submit(anyList(), eq("admin"), eq("2026-11-13"), eq(4)))
+                .thenReturn(new CleaningListService.SubmitResult(0, 0, true));
+        ResponseEntity<?> res = controller.submit(Map.of("beds", List.of(), "day", "2026-11-13", "taskCount", 4), authentication);
+        assertEquals(200, res.getStatusCode().value());
+        assertEquals(true, ((Map<?, ?>) res.getBody()).get("daySubmitted"));
+        verify(auditService).logAction(eq("SCHEDULE_DAY_SUBMITTED"), anyString());
     }
 
     @Test

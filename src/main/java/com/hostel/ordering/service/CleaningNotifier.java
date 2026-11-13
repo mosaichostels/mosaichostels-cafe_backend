@@ -29,6 +29,19 @@ public class CleaningNotifier {
         send("Cleaning list", added + " bed(s) to clean", "CLEANING_LIST", "ROLE_HOUSEKEEPING");
     }
 
+    /** Combined submit wording; the caller decides whether anything is worth a push. */
+    public void todaySubmitted(int added, int taskCount) {
+        java.util.List<String> parts = new java.util.ArrayList<>();
+        if (added > 0) {
+            parts.add(added + " bed(s)");
+        }
+        if (taskCount > 0) {
+            parts.add(taskCount + " task(s)");
+        }
+        String body = parts.isEmpty() ? "Today's cleaning is ready" : "Today's cleaning: " + String.join(", ", parts);
+        send("Cleaning list", body, "CLEANING_LIST", "ROLE_HOUSEKEEPING");
+    }
+
     public void cleaned(String roomName, String cleaner, String ezee) {
         String body = roomName + " cleaned by " + cleaner + "."
                 + ("CONFIRMED".equals(ezee) ? " eZee updated." : " eZee not updated: set it Clean in eZee.");

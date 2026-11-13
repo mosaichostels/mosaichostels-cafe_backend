@@ -46,6 +46,24 @@ class CleaningNotifierTest {
         assertEquals(Map.of("type", "CLEANING_LIST"), data.getValue());
     }
 
+    private void todayBody(int added, int tasks, String expected) {
+        when(users.findByRolesContaining("ROLE_HOUSEKEEPING")).thenReturn(List.of(user("a", "tokA", "ROLE_HOUSEKEEPING")));
+        notifier.todaySubmitted(added, tasks);
+        verify(fcm).sendNotificationToToken(eq("tokA"), eq("Cleaning list"), eq(expected), eq(Map.of("type", "CLEANING_LIST")));
+    }
+
+    @Test
+    void todayWordingBedsAndTasks() { todayBody(3, 12, "Today's cleaning: 3 bed(s), 12 task(s)"); }
+
+    @Test
+    void todayWordingBedsOnly() { todayBody(3, 0, "Today's cleaning: 3 bed(s)"); }
+
+    @Test
+    void todayWordingTasksOnly() { todayBody(0, 12, "Today's cleaning: 12 task(s)"); }
+
+    @Test
+    void todayWordingNeither() { todayBody(0, 0, "Today's cleaning is ready"); }
+
     @Test
     void listSubmittedZeroSendsNothing() {
         notifier.listSubmitted(0);

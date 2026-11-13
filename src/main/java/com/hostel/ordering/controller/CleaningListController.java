@@ -59,9 +59,24 @@ public class CleaningListController {
             }
             beds.add(new BedInput(str(m.get("roomId")), str(m.get("unitId")), str(m.get("roomName"))));
         }
-        var r = service.submit(beds, authentication.getName());
+        String day = body.get("day") == null ? null : str(body.get("day"));
+        if (body.get("day") != null && day == null) {
+            throw new IllegalArgumentException("day must be yyyy-MM-dd");
+        }
+        Integer taskCount = null;
+        if (body.get("taskCount") != null) {
+            if (!(body.get("taskCount") instanceof Integer n)) {
+                throw new IllegalArgumentException("taskCount must be a whole number");
+            }
+            taskCount = n;
+        }
+        var r = service.submit(beds, authentication.getName(), day, taskCount);
         audit("CLEANING_LIST_SUBMITTED", "added " + r.added() + " beds");
+        if (r.daySubmitted()) {
+            audit("SCHEDULE_DAY_SUBMITTED", "submitted the schedule for " + day);
+        }
         Map<String, Object> out = new HashMap<>();
+        out.put("daySubmitted", r.daySubmitted());
         out.put("added", r.added());
         out.put("alreadyListed", r.alreadyListed());
         return ResponseEntity.ok(out);

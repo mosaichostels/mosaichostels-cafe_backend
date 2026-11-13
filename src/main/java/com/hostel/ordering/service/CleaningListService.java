@@ -35,7 +35,11 @@ public class CleaningListService {
 
     public record BedInput(String roomId, String unitId, String roomName) {}
 
-    public record SubmitResult(int added, int alreadyListed) {}
+    public record SubmitResult(int added, int alreadyListed, boolean daySubmitted) {
+        public SubmitResult(int added, int alreadyListed) {
+            this(added, alreadyListed, false);
+        }
+    }
 
     /** ezee is CONFIRMED, NOT_CONFIRMED, OFF or FAILED; null when alreadyDone. */
     public record DoneResult(boolean alreadyDone, String ezee, String roomName) {}
@@ -44,13 +48,16 @@ public class CleaningListService {
     private final MongoTemplate mongoTemplate;
     private final PmsRoomStatusWriteService roomStatusWrite;
     private final CleaningNotifier notifier;
+    private final ScheduleService scheduleService;
 
     public CleaningListService(CleaningListRepository repository, MongoTemplate mongoTemplate,
-            PmsRoomStatusWriteService roomStatusWrite, CleaningNotifier notifier) {
+            PmsRoomStatusWriteService roomStatusWrite, CleaningNotifier notifier,
+            ScheduleService scheduleService) {
         this.repository = repository;
         this.mongoTemplate = mongoTemplate;
         this.roomStatusWrite = roomStatusWrite;
         this.notifier = notifier;
+        this.scheduleService = scheduleService;
     }
 
     public List<CleaningListEntry> list() {
@@ -61,8 +68,20 @@ public class CleaningListService {
     }
 
     public SubmitResult submit(List<BedInput> beds, String username) {
-        if (beds == null || beds.isEmpty() || beds.size() > MAX_BEDS) {
-            throw new IllegalArgumentException("A list holds 1 to " + MAX_BEDS + " beds");
+        return submit(beds, username, null, null);
+    }
+
+    /** With a day (must be today), beds may be empty and the day is marked submitted; without, exactly the bed-only submit. */
+    public SubmitResult submit(List<BedInput> beds, String username, String day, Integer taskCount) {
+        boolean withDay = day != null;
+        if (beds == null || beds.size() < (withDay ? 0 : 1) || beds.size() > MAX_BEDS) {
+            throw new IllegalArgumentException("A list holds " + (withDay ? 0 : 1) + " to " + MAX_BEDS + " beds");
+        }
+        if (taskCount != null && (taskCount < 0 || taskCount > MAX_BEDS)) {
+            throw new IllegalArgumentException("taskCount must be 0 to " + MAX_BEDS);
+        }
+        if (withDay) {
+            scheduleService.requireToday(day); // before any save, so a bad date saves nothing
         }
         for (BedInput b : beds) {
             validate(b);
@@ -87,14 +106,19 @@ public class CleaningListService {
                 already++; // another submit won the unique index
             }
         }
-        if (added > 0) {
+        boolean daySubmitted = withDay && scheduleService.markSubmitted(day, username);
+        if (added > 0 || daySubmitted) {
             try {
-                notifier.listSubmitted(added);
+                if (withDay) {
+                    notifier.todaySubmitted(added, taskCount == null ? 0 : taskCount);
+                } else {
+                    notifier.listSubmitted(added);
+                }
             } catch (RuntimeException ex) {
                 logger.warn("Cleaning-list push failed: {}", ex.toString());
             }
         }
-        return new SubmitResult(added, already);
+        return new SubmitResult(added, already, daySubmitted);
     }
 
     public boolean remove(String id) {
