@@ -110,4 +110,16 @@ class CleaningNotifierTest {
         assertDoesNotThrow(() -> notifier.cleaned("R", "u", "OFF"));
         assertDoesNotThrow(() -> notifier.listSubmitted(2));
     }
+
+    @Test
+    void scheduleNotSubmittedGoesToAdminAndSuperadminOnly() {
+        when(users.findByRolesContaining("ROLE_ADMIN")).thenReturn(List.of(user("x", "tokX", "ROLE_ADMIN")));
+        when(users.findByRolesContaining("ROLE_SUPERADMIN")).thenReturn(List.of(user("z", "tokZ", "ROLE_SUPERADMIN")));
+        notifier.scheduleNotSubmitted();
+        Map<String, String> data = Map.of("type", "SCHEDULE_REMINDER");
+        verify(fcm).sendNotificationToToken("tokX", "Cleaning schedule", "Today's schedule has not been submitted.", data);
+        verify(fcm).sendNotificationToToken("tokZ", "Cleaning schedule", "Today's schedule has not been submitted.", data);
+        verify(users, never()).findByRolesContaining("ROLE_HOUSEKEEPING");
+        verifyNoMoreInteractions(fcm);
+    }
 }

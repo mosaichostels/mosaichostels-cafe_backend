@@ -48,6 +48,11 @@ public class CleaningNotifier {
         send("Bed cleaned", body, "CLEANING_DONE", "ROLE_ADMIN", "ROLE_SUPERADMIN");
     }
 
+    public void scheduleNotSubmitted() {
+        send("Cleaning schedule", "Today's schedule has not been submitted.", "SCHEDULE_REMINDER",
+                "ROLE_ADMIN", "ROLE_SUPERADMIN");
+    }
+
     private void send(String title, String body, String type, String... roles) {
         try {
             Map<String, User> byId = new LinkedHashMap<>();
