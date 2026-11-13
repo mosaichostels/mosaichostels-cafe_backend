@@ -50,9 +50,6 @@ class OrderServiceTest {
     com.hostel.ordering.ezee.EzeeChargePostService ezeeChargePostService;
 
     @Mock
-    com.hostel.ordering.repository.UserRepository userRepository;
-
-    @Mock
     IdempotencyService idempotencyService;
 
     @Mock
@@ -67,7 +64,7 @@ class OrderServiceTest {
     void setUp() {
         order = new Order();
         order.setItems(new ArrayList<>());
-        orderService = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient, userRepository, idempotencyService, dormitoryService);
+        orderService = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient, idempotencyService, dormitoryService);
     }
 
     @Test
@@ -140,7 +137,7 @@ class OrderServiceTest {
 
     @Test
     void searchEzeeCandidates_byName_returnsMatchingRowsCaseInsensitive() {
-        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient, userRepository, idempotencyService, dormitoryService);
+        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient, idempotencyService, dormitoryService);
 
         LinkedHashMap<String, String> row1 = new LinkedHashMap<>();
         row1.put("guestname", "Mr. Joy");
@@ -164,7 +161,7 @@ class OrderServiceTest {
 
     @Test
     void searchEzeeCandidates_blankName_returnsWholeRoomlist() {
-        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient, userRepository, idempotencyService, dormitoryService);
+        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient, idempotencyService, dormitoryService);
 
         LinkedHashMap<String, String> row1 = new LinkedHashMap<>();
         row1.put("guestname", "Mr. Joy");
@@ -181,7 +178,7 @@ class OrderServiceTest {
 
     @Test
     void searchEzeeCandidates_ezeeThrows_surfacesUnavailableInsteadOfEmptyList() {
-        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient, userRepository, idempotencyService, dormitoryService);
+        OrderService svc = new OrderService(null, null, null, null, menuItemRepository, otherEssentialRepository, null, ezeeClient, idempotencyService, dormitoryService);
 
         when(ezeeClient.postForRoomRows(org.mockito.ArgumentMatchers.argThat(
                 m -> m != null && "roomlist".equals(m.get("oprn")))))
@@ -193,7 +190,7 @@ class OrderServiceTest {
     @Test
     void postChargeForOrder_ezeeAccepts_savesQueuedAndSetsChecked() {
         OrderService svc = new OrderService(orderRepository, null, auditService, orderStatusService,
-                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository, idempotencyService, dormitoryService);
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, idempotencyService, dormitoryService);
 
         Order existing = new Order();
         existing.setId("order1");
@@ -217,43 +214,27 @@ class OrderServiceTest {
     }
 
     @Test
-    void deliveredNotificationReachesSuperAdmins() {
+    void deliveredSendsNoPush() {
         OrderService svc = new OrderService(orderRepository, fcmNotificationService, auditService, orderStatusService,
-                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository, idempotencyService, dormitoryService);
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, idempotencyService, dormitoryService);
         Order existing = new Order();
         existing.setId("o1");
         existing.setBookingName("Guest");
-        com.hostel.ordering.model.User admin = new com.hostel.ordering.model.User("a", "x", java.util.Set.of("ROLE_ADMIN"));
-        admin.setId("1");
-        admin.setFcmToken("tokA");
-        com.hostel.ordering.model.User both = new com.hostel.ordering.model.User("b", "x", java.util.Set.of("ROLE_ADMIN", "ROLE_SUPERADMIN"));
-        both.setId("2");
-        both.setFcmToken("tokB");
-        com.hostel.ordering.model.User sup = new com.hostel.ordering.model.User("s", "x", java.util.Set.of("ROLE_SUPERADMIN"));
-        sup.setId("3");
-        sup.setFcmToken("tokS");
-
         when(orderStatusService.getAllStatuses()).thenReturn(List.of(
                 new com.hostel.ordering.model.OrderStatusConfig("DELIVERED", "Delivered", "green", false)));
         when(orderRepository.findById("o1")).thenReturn(Optional.of(existing));
         when(orderRepository.save(existing)).thenReturn(existing);
-        when(userRepository.findByRolesContaining("ROLE_ADMIN")).thenReturn(List.of(admin, both));
-        when(userRepository.findByRolesContaining("ROLE_SUPERADMIN")).thenReturn(List.of(sup, both));
 
-        svc.updateOrderStatus("o1", "DELIVERED", "staff1");
+        Order result = svc.updateOrderStatus("o1", "DELIVERED", "staff1");
 
-        org.mockito.Mockito.verify(fcmNotificationService).sendNotificationToToken(
-                org.mockito.ArgumentMatchers.eq("tokA"), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyMap());
-        org.mockito.Mockito.verify(fcmNotificationService).sendNotificationToToken(
-                org.mockito.ArgumentMatchers.eq("tokS"), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyMap());
-        org.mockito.Mockito.verify(fcmNotificationService, org.mockito.Mockito.times(1)).sendNotificationToToken(
-                org.mockito.ArgumentMatchers.eq("tokB"), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyMap());
+        assertEquals("DELIVERED", result.getStatus());
+        org.mockito.Mockito.verifyNoInteractions(fcmNotificationService);
     }
 
     @Test
     void postChargeForOrder_ezeeRejects_savesFailedAndLeavesStatusUnchanged() {
         OrderService svc = new OrderService(orderRepository, null, auditService, orderStatusService,
-                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository, idempotencyService, dormitoryService);
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, idempotencyService, dormitoryService);
 
         Order existing = new Order();
         existing.setId("order1");
@@ -279,7 +260,7 @@ class OrderServiceTest {
     @Test
     void postChargeForOrder_alreadyQueued_returnsUnchangedWithoutCallingEzee() {
         OrderService svc = new OrderService(orderRepository, null, auditService, orderStatusService,
-                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository, idempotencyService, dormitoryService);
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, idempotencyService, dormitoryService);
 
         Order existing = new Order();
         existing.setId("order1");
@@ -303,7 +284,7 @@ class OrderServiceTest {
     @Test
     void postChargeForOrder_unknownOrder_returnsNull() {
         OrderService svc = new OrderService(orderRepository, null, auditService, orderStatusService,
-                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository, idempotencyService, dormitoryService);
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, idempotencyService, dormitoryService);
 
         when(orderRepository.findById("missing")).thenReturn(java.util.Optional.empty());
 
@@ -315,7 +296,7 @@ class OrderServiceTest {
     @Test
     void updateOrderStatus_toCancelled_chargeQueued_voidsIt() {
         OrderService svc = new OrderService(orderRepository, fcmNotificationService, auditService, orderStatusService,
-                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository, idempotencyService, dormitoryService);
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, idempotencyService, dormitoryService);
 
         Order existing = new Order();
         existing.setId("order1");
@@ -344,7 +325,7 @@ class OrderServiceTest {
     @Test
     void updateOrderStatus_toCancelled_voidFails_logsAuditEntry() {
         OrderService svc = new OrderService(orderRepository, fcmNotificationService, auditService, orderStatusService,
-                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository, idempotencyService, dormitoryService);
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, idempotencyService, dormitoryService);
 
         Order existing = new Order();
         existing.setId("order1");
@@ -374,7 +355,7 @@ class OrderServiceTest {
     @Test
     void updateOrderStatus_toCancelled_chargeNotQueued_doesNotCallVoid() {
         OrderService svc = new OrderService(orderRepository, fcmNotificationService, auditService, orderStatusService,
-                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository, idempotencyService, dormitoryService);
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, idempotencyService, dormitoryService);
 
         Order existing = new Order();
         existing.setId("order1");
@@ -392,7 +373,7 @@ class OrderServiceTest {
 
     private OrderService chargeService() {
         return new OrderService(orderRepository, fcmNotificationService, auditService, orderStatusService,
-                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, userRepository, idempotencyService, dormitoryService);
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, idempotencyService, dormitoryService);
     }
 
     @Test

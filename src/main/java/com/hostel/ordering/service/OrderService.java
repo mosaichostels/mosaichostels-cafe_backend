@@ -42,7 +42,6 @@ public class OrderService {
     private final OtherEssentialRepository otherEssentialRepository;
     private final EzeeChargePostService ezeeChargePostService;
     private final EzeeClient ezeeClient;
-    private final com.hostel.ordering.repository.UserRepository userRepository;
     private final IdempotencyService idempotencyService;
     private final DormitoryService dormitoryService;
 
@@ -54,7 +53,6 @@ public class OrderService {
                         OtherEssentialRepository otherEssentialRepository,
                         EzeeChargePostService ezeeChargePostService,
                         EzeeClient ezeeClient,
-                        com.hostel.ordering.repository.UserRepository userRepository,
                         IdempotencyService idempotencyService,
                         DormitoryService dormitoryService) {
         this.orderRepository = orderRepository;
@@ -65,7 +63,6 @@ public class OrderService {
         this.otherEssentialRepository = otherEssentialRepository;
         this.ezeeChargePostService = ezeeChargePostService;
         this.ezeeClient = ezeeClient;
-        this.userRepository = userRepository;
         this.idempotencyService = idempotencyService;
         this.dormitoryService = dormitoryService;
     }
@@ -223,8 +220,6 @@ public class OrderService {
                                         "Failed to void eZee charge for " + updated.getBookingName() + ": " + voided.getChargePostError());
                             }
                         }
-                    } else if ("DELIVERED".equalsIgnoreCase(status)) {
-                        sendDeliveredNotificationToAdmins(updated);
                     }
 
                     return updated;
@@ -254,35 +249,6 @@ public class OrderService {
             log.info("Order for {} deleted successfully", order.getBookingName());
             auditService.logAction("ORDER_DELETED", "Deleted order for " + order.getBookingName());
         });
-    }
-
-    private void sendDeliveredNotificationToAdmins(Order order) {
-        try {
-            java.util.Map<String, com.hostel.ordering.model.User> byId = new java.util.LinkedHashMap<>();
-            for (String role : new String[] {"ROLE_ADMIN", "ROLE_SUPERADMIN"}) {
-                for (com.hostel.ordering.model.User u : userRepository.findByRolesContaining(role)) {
-                    byId.putIfAbsent(u.getId() != null ? u.getId() : u.getUsername(), u);
-                }
-            }
-            for (com.hostel.ordering.model.User admin : byId.values()) {
-                String fcmToken = admin.getFcmToken();
-                if (fcmToken != null && !fcmToken.isBlank()) {
-                    java.util.Map<String, String> data = new java.util.HashMap<>();
-                    data.put("type", "DELIVERED");
-                    data.put("action", "postCharge");
-                    data.put("orderId", order.getId() != null ? order.getId() : "");
-                    data.put("bookingName", order.getBookingName() != null ? order.getBookingName() : "Order");
-                    fcmNotificationService.sendNotificationToToken(
-                            fcmToken,
-                            "Ready to post",
-                            data.get("bookingName") + " delivered. Post charge?",
-                            data
-                    );
-                }
-            }
-        } catch (Exception e) {
-            log.error("Error sending delivered notification to admins: {}", e.getMessage());
-        }
     }
 
     /** Returns how many orders were deleted; pending and charged orders are skipped. */

@@ -87,7 +87,7 @@ class RoleMatrixTest {
             org.mockito.Mockito.when(svc.tick(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
                     .thenReturn(new ScheduleService.TickResult(false, "u"));
             org.mockito.Mockito.when(svc.confirm(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenReturn(true);
-            return new ScheduleController(svc, mock(AuditService.class));
+            return new ScheduleController(svc, mock(AuditService.class), mock(com.hostel.ordering.service.CleaningNotifier.class));
         }
 
         @Bean

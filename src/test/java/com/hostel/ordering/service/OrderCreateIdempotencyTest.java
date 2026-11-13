@@ -33,7 +33,7 @@ class OrderCreateIdempotencyTest {
 
     @BeforeEach
     void setUp() {
-        service = new OrderService(orderRepository, fcm, audit, null, null, null, null, null, null, null, dormitories);
+        service = new OrderService(orderRepository, fcm, audit, null, null, null, null, null, null, dormitories);
         when(dormitories.getAllDormitories()).thenReturn(List.of(new Dormitory("Dorm")));
         request.setBookingName("Joy");
         request.setDormitory("Dorm");

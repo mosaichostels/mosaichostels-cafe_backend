@@ -22,7 +22,7 @@ class StaleChargePostRecoveryTest {
         stuck.setChargePostStatus("IN_PROGRESS");
         stuck.setChargePostedItems(new ArrayList<>(List.of("a#0")));
         when(repo.findStaleChargePosts(anyLong())).thenReturn(List.of(stuck));
-        OrderService svc = new OrderService(repo, null, audit, null, null, null, null, null, null, null, null);
+        OrderService svc = new OrderService(repo, null, audit, null, null, null, null, null, null, null);
 
         svc.recoverStaleChargePosts();
 

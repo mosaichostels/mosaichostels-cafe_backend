@@ -2,10 +2,14 @@ package com.hostel.ordering.service;
 
 import com.hostel.ordering.model.User;
 import com.hostel.ordering.repository.UserRepository;
+import com.hostel.ordering.pms.PmsDates;
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /** Pushes for the cleaning list. Payloads carry room names and the cleaner's login only; a failed push never fails the request. */
@@ -17,9 +21,17 @@ public class CleaningNotifier {
     private final UserRepository userRepository;
     private final FCMNotificationService fcm;
 
+    private final Clock clock;
+
+    @Autowired
     public CleaningNotifier(UserRepository userRepository, FCMNotificationService fcm) {
+        this(userRepository, fcm, Clock.system(PmsDates.IST));
+    }
+
+    CleaningNotifier(UserRepository userRepository, FCMNotificationService fcm, Clock clock) {
         this.userRepository = userRepository;
         this.fcm = fcm;
+        this.clock = clock;
     }
 
     public void listSubmitted(int added) {
@@ -46,6 +58,12 @@ public class CleaningNotifier {
         String body = roomName + " cleaned by " + cleaner + "."
                 + ("CONFIRMED".equals(ezee) ? " eZee updated." : " eZee not updated: set it Clean in eZee.");
         send("Bed cleaned", body, "CLEANING_DONE", "ROLE_ADMIN", "ROLE_SUPERADMIN");
+    }
+
+    /** date is yyyy-MM-dd; shown only when it is not today (IST), i.e. a leftover ticked late. */
+    public void taskDone(String displayName, String doneBy, String date) {
+        String suffix = LocalDate.now(clock).toString().equals(date) ? "" : " (" + date + ")";
+        send("Task done", displayName + " done by " + doneBy + suffix, "CLEANING_DONE", "ROLE_ADMIN", "ROLE_SUPERADMIN");
     }
 
     public void scheduleNotSubmitted() {

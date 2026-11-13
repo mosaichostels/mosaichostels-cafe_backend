@@ -23,7 +23,7 @@ class CleaningNotifierTest {
     void setUp() {
         users = mock(UserRepository.class);
         fcm = mock(FCMNotificationService.class);
-        notifier = new CleaningNotifier(users, fcm);
+        notifier = new CleaningNotifier(users, fcm, java.time.Clock.fixed(java.time.Instant.parse("2026-11-13T05:00:00Z"), com.hostel.ordering.pms.PmsDates.IST));
     }
 
     private static User user(String id, String token, String... roles) {
@@ -121,5 +121,32 @@ class CleaningNotifierTest {
         verify(fcm).sendNotificationToToken("tokZ", "Cleaning schedule", "Today's schedule has not been submitted.", data);
         verify(users, never()).findByRolesContaining("ROLE_HOUSEKEEPING");
         verifyNoMoreInteractions(fcm);
+    }
+
+    @Test
+    void taskDoneNotifiesAdminAndSuperadminOnceEachWithoutDateWhenToday() {
+        User both = user("x", "tokX", "ROLE_ADMIN", "ROLE_SUPERADMIN");
+        when(users.findByRolesContaining("ROLE_ADMIN")).thenReturn(List.of(both, user("y", "", "ROLE_ADMIN")));
+        when(users.findByRolesContaining("ROLE_SUPERADMIN")).thenReturn(List.of(both, user("z", "tokZ", "ROLE_SUPERADMIN")));
+        notifier.taskDone("Clean washroom", "hk1", "2026-11-13");
+        Map<String, String> data = Map.of("type", "CLEANING_DONE");
+        verify(fcm, times(1)).sendNotificationToToken("tokX", "Task done", "Clean washroom done by hk1", data);
+        verify(fcm, times(1)).sendNotificationToToken("tokZ", "Task done", "Clean washroom done by hk1", data);
+        verifyNoMoreInteractions(fcm);
+        verify(users, never()).findByRolesContaining("ROLE_HOUSEKEEPING");
+    }
+
+    @Test
+    void taskDoneAppendsDateWhenNotToday() {
+        when(users.findByRolesContaining("ROLE_ADMIN")).thenReturn(List.of(user("x", "tokX", "ROLE_ADMIN")));
+        when(users.findByRolesContaining("ROLE_SUPERADMIN")).thenReturn(List.of());
+        notifier.taskDone("Mop floor", "hk1", "2026-11-12");
+        verify(fcm).sendNotificationToToken("tokX", "Task done", "Mop floor done by hk1 (2026-11-12)", Map.of("type", "CLEANING_DONE"));
+    }
+
+    @Test
+    void taskDoneFailureDoesNotPropagate() {
+        when(users.findByRolesContaining(anyString())).thenThrow(new RuntimeException("db"));
+        assertDoesNotThrow(() -> notifier.taskDone("t", "u", "2026-11-13"));
     }
 }

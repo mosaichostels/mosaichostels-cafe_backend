@@ -1,6 +1,7 @@
 package com.hostel.ordering.controller;
 
 import com.hostel.ordering.service.AuditService;
+import com.hostel.ordering.service.CleaningNotifier;
 import com.hostel.ordering.service.ScheduleService;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -21,9 +22,12 @@ public class ScheduleController {
     private final ScheduleService service;
     private final AuditService auditService;
 
-    public ScheduleController(ScheduleService service, AuditService auditService) {
+    private final CleaningNotifier notifier;
+
+    public ScheduleController(ScheduleService service, AuditService auditService, CleaningNotifier notifier) {
         this.service = service;
         this.auditService = auditService;
+        this.notifier = notifier;
     }
 
     @GetMapping("/days")
@@ -53,7 +57,15 @@ public class ScheduleController {
     @PreAuthorize("hasAnyRole('ADMIN','HOUSEKEEPING')")
     public Map<String, Object> tick(@PathVariable String date, @RequestBody Map<String, Object> body,
             Authentication authentication) {
-        var r = service.tick(date, str(body.get("taskKey")), str(body.get("slot")), authentication.getName());
+        String taskKey = str(body.get("taskKey"));
+        var r = service.tick(date, taskKey, str(body.get("slot")), authentication.getName());
+        if (!r.alreadyTicked()) {
+            try {
+                notifier.taskDone(displayName(str(body.get("label")), taskKey), authentication.getName(), date.strip());
+            } catch (RuntimeException e) {
+                log.warn("Task-done push failed: {}", e.toString());
+            }
+        }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("alreadyTicked", r.alreadyTicked());
         out.put("doneBy", r.doneBy());
@@ -73,6 +85,15 @@ public class ScheduleController {
             log.warn("Audit SCHEDULE_TASK_CONFIRMED failed: {}", e.toString());
         }
         return ResponseEntity.ok(Map.of("confirmed", true));
+    }
+
+    /** Optional app-sent label for the push; anything unusable falls back to the task key, never an error. */
+    static String displayName(String label, String taskKey) {
+        String l = label == null ? "" : label.strip();
+        if (l.isEmpty() || l.length() > 80 || l.chars().anyMatch(Character::isISOControl)) {
+            return taskKey;
+        }
+        return l;
     }
 
     // Non-string values fail the service's validation (null is rejected there).
