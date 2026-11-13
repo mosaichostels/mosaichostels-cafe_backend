@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 
 import com.hostel.ordering.config.SecurityConfig;
+import com.hostel.ordering.controller.CleaningListController;
 import com.hostel.ordering.controller.NotificationController;
 import com.hostel.ordering.controller.OrderController;
 import com.hostel.ordering.dto.CreateOrderRequest;
@@ -17,6 +18,7 @@ import com.hostel.ordering.pms.PmsRoomStatusWriteService;
 import com.hostel.ordering.pms.PmsUnconfirmedController;
 import com.hostel.ordering.pms.PmsWriteGuard;
 import com.hostel.ordering.service.AuditService;
+import com.hostel.ordering.service.CleaningListService;
 import com.hostel.ordering.service.ConfirmTokenService;
 import com.hostel.ordering.service.FCMNotificationService;
 import com.hostel.ordering.service.OrderService;
@@ -67,6 +69,17 @@ class RoleMatrixTest {
         }
 
         @Bean
+        CleaningListController cleaningList() {
+            CleaningListService svc = mock(CleaningListService.class);
+            org.mockito.Mockito.when(svc.done(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                    .thenReturn(new CleaningListService.DoneResult(true, null, null));
+            org.mockito.Mockito.when(svc.submit(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                    .thenReturn(new CleaningListService.SubmitResult(0, 0));
+            org.mockito.Mockito.when(svc.remove(org.mockito.ArgumentMatchers.any())).thenReturn(true);
+            return new CleaningListController(svc, mock(AuditService.class));
+        }
+
+        @Bean
         PmsReconcileController reconcile() {
             return new PmsReconcileController(mock(PmsReconcileService.class));
         }
@@ -86,6 +99,7 @@ class RoleMatrixTest {
     @Autowired NotificationController notifications;
     @Autowired PmsHousekeepingController housekeeping;
     @Autowired PmsHousekeepingWorkflowController cleaning;
+    @Autowired CleaningListController cleaningList;
     @Autowired PmsReconcileController reconcile;
     @Autowired PmsUnconfirmedController unconfirmed;
 
@@ -114,6 +128,11 @@ class RoleMatrixTest {
         m.put("GET /pms/cleaning-tasks", () -> cleaning.tasks(null));
         m.put("GET /pms/housekeeping/rooms", () -> housekeeping.rooms());
         m.put("POST /pms/housekeeping/rooms/{id}/status", () -> housekeeping.setStatus("r", "k", null));
+        var auth = new TestingAuthenticationToken("u", "p");
+        m.put("GET /cleaning-list", () -> cleaningList.list());
+        m.put("POST /cleaning-list", () -> cleaningList.submit(Map.of("beds", java.util.List.of()), auth));
+        m.put("DELETE /cleaning-list/{id}", () -> cleaningList.remove("x", auth));
+        m.put("POST /cleaning-list/{id}/done", () -> cleaningList.done("x", auth));
         m.put("GET /pms/reconcile/charges", () -> reconcile.charges(null));
         m.put("GET /pms/unconfirmed", () -> unconfirmed.list());
         return m;
@@ -130,6 +149,8 @@ class RoleMatrixTest {
             "POST /notifications/subscribe", "POST /notifications/unsubscribe"};
     private static final String[] CLEANING = {"GET /pms/cleaning-tasks", "GET /pms/housekeeping/rooms",
             "POST /pms/housekeeping/rooms/{id}/status"};
+    private static final String[] LIST_HK = {"GET /cleaning-list", "POST /cleaning-list/{id}/done"};
+    private static final String[] LIST_ADMIN = {"POST /cleaning-list", "DELETE /cleaning-list/{id}"};
     private static final String[] ADMIN_ONLY = {"GET /pms/reconcile/charges", "GET /pms/unconfirmed"};
 
     private static String[] concat(String[]... parts) {
@@ -143,13 +164,13 @@ class RoleMatrixTest {
 
     @Test
     void housekeepingGetsCleaningAndBoardOnly() {
-        expect("ROLE_HOUSEKEEPING", CLEANING);
+        expect("ROLE_HOUSEKEEPING", concat(CLEANING, LIST_HK));
     }
 
     @Test
     void adminAndSuperAdminGetEverything() {
-        expect("ROLE_ADMIN", concat(ORDER_AND_PUSH, CLEANING, ADMIN_ONLY));
-        expect("ROLE_SUPERADMIN", concat(ORDER_AND_PUSH, CLEANING, ADMIN_ONLY));
+        expect("ROLE_ADMIN", concat(ORDER_AND_PUSH, CLEANING, LIST_HK, LIST_ADMIN, ADMIN_ONLY));
+        expect("ROLE_SUPERADMIN", concat(ORDER_AND_PUSH, CLEANING, LIST_HK, LIST_ADMIN, ADMIN_ONLY));
     }
 
     @Test
