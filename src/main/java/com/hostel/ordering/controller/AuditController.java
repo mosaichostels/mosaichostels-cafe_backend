@@ -33,10 +33,12 @@ public class AuditController {
             @RequestParam(required = false) Long dateTo,
             @RequestParam(required = false) Integer limit,
             @RequestParam(required = false) Integer offset) {
-        if (action == null && username == null && dateFrom == null && dateTo == null) {
-            return auditService.getFilteredLogs(null, null, null, null, limit, offset);
-        }
         return auditService.getFilteredLogs(action, username, dateFrom, dateTo, limit, offset);
+    }
+
+    @GetMapping("/actions")
+    public List<String> getActions() {
+        return auditService.getActions();
     }
 
     @DeleteMapping
