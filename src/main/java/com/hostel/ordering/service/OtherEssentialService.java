@@ -20,6 +20,7 @@ public class OtherEssentialService {
     }
 
     public OtherEssential createOtherEssential(OtherEssential otherEssential) {
+        validate(otherEssential);
         OtherEssential saved = otherEssentialRepository.save(otherEssential);
         log.info("New essential item created: {}", saved.getName());
         auditService.logAction("ESSENTIAL_CREATED", "Created essential item: " + saved.getName() + " with price " + saved.getPrice());
@@ -81,6 +82,7 @@ public class OtherEssentialService {
                     if (otherEssential.getPrice() != null) existing.setPrice(otherEssential.getPrice());
                     if (otherEssential.getCategory() != null) existing.setCategory(otherEssential.getCategory());
                     if (otherEssential.getAvailable() != null) existing.setAvailable(otherEssential.getAvailable());
+                    validate(existing);
                     // Updating a removed item is how the panel's Undo restores it.
                     existing.setDeleted(false);
                     OtherEssential updated = otherEssentialRepository.save(existing);
@@ -89,6 +91,24 @@ public class OtherEssentialService {
                     return updated;
                 })
                 .orElse(null);
+    }
+
+    private static void validate(OtherEssential item) {
+        if (item.getName() == null || item.getName().isBlank() || item.getName().length() > 100) {
+            throw new IllegalArgumentException("Name must be between 1 and 100 characters");
+        }
+        if (item.getCategory() == null || item.getCategory().isBlank() || item.getCategory().length() > 100) {
+            throw new IllegalArgumentException("Category must be between 1 and 100 characters");
+        }
+        if (item.getDescription() != null && item.getDescription().length() > 500) {
+            throw new IllegalArgumentException("Description must be at most 500 characters");
+        }
+        if (item.getPrice() == null || !Double.isFinite(item.getPrice()) || item.getPrice() <= 0) {
+            throw new IllegalArgumentException("Price must be a finite positive number");
+        }
+        if (item.getAvailable() == null) {
+            throw new IllegalArgumentException("Availability is required");
+        }
     }
 
     public void deleteOtherEssential(String id) {

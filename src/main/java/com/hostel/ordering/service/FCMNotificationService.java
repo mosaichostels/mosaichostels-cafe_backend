@@ -136,11 +136,10 @@ public class FCMNotificationService {
         return "#" + (id.length() > 6 ? id.substring(id.length() - 6) : id).toUpperCase(java.util.Locale.ROOT);
     }
 
-    @Async
-    public void sendNotificationToToken(String token, String title, String body, java.util.Map<String, String> data) {
+    public boolean sendNotificationToToken(String token, String title, String body, java.util.Map<String, String> data) {
         if (token == null || token.isBlank()) {
             logger.warn("⚠️ FCM token is null or blank, skipping notification");
-            return;
+            return false;
         }
         try {
             Message.Builder messageBuilder = Message.builder()
@@ -165,8 +164,10 @@ public class FCMNotificationService {
 
             String response = firebaseMessaging.send(message);
             logger.info("✅ FCM notification sent to token: {}", response);
+            return true;
         } catch (FirebaseMessagingException e) {
             logger.error("❌ Failed to send FCM notification to token: {}", e.getMessage());
+            return false;
         }
     }
 }

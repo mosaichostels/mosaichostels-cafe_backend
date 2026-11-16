@@ -5,6 +5,7 @@ import com.hostel.ordering.service.MenuItemService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import java.util.List;
+import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 @RestController
@@ -19,7 +20,7 @@ public class MenuItemController {
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<MenuItem> createMenuItem(@RequestBody MenuItem menuItem) {
+    public ResponseEntity<MenuItem> createMenuItem(@Valid @RequestBody MenuItem menuItem) {
         return ResponseEntity.status(HttpStatus.CREATED).body(menuItemService.createMenuItem(menuItem));
     }
 

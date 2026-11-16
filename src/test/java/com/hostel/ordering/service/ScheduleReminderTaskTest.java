@@ -42,6 +42,7 @@ class ScheduleReminderTaskTest {
     @Test
     void notSubmittedRecordsRowAndPushesOnce() {
         when(schedule.isSubmitted("2026-11-16")).thenReturn(false);
+        when(notifier.scheduleNotSubmitted()).thenReturn(1);
         at("2026-11-16T03:30:00Z").run();
         ArgumentCaptor<ScheduleReminder> row = ArgumentCaptor.forClass(ScheduleReminder.class);
         verify(reminders).insert(row.capture());
@@ -66,10 +67,26 @@ class ScheduleReminderTaskTest {
     }
 
     @Test
-    void notifierFailureIsSwallowedAndRowStays() {
+    void zeroAcceptedPushesDeleteOnlyTheInsertedClaim() {
         when(schedule.isSubmitted("2026-11-16")).thenReturn(false);
-        doThrow(new RuntimeException("fcm")).when(notifier).scheduleNotSubmitted();
+        ScheduleReminder inserted = new ScheduleReminder();
+        inserted.setId("claim-1");
+        when(reminders.insert(any(ScheduleReminder.class))).thenReturn(inserted);
+        when(notifier.scheduleNotSubmitted()).thenReturn(0);
+
         assertDoesNotThrow(() -> at("2026-11-16T03:30:00Z").run());
-        verify(reminders).insert(any(ScheduleReminder.class));
+        verify(reminders).deleteById("claim-1");
+    }
+
+    @Test
+    void notifierFailureDeletesClaimForRetry() {
+        when(schedule.isSubmitted("2026-11-16")).thenReturn(false);
+        ScheduleReminder inserted = new ScheduleReminder();
+        inserted.setId("claim-2");
+        when(reminders.insert(any(ScheduleReminder.class))).thenReturn(inserted);
+        when(notifier.scheduleNotSubmitted()).thenThrow(new RuntimeException("fcm"));
+
+        assertDoesNotThrow(() -> at("2026-11-16T03:30:00Z").run());
+        verify(reminders).deleteById("claim-2");
     }
 }

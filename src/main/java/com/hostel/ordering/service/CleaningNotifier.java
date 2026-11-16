@@ -66,12 +66,13 @@ public class CleaningNotifier {
         send("Task done", displayName + " done by " + doneBy + suffix, "CLEANING_DONE", "ROLE_ADMIN", "ROLE_SUPERADMIN");
     }
 
-    public void scheduleNotSubmitted() {
-        send("Cleaning schedule", "Today's schedule has not been submitted.", "SCHEDULE_REMINDER",
+    public int scheduleNotSubmitted() {
+        return send("Cleaning schedule", "Today's schedule has not been submitted.", "SCHEDULE_REMINDER",
                 "ROLE_ADMIN", "ROLE_SUPERADMIN");
     }
 
-    private void send(String title, String body, String type, String... roles) {
+    private int send(String title, String body, String type, String... roles) {
+        int accepted = 0;
         try {
             Map<String, User> byId = new LinkedHashMap<>();
             for (String role : roles) {
@@ -85,7 +86,9 @@ public class CleaningNotifier {
                     continue;
                 }
                 try {
-                    fcm.sendNotificationToToken(token, title, body, Map.of("type", type));
+                    if (fcm.sendNotificationToToken(token, title, body, Map.of("type", type))) {
+                        accepted++;
+                    }
                 } catch (Exception e) {
                     logger.warn("{} push to {} failed: {}", type, u.getUsername(), e.toString());
                 }
@@ -93,5 +96,6 @@ public class CleaningNotifier {
         } catch (Exception e) {
             logger.warn("{} push failed: {}", type, e.toString());
         }
+        return accepted;
     }
 }

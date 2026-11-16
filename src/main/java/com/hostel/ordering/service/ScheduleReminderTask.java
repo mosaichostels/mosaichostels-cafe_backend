@@ -47,15 +47,25 @@ public class ScheduleReminderTask {
         ScheduleReminder row = new ScheduleReminder();
         row.setDate(today);
         row.setSentAt(clock.millis());
+        ScheduleReminder inserted;
         try {
-            reminders.insert(row);
+            inserted = reminders.insert(row);
         } catch (DuplicateKeyException e) {
             return;
         }
         try {
-            notifier.scheduleNotSubmitted();
+            if (notifier.scheduleNotSubmitted() == 0) {
+                release(inserted);
+            }
         } catch (Exception e) {
             logger.warn("Schedule reminder push failed: {}", e.toString());
+            release(inserted);
+        }
+    }
+
+    private void release(ScheduleReminder claim) {
+        if (claim != null && claim.getId() != null) {
+            reminders.deleteById(claim.getId());
         }
     }
 }

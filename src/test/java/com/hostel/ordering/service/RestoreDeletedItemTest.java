@@ -20,6 +20,10 @@ class RestoreDeletedItemTest {
     void updatingASoftDeletedMenuItemRestoresIt() {
         MenuItemRepository repo = mock(MenuItemRepository.class);
         MenuItem gone = new MenuItem();
+        gone.setName("Coffee");
+        gone.setCategory("Drinks");
+        gone.setPrice(50.0);
+        gone.setAvailable(false);
         gone.setDeleted(true);
         when(repo.findById("m1")).thenReturn(Optional.of(gone));
         when(repo.save(any())).thenAnswer(i -> i.getArgument(0));
@@ -35,6 +39,10 @@ class RestoreDeletedItemTest {
     void updatingASoftDeletedEssentialRestoresIt() {
         OtherEssentialRepository repo = mock(OtherEssentialRepository.class);
         OtherEssential gone = new OtherEssential();
+        gone.setName("Towel");
+        gone.setCategory("Essentials");
+        gone.setPrice(100.0);
+        gone.setAvailable(false);
         gone.setDeleted(true);
         when(repo.findById("e1")).thenReturn(Optional.of(gone));
         when(repo.save(any())).thenAnswer(i -> i.getArgument(0));
