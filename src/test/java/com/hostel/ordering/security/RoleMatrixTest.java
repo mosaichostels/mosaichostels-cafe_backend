@@ -5,7 +5,6 @@ import static org.mockito.Mockito.mock;
 
 import com.hostel.ordering.config.SecurityConfig;
 import com.hostel.ordering.controller.CleaningListController;
-import com.hostel.ordering.controller.NotificationController;
 import com.hostel.ordering.controller.ScheduleController;
 import com.hostel.ordering.service.ScheduleService;
 import com.hostel.ordering.controller.OrderController;
@@ -22,7 +21,6 @@ import com.hostel.ordering.pms.PmsWriteGuard;
 import com.hostel.ordering.service.AuditService;
 import com.hostel.ordering.service.CleaningListService;
 import com.hostel.ordering.service.ConfirmTokenService;
-import com.hostel.ordering.service.FCMNotificationService;
 import com.hostel.ordering.service.OrderService;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -56,11 +54,6 @@ class RoleMatrixTest {
         @Bean
         OrderController orders() {
             return new OrderController(mock(OrderService.class), mock(AuditService.class), mock(ConfirmTokenService.class));
-        }
-
-        @Bean
-        NotificationController notifications() {
-            return new NotificationController(mock(FCMNotificationService.class));
         }
 
         @Bean
@@ -107,7 +100,6 @@ class RoleMatrixTest {
     }
 
     @Autowired OrderController orders;
-    @Autowired NotificationController notifications;
     @Autowired PmsHousekeepingController housekeeping;
     @Autowired PmsHousekeepingWorkflowController cleaning;
     @Autowired CleaningListController cleaningList;
@@ -135,8 +127,6 @@ class RoleMatrixTest {
         m.put("GET /orders", () -> orders.getAllOrders(null, null, null, null, null, null, "createdAt_desc"));
         m.put("GET /orders/{id}", () -> orders.getOrder("x"));
         m.put("PUT /orders/{id}/status", () -> orders.updateOrderStatus("x", Map.of("status", "DELIVERED"), null, null));
-        m.put("POST /notifications/subscribe", () -> notifications.subscribe(Map.of("token", "t")));
-        m.put("POST /notifications/unsubscribe", () -> notifications.unsubscribe(Map.of("token", "t")));
         m.put("GET /pms/cleaning-tasks", () -> cleaning.tasks(null));
         m.put("GET /pms/housekeeping/rooms", () -> housekeeping.rooms());
         m.put("POST /pms/housekeeping/rooms/{id}/status", () -> housekeeping.setStatus("r", "k", null));
@@ -160,8 +150,7 @@ class RoleMatrixTest {
         routes().forEach((name, call) -> assertEquals(ok.contains(name), allowed(call), role + " " + name));
     }
 
-    private static final String[] ORDER_AND_PUSH = {"GET /orders", "GET /orders/{id}", "PUT /orders/{id}/status",
-            "POST /notifications/subscribe", "POST /notifications/unsubscribe"};
+    private static final String[] ORDER_AND_PUSH = {"GET /orders", "GET /orders/{id}", "PUT /orders/{id}/status"};
     private static final String[] CLEANING = {"GET /pms/cleaning-tasks", "GET /pms/housekeeping/rooms",
             "POST /pms/housekeeping/rooms/{id}/status"};
     private static final String[] LIST_HK = {"GET /cleaning-list", "POST /cleaning-list/{id}/done"};
