@@ -75,6 +75,11 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(new ErrorResponse(ex.getMessage()), HttpStatus.CONFLICT);
     }
 
+    @ExceptionHandler(StaleOrderException.class)
+    public ResponseEntity<ErrorResponse> handleStaleOrder(StaleOrderException ex) {
+        return new ResponseEntity<>(new ErrorResponse(ex.getMessage()), HttpStatus.CONFLICT);
+    }
+
     @ExceptionHandler(com.hostel.ordering.ezee.EzeeUnavailableException.class)
     public ResponseEntity<ErrorResponse> handleEzeeUnavailable(com.hostel.ordering.ezee.EzeeUnavailableException ex) {
         log.warn("eZee unavailable: {}", ex.getMessage());

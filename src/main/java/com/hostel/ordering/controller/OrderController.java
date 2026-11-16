@@ -1,6 +1,7 @@
 package com.hostel.ordering.controller;
 
 import com.hostel.ordering.dto.CreateOrderRequest;
+import com.hostel.ordering.dto.StatusUpdateRequest;
 import com.hostel.ordering.model.Order;
 import com.hostel.ordering.service.AuditService;
 import com.hostel.ordering.service.ConfirmTokenService;
@@ -66,10 +67,10 @@ public class OrderController {
     // orders and posting charges stay admin-only below.
     @PreAuthorize("hasAnyRole('ADMIN', 'KITCHEN', 'STAFF')")
     public ResponseEntity<Order> updateOrderStatus(@PathVariable String id,
-            @RequestBody Map<String, String> payload,
+            @RequestBody StatusUpdateRequest payload,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             Authentication authentication) {
-        String status = payload.get("status");
+        String status = payload.status();
         if (status == null || status.isBlank()) {
             throw new IllegalArgumentException("Status parameter cannot be null or empty");
         }
@@ -80,7 +81,7 @@ public class OrderController {
         }
 
         String updatedBy = getAuthenticatedUser(authentication);
-        Order updated = orderService.updateOrderStatus(id, status, updatedBy);
+        Order updated = orderService.updateOrderStatus(id, status, updatedBy, payload.expectedVersion());
 
         if (updated != null) {
             cacheIdempotencyIfPresent("order-status:" + id, idempotencyKey, updated);

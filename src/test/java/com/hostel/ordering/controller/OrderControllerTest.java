@@ -2,6 +2,8 @@ package com.hostel.ordering.controller;
 
 import com.hostel.ordering.service.AuditService;
 import com.hostel.ordering.service.OrderService;
+import com.hostel.ordering.dto.StatusUpdateRequest;
+import com.hostel.ordering.model.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -88,6 +90,20 @@ class OrderControllerTest {
 
         assertTrue(rule.contains("STAFF"), "Staff must be able to mark orders delivered: " + rule);
         assertTrue(rule.contains("ADMIN"), "Admin must keep the permission: " + rule);
+    }
+
+    @Test
+    void updateStatusReturnsCachedResultBeforeCheckingVersion() {
+        Order cached = new Order();
+        cached.setId("o1");
+        cached.setVersion(6L);
+        when(orderService.getIdempotencyResult("order-status:o1:key", Order.class)).thenReturn(cached);
+        StatusUpdateRequest request = new StatusUpdateRequest("DELIVERED", 4L);
+
+        assertEquals(cached, createController().updateOrderStatus("o1", request, "key", authentication).getBody());
+        org.mockito.Mockito.verify(orderService, org.mockito.Mockito.never())
+                .updateOrderStatus(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+                        org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any());
     }
 
     @Test

@@ -126,7 +126,8 @@ class RoleMatrixTest {
         m.put("POST /orders", () -> orders.createOrder(new CreateOrderRequest(), null, null));
         m.put("GET /orders", () -> orders.getAllOrders(null, null, null, null, null, null, "createdAt_desc"));
         m.put("GET /orders/{id}", () -> orders.getOrder("x"));
-        m.put("PUT /orders/{id}/status", () -> orders.updateOrderStatus("x", Map.of("status", "DELIVERED"), null, null));
+        m.put("PUT /orders/{id}/status", () -> orders.updateOrderStatus("x",
+                new com.hostel.ordering.dto.StatusUpdateRequest("DELIVERED", null), null, null));
         m.put("GET /pms/cleaning-tasks", () -> cleaning.tasks(null));
         m.put("GET /pms/housekeeping/rooms", () -> housekeeping.rooms());
         m.put("POST /pms/housekeeping/rooms/{id}/status", () -> housekeeping.setStatus("r", "k", null));

@@ -225,10 +225,41 @@ class OrderServiceTest {
         when(orderRepository.findById("o1")).thenReturn(Optional.of(existing));
         when(orderRepository.save(existing)).thenReturn(existing);
 
-        Order result = svc.updateOrderStatus("o1", "DELIVERED", "staff1");
+        Order result = svc.updateOrderStatus("o1", "DELIVERED", "staff1", null);
 
         assertEquals("DELIVERED", result.getStatus());
         org.mockito.Mockito.verifyNoInteractions(fcmNotificationService);
+    }
+
+    @Test
+    void updateOrderStatus_matchingVersionSaves() {
+        OrderService svc = new OrderService(orderRepository, fcmNotificationService, auditService, orderStatusService,
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, idempotencyService, dormitoryService);
+        Order existing = new Order();
+        existing.setVersion(4L);
+        existing.setBookingName("Guest");
+        when(orderStatusService.getAllStatuses()).thenReturn(List.of(
+                new com.hostel.ordering.model.OrderStatusConfig("DELIVERED", "Delivered", "green", false)));
+        when(orderRepository.findById("o1")).thenReturn(Optional.of(existing));
+        when(orderRepository.save(existing)).thenReturn(existing);
+
+        assertEquals("DELIVERED", svc.updateOrderStatus("o1", "DELIVERED", "staff1", 4L).getStatus());
+    }
+
+    @Test
+    void updateOrderStatus_staleVersionHasNoSideEffects() {
+        OrderService svc = new OrderService(orderRepository, fcmNotificationService, auditService, orderStatusService,
+                menuItemRepository, otherEssentialRepository, ezeeChargePostService, ezeeClient, idempotencyService, dormitoryService);
+        Order existing = new Order();
+        existing.setVersion(5L);
+        when(orderStatusService.getAllStatuses()).thenReturn(List.of(
+                new com.hostel.ordering.model.OrderStatusConfig("DELIVERED", "Delivered", "green", false)));
+        when(orderRepository.findById("o1")).thenReturn(Optional.of(existing));
+
+        assertThrows(com.hostel.ordering.exception.StaleOrderException.class,
+                () -> svc.updateOrderStatus("o1", "DELIVERED", "staff1", 4L));
+        org.mockito.Mockito.verify(orderRepository, org.mockito.Mockito.never()).save(org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.verifyNoInteractions(auditService, fcmNotificationService);
     }
 
     @Test
@@ -315,7 +346,7 @@ class OrderServiceTest {
         });
         when(orderRepository.save(existing)).thenReturn(existing);
 
-        svc.updateOrderStatus("order1", "CANCELLED", "staff1");
+        svc.updateOrderStatus("order1", "CANCELLED", "staff1", null);
 
         org.mockito.Mockito.verify(ezeeChargePostService).voidPost(existing);
         org.mockito.Mockito.verify(auditService, org.mockito.Mockito.never())
@@ -345,7 +376,7 @@ class OrderServiceTest {
         });
         when(orderRepository.save(existing)).thenReturn(existing);
 
-        svc.updateOrderStatus("order1", "CANCELLED", "staff1");
+        svc.updateOrderStatus("order1", "CANCELLED", "staff1", null);
 
         org.mockito.Mockito.verify(auditService).logAction(
                 org.mockito.ArgumentMatchers.eq("ORDER_CHARGEPOST_VOID_FAILED"),
@@ -366,7 +397,7 @@ class OrderServiceTest {
         when(orderRepository.findById("order1")).thenReturn(java.util.Optional.of(existing));
         when(orderRepository.save(existing)).thenReturn(existing);
 
-        svc.updateOrderStatus("order1", "CANCELLED", "staff1");
+        svc.updateOrderStatus("order1", "CANCELLED", "staff1", null);
 
         org.mockito.Mockito.verifyNoInteractions(ezeeChargePostService);
     }
