@@ -96,18 +96,6 @@ public class OrderRepositoryImpl implements OrderRepositoryCustom {
                 .and("chargePostAt").lt(cutoffMs)), Order.class);
     }
 
-    static Query chargeReconcileQuery(long fromMs, long toMs, int limit) {
-        return new Query(Criteria.where("createdAt").gte(fromMs).lt(toMs)
-                .orOperator(Criteria.where("status").is("DELIVERED"), Criteria.where("chargePostStatus").ne(null)))
-                .with(Sort.by(Sort.Direction.ASC, "createdAt"))
-                .limit(limit);
-    }
-
-    @Override
-    public List<Order> findForChargeReconcile(long fromMs, long toMs, int limit) {
-        return mongoTemplate.find(chargeReconcileQuery(fromMs, toMs, limit), Order.class);
-    }
-
     @Override
     public Order claimForChargePost(String orderId, String room, boolean acknowledgeUnconfirmed) {
         Update update = claimUpdate(room);
