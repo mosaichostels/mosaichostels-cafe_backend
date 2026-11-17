@@ -3,7 +3,7 @@
     {
       "file": "ARCHITECTURE.md",
       "read_when": "tracing a request, changing auth, orders, eZee posting, schedulers or data.",
-      "verified_commit": "2026-11-17 on branch `codex/codebase-hardening`",
+      "verified_commit": "2026-11-17 on `main`",
       "covers": [
         "src/main/java/com/hostel/ordering/pms/**/*.java",
         "src/main/java/com/hostel/ordering/controller/**/*.java",
@@ -12,7 +12,7 @@
         "src/main/java/com/hostel/ordering/model/**/*.java",
         "src/main/java/com/hostel/ordering/repository/**/*.java"
       ],
-      "tokens_est": 4507
+      "tokens_est": 4501
     },
     {
       "file": "COMMANDS.md",
@@ -42,20 +42,20 @@
     {
       "file": "DECISIONS.md",
       "read_when": "about to change auth, idempotency, eZee posting, rate limits or notifications.",
-      "verified_commit": "2026-11-17 on branch `codex/codebase-hardening`. Source: backend AGENTS (`../docs/backend/AGENTS.md`) plus code comments where cited.",
+      "verified_commit": "2026-11-17 on `main`. Source: backend AGENTS (`../docs/backend/AGENTS.md`) plus code comments where cited.",
       "covers": [],
-      "tokens_est": 838
+      "tokens_est": 831
     },
     {
       "file": "ENVIRONMENT.md",
       "read_when": "configuring, deploying, or debugging startup. Names only; no values read.",
-      "verified_commit": "2026-11-17 on branch `codex/codebase-hardening` (source: application-prod.yml and `@Value`/`getenv` in src/main)",
+      "verified_commit": "2026-11-17 on `main` (source: application-prod.yml and `@Value`/`getenv` in src/main)",
       "covers": [
         "src/main/resources/application-prod.yml",
         "src/main/java/**/*.java",
         "Dockerfile"
       ],
-      "tokens_est": 924
+      "tokens_est": 918
     },
     {
       "file": "EXTERNAL.md",
@@ -67,7 +67,7 @@
     {
       "file": "GOTCHAS.md",
       "read_when": "debugging, deploying, editing hooks, or before touching prod config.",
-      "verified_commit": "2026-11-17 on branch `codex/codebase-hardening`",
+      "verified_commit": "2026-11-17 on `main`",
       "covers": [
         "../AGENTS.md",
         "../docs/backend/AGENTS.md",
@@ -75,7 +75,7 @@
         ".codex/hooks.json",
         "src/main/java/com/hostel/ordering/service/OrderService.java"
       ],
-      "tokens_est": 870
+      "tokens_est": 863
     },
     {
       "file": "OBSERVABILITY.md",
@@ -112,7 +112,7 @@
     {
       "file": "STATUS.md",
       "read_when": "always, at the start and end of every task (update after changing code).",
-      "verified_commit": "2026-11-17 on branch `codex/codebase-hardening`",
+      "verified_commit": "2026-11-17 on `main`",
       "covers": [
         "src/main/**",
         "src/test/**",
@@ -124,7 +124,7 @@
     {
       "file": "STRUCTURE.md",
       "read_when": "you must find where code lives or add a file.",
-      "verified_commit": "2026-11-17 on branch `codex/codebase-hardening`",
+      "verified_commit": "2026-11-17 on `main`",
       "covers": [
         "src/main/java/**/*.java",
         "src/main/resources/**",
@@ -132,18 +132,18 @@
         "scripts/**",
         "pom.xml"
       ],
-      "tokens_est": 685
+      "tokens_est": 679
     },
     {
       "file": "TESTING.md",
       "read_when": "adding/running tests or judging whether a change is covered.",
-      "verified_commit": "2026-11-17 on branch `codex/codebase-hardening`; `mvn -B verify` passed: 427 tests, 0 failures/errors/skips, jar built.",
+      "verified_commit": "2026-11-17 on `main`; `mvn -B verify` passed: 427 tests, 0 failures/errors/skips, jar built.",
       "covers": [
         "src/test/java/**/*.java",
         "pom.xml",
         ".github/workflows/**"
       ],
-      "tokens_est": 721
+      "tokens_est": 714
     }
   ],
   "nested": []

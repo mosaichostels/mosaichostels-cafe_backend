@@ -1,5 +1,5 @@
 Read when: you must find where code lives or add a file.
-Verified: 2026-11-17 on branch `codex/codebase-hardening`
+Verified: 2026-11-17 on `main`
 Covers: src/main/java/**/*.java, src/main/resources/**, src/test/java/**/*.java, scripts/**, pom.xml
 
 # Structure

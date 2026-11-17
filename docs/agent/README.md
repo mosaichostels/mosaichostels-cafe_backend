@@ -1,7 +1,7 @@
 # Agent context router
 
 Read when: starting any task in this repo (read this first, then only the files your task row lists).
-Verified: 2026-11-17 on branch `codex/codebase-hardening` (not deployed; pushing `main` deploys).
+Verified: 2026-11-17 on `main`; pushing `main` deploys.
 
 | Task | Read |
 | --- | --- |

@@ -1,5 +1,5 @@
 Read when: about to change auth, idempotency, eZee posting, rate limits or notifications.
-Verified: 2026-11-17 on branch `codex/codebase-hardening`. Source: backend AGENTS (`../docs/backend/AGENTS.md`) plus code comments where cited.
+Verified: 2026-11-17 on `main`. Source: backend AGENTS (`../docs/backend/AGENTS.md`) plus code comments where cited.
 Covers: -
 
 # Decisions

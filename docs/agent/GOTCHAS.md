@@ -1,5 +1,5 @@
 Read when: debugging, deploying, editing hooks, or before touching prod config.
-Verified: 2026-11-17 on branch `codex/codebase-hardening`
+Verified: 2026-11-17 on `main`
 Covers: ../AGENTS.md, ../docs/backend/AGENTS.md, .claude/settings.json, .codex/hooks.json, src/main/java/com/hostel/ordering/service/OrderService.java
 
 # Gotchas

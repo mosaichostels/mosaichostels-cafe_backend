@@ -1,5 +1,5 @@
 Read when: adding/running tests or judging whether a change is covered.
-Verified: 2026-11-17 on branch `codex/codebase-hardening`; `mvn -B verify` passed: 427 tests, 0 failures/errors/skips, jar built.
+Verified: 2026-11-17 on `main`; `mvn -B verify` passed: 427 tests, 0 failures/errors/skips, jar built.
 Covers: src/test/java/**/*.java, pom.xml, .github/workflows/**
 
 # Testing

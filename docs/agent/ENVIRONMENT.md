@@ -1,5 +1,5 @@
 Read when: configuring, deploying, or debugging startup. Names only; no values read.
-Verified: 2026-11-17 on branch `codex/codebase-hardening` (source: application-prod.yml and `@Value`/`getenv` in src/main)
+Verified: 2026-11-17 on `main` (source: application-prod.yml and `@Value`/`getenv` in src/main)
 Covers: src/main/resources/application-prod.yml, src/main/java/**/*.java, Dockerfile
 
 # Environment
