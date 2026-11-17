@@ -3,7 +3,7 @@
     {
       "file": "ARCHITECTURE.md",
       "read_when": "tracing a request, changing auth, orders, eZee posting, schedulers or data.",
-      "verified_commit": "2026-11-11 @ 2626fed + final review fixes",
+      "verified_commit": "2026-11-17 on branch `codex/codebase-hardening`",
       "covers": [
         "src/main/java/com/hostel/ordering/pms/**/*.java",
         "src/main/java/com/hostel/ordering/controller/**/*.java",
@@ -12,7 +12,7 @@
         "src/main/java/com/hostel/ordering/model/**/*.java",
         "src/main/java/com/hostel/ordering/repository/**/*.java"
       ],
-      "tokens_est": 5598
+      "tokens_est": 4507
     },
     {
       "file": "COMMANDS.md",
@@ -42,20 +42,20 @@
     {
       "file": "DECISIONS.md",
       "read_when": "about to change auth, idempotency, eZee posting, rate limits or notifications.",
-      "verified_commit": "2026-11-11 @ 2626fed + final review fixes. Source: backend AGENTS (`../docs/backend/AGENTS.md`) plus code comments where cited.",
+      "verified_commit": "2026-11-17 on branch `codex/codebase-hardening`. Source: backend AGENTS (`../docs/backend/AGENTS.md`) plus code comments where cited.",
       "covers": [],
-      "tokens_est": 1045
+      "tokens_est": 838
     },
     {
       "file": "ENVIRONMENT.md",
       "read_when": "configuring, deploying, or debugging startup. Names only; no values read.",
-      "verified_commit": "2026-11-11 @ 2626fed + final review fixes (source: application-prod.yml and `@Value`/`getenv` in src/main)",
+      "verified_commit": "2026-11-17 on branch `codex/codebase-hardening` (source: application-prod.yml and `@Value`/`getenv` in src/main)",
       "covers": [
         "src/main/resources/application-prod.yml",
         "src/main/java/**/*.java",
         "Dockerfile"
       ],
-      "tokens_est": 960
+      "tokens_est": 924
     },
     {
       "file": "EXTERNAL.md",
@@ -67,7 +67,7 @@
     {
       "file": "GOTCHAS.md",
       "read_when": "debugging, deploying, editing hooks, or before touching prod config.",
-      "verified_commit": "2026-11-11 @ 2626fed + final review fixes",
+      "verified_commit": "2026-11-17 on branch `codex/codebase-hardening`",
       "covers": [
         "../AGENTS.md",
         "../docs/backend/AGENTS.md",
@@ -75,7 +75,7 @@
         ".codex/hooks.json",
         "src/main/java/com/hostel/ordering/service/OrderService.java"
       ],
-      "tokens_est": 1123
+      "tokens_est": 870
     },
     {
       "file": "OBSERVABILITY.md",
@@ -112,19 +112,19 @@
     {
       "file": "STATUS.md",
       "read_when": "always, at the start and end of every task (update after changing code).",
-      "verified_commit": "2026-11-11 @ 2626fed + final review fixes",
+      "verified_commit": "2026-11-17 on branch `codex/codebase-hardening`",
       "covers": [
         "src/main/**",
         "src/test/**",
         "docs/agent/**",
         "AGENTS.md"
       ],
-      "tokens_est": 1763
+      "tokens_est": 1613
     },
     {
       "file": "STRUCTURE.md",
       "read_when": "you must find where code lives or add a file.",
-      "verified_commit": "2026-11-11 @ 2626fed + final review fixes",
+      "verified_commit": "2026-11-17 on branch `codex/codebase-hardening`",
       "covers": [
         "src/main/java/**/*.java",
         "src/main/resources/**",
@@ -132,18 +132,18 @@
         "scripts/**",
         "pom.xml"
       ],
-      "tokens_est": 841
+      "tokens_est": 685
     },
     {
       "file": "TESTING.md",
       "read_when": "adding/running tests or judging whether a change is covered.",
-      "verified_commit": "2026-11-11 @ 2626fed + final review fixes. `.superpowers/run-tests.sh` (Java 17): 405 tests, 0 failures (sum of `target/surefire-reports/TEST-*.xml`).",
+      "verified_commit": "2026-11-17 on branch `codex/codebase-hardening`; `mvn -B verify` passed: 427 tests, 0 failures/errors/skips, jar built.",
       "covers": [
         "src/test/java/**/*.java",
         "pom.xml",
         ".github/workflows/**"
       ],
-      "tokens_est": 752
+      "tokens_est": 721
     }
   ],
   "nested": []

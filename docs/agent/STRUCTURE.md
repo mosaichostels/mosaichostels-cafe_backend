@@ -1,5 +1,5 @@
 Read when: you must find where code lives or add a file.
-Verified: 2026-11-11 @ 2626fed + final review fixes
+Verified: 2026-11-17 on branch `codex/codebase-hardening`
 Covers: src/main/java/**/*.java, src/main/resources/**, src/test/java/**/*.java, scripts/**, pom.xml
 
 # Structure
@@ -10,14 +10,14 @@ Base package `src/main/java/com/hostel/ordering/` (all paths below relative to i
 | --- | --- |
 | `HostelOrderingApplication.java` | entry; `@EnableAsync`, `@EnableScheduling`; `CommandLineRunner init` seeds initial admin via `AuthService.registerInitialAdmin` |
 | `config/` | `SecurityConfig`, `WebConfig` (CORS), `RateLimitFilter`, `RequestLoggingFilter`, `FirebaseConfig`, `HeartbeatTask` |
-| `controller/` | Audit, AppVersion (`GET /app/android-version`), Auth, Config, Health, MenuItem, Notification, Order, OtherEssential, User |
+| `controller/` | Audit, AppVersion (`GET /app/android-version`), Auth, Config, Health, MenuItem, Order, OtherEssential, User |
 | `service/` | Audit(+CleanupTask), Auth, Category, ConfirmToken, Dormitory, FCMNotification, Idempotency, MenuItem, Order, OrderStatus, OtherEssential, User |
-| `repository/` | Spring Data repos; `OrderRepositoryCustom`/`OrderRepositoryImpl` hold atomic claim + stale queries + `findForChargeReconcile` |
+| `repository/` | Spring Data repos; `OrderRepositoryCustom`/`OrderRepositoryImpl` hold atomic charge claims, stale queries and version-checked status writes |
 | `model/` | Mongo documents (see ARCHITECTURE.md), `ErrorResponse` |
 | `security/` | `AuthTokenFilter`, `JwtUtils`, `LoginThrottle`, `AuthUserDetails`, `UserDetailsServiceImpl` |
 | `ezee/` | `EzeeClient`, `EzeeChargePostService`, `EzeeXmlUtil`, `EzeeMockResponses`, `RoomQueryResult`, `EzeeUnavailableException` |
-| `pms/` | staff-hub eZee foundation: `EzeeGateway` (+`EzeeFamily`, `PmsTransport`, `JdkPmsTransport`), `PmsRateLimiter`/`PmsPriority`, `PmsCache`, `PmsProperties`, `PmsFlags`, `PmsWriteGuard`/`PmsWriteClaim`/`PmsWriteClaimStore` (+`MongoPmsWriteClaimStore`), `PmsStatusController`, `PmsUnconfirmedController`, `Pms*Exception`. P1 read-only hub: `PmsHousekeepingController`/`PmsHousekeepingService`, `PmsHousekeepingFeed` (shared cached InhouseRoomStatus), `PmsRoomStatusWriteService` (guarded clean/dirty write, P3), `PmsReconcileController`/`PmsReconcileService`, `PmsHousekeepingWorkflowController`/`PmsHousekeepingWorkflowService` (read-only cleaning to-do from the departures feed), helpers `PmsReads`, `PmsJson`, `PmsDates`, `PmsCsv`; `pms/dto/` records `CleaningTask`, `CleaningTaskList`, `RoomStatus`, `RoomStatusWriteRequest`, `RoomStatusWriteResult`, `ChargeCheck` |
-| `dto/` | `CreateOrderRequest` only |
+| `pms/` | staff-hub eZee foundation, read-only rooms/cleaning feeds, status/unconfirmed administration, and `PmsRoomStatusWriteService` used internally by Cleaning List Done. Reconcile and public room-write routes are removed |
+| `dto/` | `CreateOrderRequest`, `StatusUpdateRequest` |
 | `exception/` | `GlobalExceptionHandler`, `ChargeUnconfirmedException` |
 
 Other paths:

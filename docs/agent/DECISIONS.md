@@ -1,5 +1,5 @@
 Read when: about to change auth, idempotency, eZee posting, rate limits or notifications.
-Verified: 2026-11-11 @ 2626fed + final review fixes. Source: backend AGENTS (`../docs/backend/AGENTS.md`) plus code comments where cited.
+Verified: 2026-11-17 on branch `codex/codebase-hardening`. Source: backend AGENTS (`../docs/backend/AGENTS.md`) plus code comments where cited.
 Covers: -
 
 # Decisions
@@ -25,7 +25,5 @@ Covers: -
 | Front desk reads and cleaning task actions dropped (2026-11-11) | owner decision: the cleaning to-do is a read-only list built from the departures feed; no assignments are stored; `cleaning_assignments` unused, dropped by the migration script |
 | Hub reads never log values and never put guest names, phones or emails in cache keys | keys are logged at DEBUG; keys hold only ids and dates; DTOs carry no phone/email |
 | The room board and cleaning to-do read HOUSEKEEPING `InhouseRoomStatus` JSON, not POS2PMS `roomlist` XML | no XML/XXE surface, names only, and one cached call (`PmsHousekeepingFeed`, `hk:inhouse`) feeds both |
-| Reconciliation never reports a false FOUND (it may say UNKNOWN or MISSING) | FOUND needs a Retrieve Bills row with the order's folio, the IST day of `chargePostAt`, and Amount equal to the order total or a confirmed item subtotal; header must have `Folio No, Date, Type, Particular, Amount`, else UNKNOWN |
-| Reconcile consumes rows: each order claims an amount with a weight | one row cannot prove two orders; claims come from every listed order with a folio and `chargePostAt` whatever its status (FAILED/UNCONFIRMED/VOIDED can leave real rows), only QUEUED/CHECKED are looked up; fewer rows than total claims = UNKNOWN |
-| Reconcile counts only café charge rows: Type "Extra Charges" and Particular "Food Charge" or "Essential" (case-insensitive) | from a read-only live Retrieve Bills probe 2026-11-11; Date is ISO yyyy-MM-dd; negative (reversal) rows are ignored; a differently named charge shows MISSING (safe direction). A manual eZee posting with Particular "Food Charge" is indistinguishable from a café row. |
 | Money in hub DTOs is `BigDecimal`; an unparsable folio amount is null | eZee amounts are decimal strings; never double |
+| Retire topic subscriptions and charge reconciliation | current-role token delivery prevents stale authorization; the old reconciliation screen/API was not part of the active workflow |

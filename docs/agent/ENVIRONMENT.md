@@ -1,5 +1,5 @@
 Read when: configuring, deploying, or debugging startup. Names only; no values read.
-Verified: 2026-11-11 @ 2626fed + final review fixes (source: application-prod.yml and `@Value`/`getenv` in src/main)
+Verified: 2026-11-17 on branch `codex/codebase-hardening` (source: application-prod.yml and `@Value`/`getenv` in src/main)
 Covers: src/main/resources/application-prod.yml, src/main/java/**/*.java, Dockerfile
 
 # Environment
@@ -29,8 +29,8 @@ Properties with no env mapping in the yml (set elsewhere or defaults):
 | `pms.cafe-quiet-ms` | hub reads yield this long after any café eZee call (default 3000); env `PMS_CAFE_QUIET_MS` |
 | `pms.writes.<feature>` | write flag per feature, default off; NOT settable by a per-feature env var (see below) |
 | `pms.canary.<feature>` | canary list per feature |
-| `pms.writes.room-status`, `pms.canary.room-status` | clean/dirty write to eZee (`POST /pms/housekeeping/rooms/{roomId}/status`); flag absent = off, no default turns it on; canary = list of eZee ROOM ids (not booking ids). The room-status write FAILS CLOSED: flag on with an empty or missing canary list refuses every room (403), so set the canary first. Set via `SPRING_APPLICATION_JSON` (see below) |
-| `pms.ttl.<name>` | cache TTL seconds; env `PMS_TTL_<NAME>` for single-word names. Names in use: `hk` (30), `departures` (60, cleaning to-do), `bills` (60) |
+| `pms.writes.room-status`, `pms.canary.room-status` | internal Cleaning List Done clean write to eZee; no public route. Flag absent = off; canary is a list of eZee ROOM ids. The writer fails closed with an empty canary. Set via `SPRING_APPLICATION_JSON` (see below) |
+| `pms.ttl.<name>` | cache TTL seconds; env `PMS_TTL_<NAME>` for single-word names. Names in use: `hk` (30), `departures` (60, cleaning to-do) |
 | `app.android.latest-version-code`, `app.android.min-version-code` | `AppVersionController` `@Value`, default 0; env `APP_ANDROID_LATEST_VERSION_CODE`, `APP_ANDROID_MIN_VERSION_CODE`; not in `application-prod.yml`; a non-numeric value fails context start (the app does not boot) |
 | `app.android.apk-url` | default empty; env `APP_ANDROID_APK_URL`; not in `application-prod.yml` (all three unset = `{0,0,""}`, no update prompt) |
 | `ezee.base-url` | optional; gateway also reads existing `ezee.auth-code`, `ezee.hotel-code` (`PmsProperties`, `EzeeGateway`) |
