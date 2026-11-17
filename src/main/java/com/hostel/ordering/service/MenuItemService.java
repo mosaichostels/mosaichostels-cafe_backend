@@ -21,6 +21,7 @@ public class MenuItemService {
     }
 
     public MenuItem createMenuItem(MenuItem menuItem) {
+        validate(menuItem);
         menuItem.setCreatedAt(System.currentTimeMillis());
         MenuItem saved = menuItemRepository.save(menuItem);
         log.info("New menu item created: {}", saved.getName());
@@ -84,6 +85,7 @@ public class MenuItemService {
                     if (menuItem.getPrice() != null) existing.setPrice(menuItem.getPrice());
                     if (menuItem.getCategory() != null) existing.setCategory(menuItem.getCategory());
                     if (menuItem.getAvailable() != null) existing.setAvailable(menuItem.getAvailable());
+                    validate(existing);
                     // Updating a removed item is how the panel's Undo restores it.
                     existing.setDeleted(false);
                     MenuItem updated = menuItemRepository.save(existing);
@@ -92,6 +94,24 @@ public class MenuItemService {
                     return updated;
                 })
                 .orElse(null);
+    }
+
+    private static void validate(MenuItem item) {
+        if (item.getName() == null || item.getName().isBlank() || item.getName().length() > 100) {
+            throw new IllegalArgumentException("Name must be between 1 and 100 characters");
+        }
+        if (item.getCategory() == null || item.getCategory().isBlank() || item.getCategory().length() > 100) {
+            throw new IllegalArgumentException("Category must be between 1 and 100 characters");
+        }
+        if (item.getDescription() != null && item.getDescription().length() > 500) {
+            throw new IllegalArgumentException("Description must be at most 500 characters");
+        }
+        if (item.getPrice() == null || !Double.isFinite(item.getPrice()) || item.getPrice() <= 0) {
+            throw new IllegalArgumentException("Price must be a finite positive number");
+        }
+        if (item.getAvailable() == null) {
+            throw new IllegalArgumentException("Availability is required");
+        }
     }
 
     public void deleteMenuItem(String id) {

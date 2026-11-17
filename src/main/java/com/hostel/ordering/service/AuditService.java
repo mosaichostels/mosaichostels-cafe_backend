@@ -4,15 +4,22 @@ import com.hostel.ordering.model.AuditLog;
 import com.hostel.ordering.repository.AuditRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import java.util.List;
+import java.util.regex.Pattern;
 @Service
 public class AuditService {
 
     @Autowired
     AuditRepository auditRepository;
+
+    @Autowired
+    MongoTemplate mongoTemplate;
 
     public void logAction(String action, String details) {
         String username = "SYSTEM";
@@ -38,31 +45,31 @@ public class AuditService {
         auditRepository.save(log);
     }
 
-    public List<AuditLog> getAllLogs() {
-        return auditRepository.findAll(Sort.by(Sort.Direction.DESC, "timestamp"));
-    }
-
     public List<AuditLog> getFilteredLogs(String action, String username, Long dateFrom, Long dateTo, Integer limit, Integer offset) {
-        List<AuditLog> logs = getAllLogs();
-
+        Query query = new Query();
         if (action != null && !action.isBlank()) {
-            String lowerAction = action.toLowerCase();
-            logs = logs.stream().filter(l -> l.getAction().toLowerCase().contains(lowerAction)).toList();
+            query.addCriteria(Criteria.where("action").regex(Pattern.compile(Pattern.quote(action), Pattern.CASE_INSENSITIVE)));
         }
         if (username != null && !username.isBlank()) {
-            String lowerUsername = username.toLowerCase();
-            logs = logs.stream().filter(l -> l.getUsername().toLowerCase().contains(lowerUsername)).toList();
+            query.addCriteria(Criteria.where("username").regex(Pattern.compile(Pattern.quote(username), Pattern.CASE_INSENSITIVE)));
         }
-        if (dateFrom != null) {
-            logs = logs.stream().filter(l -> l.getTimestamp() >= dateFrom).toList();
-        }
-        if (dateTo != null) {
-            logs = logs.stream().filter(l -> l.getTimestamp() <= dateTo).toList();
+        if (dateFrom != null || dateTo != null) {
+            Criteria timestamp = Criteria.where("timestamp");
+            if (dateFrom != null) timestamp.gte(dateFrom);
+            if (dateTo != null) timestamp.lte(dateTo);
+            query.addCriteria(timestamp);
         }
 
         int off = offset != null && offset > 0 ? offset : 0;
         int lim = limit != null && limit > 0 ? Math.min(limit, 1000) : 100;
-        return logs.stream().skip(off).limit(lim).toList();
+        query.with(Sort.by(Sort.Direction.DESC, "timestamp")).skip(off).limit(lim);
+        return mongoTemplate.find(query, AuditLog.class);
+    }
+
+    public List<String> getActions() {
+        return mongoTemplate.findDistinct(new Query(), "action", AuditLog.class, String.class).stream()
+                .sorted()
+                .toList();
     }
 
     public void deleteAllLogs() {

@@ -185,7 +185,7 @@ public class OrderService {
         return orders;
     }
 
-    public Order updateOrderStatus(String id, String status, String updatedBy) {
+    public Order updateOrderStatus(String id, String status, String updatedBy, Long expectedVersion) {
         if (status == null || status.isBlank()) {
             throw new IllegalArgumentException("Status cannot be empty");
         }
@@ -200,6 +200,9 @@ public class OrderService {
 
         return orderRepository.findById(id)
                 .map(order -> {
+                    if (expectedVersion != null && !expectedVersion.equals(order.getVersion())) {
+                        throw new com.hostel.ordering.exception.StaleOrderException();
+                    }
                     String oldStatus = order.getStatus();
                     order.setStatus(status);
                     order.setUpdatedAt(System.currentTimeMillis());

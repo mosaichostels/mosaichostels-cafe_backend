@@ -5,7 +5,6 @@ import static org.mockito.Mockito.mock;
 
 import com.hostel.ordering.config.SecurityConfig;
 import com.hostel.ordering.controller.CleaningListController;
-import com.hostel.ordering.controller.NotificationController;
 import com.hostel.ordering.controller.ScheduleController;
 import com.hostel.ordering.service.ScheduleService;
 import com.hostel.ordering.controller.OrderController;
@@ -14,15 +13,11 @@ import com.hostel.ordering.pms.PmsHousekeepingController;
 import com.hostel.ordering.pms.PmsHousekeepingService;
 import com.hostel.ordering.pms.PmsHousekeepingWorkflowController;
 import com.hostel.ordering.pms.PmsHousekeepingWorkflowService;
-import com.hostel.ordering.pms.PmsReconcileController;
-import com.hostel.ordering.pms.PmsReconcileService;
-import com.hostel.ordering.pms.PmsRoomStatusWriteService;
 import com.hostel.ordering.pms.PmsUnconfirmedController;
 import com.hostel.ordering.pms.PmsWriteGuard;
 import com.hostel.ordering.service.AuditService;
 import com.hostel.ordering.service.CleaningListService;
 import com.hostel.ordering.service.ConfirmTokenService;
-import com.hostel.ordering.service.FCMNotificationService;
 import com.hostel.ordering.service.OrderService;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -59,15 +54,10 @@ class RoleMatrixTest {
         }
 
         @Bean
-        NotificationController notifications() {
-            return new NotificationController(mock(FCMNotificationService.class));
-        }
-
-        @Bean
         PmsHousekeepingController housekeeping() {
             PmsHousekeepingService svc = mock(PmsHousekeepingService.class);
             org.mockito.Mockito.when(svc.rooms()).thenReturn(new com.hostel.ordering.pms.Cached<>(java.util.List.of(), 0L, false));
-            return new PmsHousekeepingController(svc, mock(PmsRoomStatusWriteService.class));
+            return new PmsHousekeepingController(svc);
         }
 
         @Bean
@@ -91,11 +81,6 @@ class RoleMatrixTest {
         }
 
         @Bean
-        PmsReconcileController reconcile() {
-            return new PmsReconcileController(mock(PmsReconcileService.class));
-        }
-
-        @Bean
         PmsUnconfirmedController unconfirmed() {
             return new PmsUnconfirmedController(mock(PmsWriteGuard.class));
         }
@@ -107,12 +92,10 @@ class RoleMatrixTest {
     }
 
     @Autowired OrderController orders;
-    @Autowired NotificationController notifications;
     @Autowired PmsHousekeepingController housekeeping;
     @Autowired PmsHousekeepingWorkflowController cleaning;
     @Autowired CleaningListController cleaningList;
     @Autowired ScheduleController schedule;
-    @Autowired PmsReconcileController reconcile;
     @Autowired PmsUnconfirmedController unconfirmed;
 
     @AfterEach
@@ -134,12 +117,10 @@ class RoleMatrixTest {
         m.put("POST /orders", () -> orders.createOrder(new CreateOrderRequest(), null, null));
         m.put("GET /orders", () -> orders.getAllOrders(null, null, null, null, null, null, "createdAt_desc"));
         m.put("GET /orders/{id}", () -> orders.getOrder("x"));
-        m.put("PUT /orders/{id}/status", () -> orders.updateOrderStatus("x", Map.of("status", "DELIVERED"), null, null));
-        m.put("POST /notifications/subscribe", () -> notifications.subscribe(Map.of("token", "t")));
-        m.put("POST /notifications/unsubscribe", () -> notifications.unsubscribe(Map.of("token", "t")));
+        m.put("PUT /orders/{id}/status", () -> orders.updateOrderStatus("x",
+                new com.hostel.ordering.dto.StatusUpdateRequest("DELIVERED", null), null, null));
         m.put("GET /pms/cleaning-tasks", () -> cleaning.tasks(null));
         m.put("GET /pms/housekeeping/rooms", () -> housekeeping.rooms());
-        m.put("POST /pms/housekeeping/rooms/{id}/status", () -> housekeeping.setStatus("r", "k", null));
         var auth = new TestingAuthenticationToken("u", "p");
         m.put("GET /cleaning-list", () -> cleaningList.list());
         m.put("POST /cleaning-list", () -> cleaningList.submit(Map.of("beds", java.util.List.of()), auth));
@@ -148,7 +129,6 @@ class RoleMatrixTest {
         m.put("GET /schedule/days", () -> schedule.days("2026-11-01", "2026-11-13"));
         m.put("POST /schedule/days/{date}/ticks", () -> schedule.tick("2026-11-13", Map.of("taskKey", "k", "slot", "ONCE"), auth));
         m.put("POST /schedule/.../confirm", () -> schedule.confirm("2026-11-13", "k", "ONCE", auth));
-        m.put("GET /pms/reconcile/charges", () -> reconcile.charges(null));
         m.put("GET /pms/unconfirmed", () -> unconfirmed.list());
         return m;
     }
@@ -160,15 +140,13 @@ class RoleMatrixTest {
         routes().forEach((name, call) -> assertEquals(ok.contains(name), allowed(call), role + " " + name));
     }
 
-    private static final String[] ORDER_AND_PUSH = {"GET /orders", "GET /orders/{id}", "PUT /orders/{id}/status",
-            "POST /notifications/subscribe", "POST /notifications/unsubscribe"};
-    private static final String[] CLEANING = {"GET /pms/cleaning-tasks", "GET /pms/housekeeping/rooms",
-            "POST /pms/housekeeping/rooms/{id}/status"};
+    private static final String[] ORDER_AND_PUSH = {"GET /orders", "GET /orders/{id}", "PUT /orders/{id}/status"};
+    private static final String[] CLEANING = {"GET /pms/cleaning-tasks", "GET /pms/housekeeping/rooms"};
     private static final String[] LIST_HK = {"GET /cleaning-list", "POST /cleaning-list/{id}/done"};
     private static final String[] LIST_ADMIN = {"POST /cleaning-list", "DELETE /cleaning-list/{id}"};
     private static final String[] SCHED_HK = {"GET /schedule/days", "POST /schedule/days/{date}/ticks"};
     private static final String[] SCHED_ADMIN = {"POST /schedule/.../confirm"};
-    private static final String[] ADMIN_ONLY = {"GET /pms/reconcile/charges", "GET /pms/unconfirmed"};
+    private static final String[] ADMIN_ONLY = {"GET /pms/unconfirmed"};
 
     private static String[] concat(String[]... parts) {
         return java.util.Arrays.stream(parts).flatMap(java.util.Arrays::stream).toArray(String[]::new);

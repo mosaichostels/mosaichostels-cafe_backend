@@ -1,10 +1,10 @@
 Read when: tracing a request, changing auth, orders, eZee posting, schedulers or data.
-Verified: 2026-11-11 @ 2626fed + final review fixes
+Verified: 2026-11-17 on branch `codex/codebase-hardening`
 Covers: src/main/java/com/hostel/ordering/pms/**/*.java, src/main/java/com/hostel/ordering/controller/**/*.java, src/main/java/com/hostel/ordering/service/**/*.java, src/main/java/com/hostel/ordering/config/**/*.java, src/main/java/com/hostel/ordering/model/**/*.java, src/main/java/com/hostel/ordering/repository/**/*.java
 
 # Architecture
 
-Flow: `request -> RateLimitFilter / AuthTokenFilter (SecurityConfig) -> controller (@PreAuthorize) -> service -> repository (Mongo)`. Hot path: `OrderController -> OrderService -> EzeeChargePostService -> EzeeClient`, then `FCMNotificationService` (topic `new_orders`, or `new_essential_orders` when every item is ESSENTIAL; Kitchen, Admin, Superadmin subscribe to the first, Admin and Superadmin also to the second). No SQL.
+Flow: `request -> RateLimitFilter / AuthTokenFilter (SecurityConfig) -> controller (@PreAuthorize) -> service -> repository (Mongo)`. Hot path: `OrderController -> OrderService -> EzeeChargePostService -> EzeeClient`, then `FCMNotificationService`, which resolves registered device tokens from users' current roles. No SQL.
 
 ## Routes and roles (SecurityConfig.java:75-81 + method @PreAuthorize)
 | Route | Access |
@@ -15,14 +15,12 @@ Flow: `request -> RateLimitFilter / AuthTokenFilter (SecurityConfig) -> controll
 | `GET /config`, `GET /menu-items/**`, `GET /other-essentials/**` | public |
 | `GET /orders`, `/orders/{id}`, `PUT /orders/{id}/status` | ADMIN, KITCHEN, STAFF (STAFF only for the rollout window) |
 | `DELETE /orders`, `/orders/{id}`; `POST /orders/{id}/chargepost`; `GET /orders/{id}/ezee-candidates` | ADMIN only (OrderController:93,108,175,202) |
-| `/notifications/subscribe`, `/unsubscribe` | ADMIN, KITCHEN, STAFF (STAFF only for the rollout window) |
 | `POST /users/me/register-fcm` | any authenticated |
 | `/users` CRUD, `/audit`, `GET /pms/status` | SUPERADMIN only (Admin gets 403) |
-| `/pms/housekeeping/**` (board read and room status write) | ADMIN, HOUSEKEEPING (class-level; SUPERADMIN via hierarchy) |
+| `GET /pms/housekeeping/rooms` | ADMIN, HOUSEKEEPING (class-level; SUPERADMIN via hierarchy) |
 | `GET /pms/cleaning-tasks?date=` | ADMIN, HOUSEKEEPING (class-level `@PreAuthorize`; SUPERADMIN via hierarchy). Read-only list |
 | `GET /cleaning-list`, `POST /cleaning-list/{id}/done` | ADMIN, HOUSEKEEPING (Superadmin via hierarchy); Kitchen 403 |
 | `POST /cleaning-list`, `DELETE /cleaning-list/{id}` | ADMIN only (Housekeeping and Kitchen 403) |
-| `GET /pms/reconcile/charges?date=` | ADMIN (shows guest names) |
 | `GET /app/android-version` | any authenticated (`anyRequest().authenticated()`; `AppVersionController`) |
 | `GET /pms/unconfirmed`, `POST /pms/unconfirmed/{idempotencyKey}/resolve` (body `{outcome: APPLIED\|NOT_APPLIED}`) | ADMIN (`@PreAuthorize`) |
 | POST/PUT/DELETE on `/config/categories`, `/config/dormitories`, `/config/statuses`, menu-items and other-essentials writes | ADMIN only |
@@ -39,8 +37,8 @@ Flow: `request -> RateLimitFilter / AuthTokenFilter (SecurityConfig) -> controll
 ## Category rename
 Items store their category by name: `CategoryService` update (:72-82) `updateMulti`s the new name into `menu_items` or `other_essentials` (by category type), then renumbers `showOrder`. Test: `CategoryRenameCascadeTest`.
 
-## Order create idempotency
-`Idempotency-Key` header (OrderController:34): stored on order + `IdempotencyRecord` (TTL). Status updates also cached (`order-status:<id>`, :77). Prices always re-read from DB.
+## Order idempotency and concurrency
+`Idempotency-Key` on create is stored on the order plus `IdempotencyRecord` (TTL). Prices are always re-read from DB. Status updates send `{status, expectedVersion}`; `OrderRepositoryImpl.updateStatusIfVersion` atomically matches `_id` and `version`, increments `version`, and a stale write returns 409 instead of overwriting newer state.
 
 ## eZee charge posting (highest risk)
 - Admin picks occupant by hand: `GET /orders/{id}/ezee-candidates` then `POST /orders/{id}/chargepost`; no auto matching.
@@ -58,40 +56,35 @@ Items store their category by name: `CategoryService` update (:72-82) `updateMul
 - `GlobalExceptionHandler.handlePms` -> `{errorCode, message}` with fixed generic text: 502 auth/upstream, 503 busy (`Retry-After: 3`), 501 not-enabled, 403 feature-disabled, 409 unconfirmed/in-progress/target-busy/idempotency-mismatch. `GET /pms/status` reports eZee OK/AUTH/UPSTREAM/DISABLED (a stale probe reports UPSTREAM).
 
 ## Hub reads (`pms/`, P1, read-only)
-- Envelopes: room board `{items, asOf, stale}` (`asOf` = `Cached.fetchedAtMs()`); reconcile `{items, asOf, stale, truncated}`. Dates are Asia/Kolkata `yyyy-MM-dd`, default today, range over 30 days or `from` after `to` = 400 (`PmsDates`). DTOs carry no phone/email.
-- `PmsReads.load` wraps `PmsCache.getOrLoad` (checked exceptions become `PmsUpstreamException`). Cache names (`pms.ttl.<name>`, defaults): `departures` 60 s (key `departures:<date>:<date>`, cleaning to-do only), `bills` 60 s (`bills:<first>:<last>`), `hk` 30 s (`hk:inhouse`).
+- The rooms envelope is `{items, asOf, stale}` (`asOf` = `Cached.fetchedAtMs()`). DTOs carry no phone/email.
+- `PmsReads.load` wraps `PmsCache.getOrLoad` (checked exceptions become `PmsUpstreamException`). Active cache names are `departures` 60 s (cleaning to-do) and `hk` 30 s (`hk:inhouse`).
 - `PmsHousekeepingFeed` caches one eZee HOUSEKEEPING `InhouseRoomStatus` call (`{roomlist, checkinguestlist}`); `/pms/housekeeping/rooms` (from `roomlist`, guest joined by room name) and the cleaning to-do (room list) both read it, so one eZee request serves both. `hkstatus` is passed through raw.
 - Source: the cleaning to-do's departures = CONNECTIVITY `DepartureList` (one row per `BookingTran`; only `RoomName` and `End` are kept).
-- Reconcile (`PmsReconcileService`): orders of one IST day (`OrderRepositoryCustom.findForChargeReconcile`: `createdAt` in the day AND (`status` DELIVERED OR `chargePostStatus` set), oldest first, capped at 500 -> `truncated`) vs FINANCE `RetrieveBills` CSV; each item `{orderId, bookingName, room, amount, ours, theirs}` with `theirs` FOUND/MISSING/UNKNOWN/N/A. See DECISIONS.md for the match policy.
 - Hub limiter (P1 Task 0): HUB is refused for `pms.cafe-quiet-ms` (3000) after any café eZee call and `hubPer5s` defaults to 2, so a hub read gets `PmsBusyException` (503) during a café burst; clients must show a retry state.
 
 ## Schedulers
 `OrderService.recoverStaleChargePosts` (60 s), `AuditCleanupTask` (cron `0 0 0 * * *`, retention `audit.retention-days` default 90), `HeartbeatTask` (6 h log line only; does not keep the Space awake).
 
 ## Notifications / startup
-`FCMNotificationService`; `FirebaseConfig` throws at startup without credentials. Initial admin created/re-hashed at startup from `config.admin.*`.
+`FCMNotificationService` sends to deduplicated registered tokens selected from users' current roles; invalid tokens are removed. NEW_ORDER/CANCELLED target ADMIN, SUPERADMIN, KITCHEN and legacy STAFF, except essentials-only orders omit KITCHEN. Cleaning/schedule notifications use their own role sets. `FirebaseConfig` throws at startup without credentials. Initial admin is created/re-hashed at startup from `config.admin.*`.
 
 ## Cleaning workflow (`pms/`, P3, Mongo writes only)
 - `PmsHousekeepingWorkflowService`: `GET /pms/cleaning-tasks?date=` (default today IST; invalid or >31 days from today = 400) is read-only: one task per `date|room` (`taskKey`), `turnovers` = departures in that room. Departure room NAME is mapped to `roomId`/`unitId` through the `InhouseRoomStatus` roomlist (trimmed, case-insensitive, letter O never equals 0); blank names never match; a name shared by several rooms (dorm beds) or with no match goes to `unmatched` (`{roomName, count, ambiguous}`, no guest data). Task fields: `taskKey, roomId, unitId, roomName, roomType, departureDate, turnovers, hkStatus`. `hkStatus` is the room's current eZee `hkstatus` label (trimmed, e.g. `Clean`/`Dirty`, `""` when absent) read from the same cached `hk:inhouse` roomlist node the room is matched on, so no extra eZee call; clients compare it case-insensitively, as `PmsRoomStatusWriteService.norm` does. A feed outage serves the stale cache (or fails as before), never a different shape. Envelope `{items, unmatched, asOf, stale}`. Nothing is stored; the assign/update endpoints, assignments, idempotency keys and `CLEANING_*` audit actions were removed.
 
-## Room status write (`pms/`, P3, first eZee write, ships OFF)
-- `POST /pms/housekeeping/rooms/{roomId}/status` `{unitId, status: CLEAN|DIRTY, remarks?<=200, no control chars}` + required `Idempotency-Key` (ADMIN, HOUSEKEEPING; SuperAdmin via hierarchy) -> `PmsWriteResult<RoomStatusWriteResult>` `{value:{roomId,unitId,status,hkStatus,confirmed}, confirmed}`. `PmsRoomStatusWriteService` order: validate (400) -> `PmsFlags.requireWrite("room-status")` and canary (403, zero eZee calls) -> fresh `InhouseRoomStatus` read (cache `hk:inhouse` evicted first) -> room+unit must match (else 409 "no longer matches eZee") -> same status = confirmed no-op, no eZee write -> `PmsWriteGuard.execute` (feature `room-status`, target = roomId, hash of room/unit/current status/target/remarks, audit `PMS_ROOM_STATUS` with ids, statuses and remark LENGTH only) -> ONE `UpdateRoomStatus` POST (HOUSEKEEPING family, `service.hkupdatestatus`) -> read-back (evict, reload, same room/unit, trimmed case-insensitive `hkstatus` == `Clean`/`Dirty`). Mismatch or failed read-back = `confirmed=false` and the claim stays UNCONFIRMED (`/pms/unconfirmed`); a send timeout or error reply = 409 unconfirmed; never auto-retried. Blocked rooms may be marked (doc silent; the block is untouched).
-- Request body (eZee doc "Update Room Status", never run live): `{authcode, hotel_code, updatehkdata:[{hotel_code, roomid, unitid, hkstatus:"Clean"|"Dirty", hkremarks}]}`; success reply `{"status":"0","message":"Success"}`; error reply `{"errorcode":"1",...}` is NOT recognised by the gateway, so the service accepts only `status=="0"` and treats anything else as an upstream error (unconfirmed).
-- Rollout (owner step, nothing is enabled by this change): (1) check the DEPLOY GATE indexes in STATUS.md; (2) set `SPRING_APPLICATION_JSON` with `pms.writes.room-status=true` and `pms.canary.room-status=["<one test room id>"]`; (3) mark that one room Dirty then Clean from the board, watch the response `confirmed`, the eZee UI and a `/pms/housekeeping/rooms` read; (4) if `confirmed=false` or 409, stop, resolve in `/pms/unconfirmed`, and fix the body (per-row `hotel_code`, status value "0" vs "1" are unproven) before widening the canary.
-- Review fixes (P3-9): pre-check, write and read-back use `gateway.json(..., PmsPriority.HUB, Duration 7 s)` (limiter wait only; window and defaults unchanged) because 3 hub calls in ~1 s exceed 2 per 5 s; both reads go straight to eZee (no cache, no shared in-flight load) and evict `hk:inhouse` before and after. The service fails closed on an empty canary (the guard itself still treats empty as any). Reply check: only `errorcode` or a non-empty textual `warning` throws; any other reply (even status other than "0") is judged by the read-back. Non-blank remarks skip the no-op shortcut. A same-key retry after an applied-but-UNCONFIRMED write can return a confirmed no-op while the claim stays listed in `/pms/unconfirmed`.
-- Lock and canary are per ROOM (`room-status:<roomId>`): dorm units sharing a roomid share the lock; revisit as `roomId:unitId` once dorm ids are seen live. Blocked rooms may be marked (owner decision pending).
-- Must prove live before enabling: eZee accepts the body (per-row `hotel_code`, casing) and replies status "0"; the read-back sees the new hkstatus without lag under real limits; `hkremarks` lands as sent and empty does not clear unexpectedly; roomid/unitid from the feed are what UpdateRoomStatus accepts, incl. dorm units; behaviour on blocked and occupied rooms; `pms_write_claims` indexes exist in prod and a deliberately failed write appears in `/pms/unconfirmed` and resolves.
+## Internal room status write (`pms/`, ships OFF)
+- No public room-status write route exists. `PmsRoomStatusWriteService` is called only after Cleaning List Done and retains its feature flag, canary, write guard and read-back confirmation. The live eZee write path remains unverified.
+- The write guard locks per room. A Cleaning List Done call removes the bed first and reports the eZee outcome separately, so the list cannot get stuck on an uncertain external write.
 
 ## Role rollout (owner-run, role-based tabs)
 1. Push the backend first: it accepts old and new roles (`ROLE_STAFF` still allowed on orders and notifications for the window).
 2. Run `MONGODB_URI=... scripts/migrate-staff-to-kitchen.sh --dry-run`, compare its "matched" count with a manual `db.users.countDocuments({roles: {$in: ["ROLE_STAFF","STAFF"]}})` on the same database, then run it without `--dry-run` (this also drops the unused `cleaning_assignments` collection). Sessions survive (roles load from the DB per request).
-3. Push the web admin. 4. Hand out the Android APK (1.7.0, versionCode 15). 5. Set the Space env value `APP_ANDROID_MIN_VERSION_CODE` (`app.android.min-version-code`) to 15 so 1.6.0 installs get the required-update prompt (1.6.0 joins the `new_orders` topic for any role, so a Housekeeping login on it would ring with guest names). 6. Create housekeeping accounts (ROLE_HOUSEKEEPING). 7. A follow-up change drops `ROLE_STAFF` from the allowed roles and rules.
+3. Push the web admin. 4. Hand out the current Android APK. 5. Set the Space minimum Android version code so older topic-based builds cannot remain active. 6. Create housekeeping accounts (ROLE_HOUSEKEEPING). 7. A follow-up change drops `ROLE_STAFF` from the allowed roles and rules.
 - Until step 2 is done, an old `ROLE_STAFF` account loses every `/pms/**` endpoint (403) and Android treats it as no access.
 - Reverse: edit the script's `rewrite()` to map `ROLE_KITCHEN` to `ROLE_STAFF` and re-run; it also flips accounts that were KITCHEN before the migration, so dry-run first. There is no separate rollback script.
 - The script has never been run on a real mongod (no mongod available when written); only its rewrite function was tested with node. Treat the first dry-run as the test.
 
-## Release note: dropped routes (2026-11-11, drop-features)
-- The front desk routes (`/pms/arrivals`, `/pms/departures`, `/pms/inhouse`, `/pms/bookings/{id}`, `/pms/guests`) and the cleaning write routes (`POST /pms/cleaning-tasks/{taskKey}/assign`, `PUT /pms/cleaning-assignments/{id}`) are gone. An unmapped path falls into `GlobalExceptionHandler` and returns HTTP 500 (with an ERROR stack trace in the log), not 404.
+## Release note: dropped routes
+- The front desk, reconciliation, public room-write and old cleaning assignment routes are gone. Unmapped paths return HTTP 404.
 - Hand out the Android 1.8.0 (versionCode 16) APK before or together with this backend deploy. An older 1.7.0 app shows the front desk error state with a retry that never succeeds, its cleaning "Take it" fails with a server-error toast, and a cleaning action already in its offline queue replays into a 500, is kept for retry and can delay queued order updates behind it for up to 30 minutes.
 - On the Space set `APP_ANDROID_MIN_VERSION_CODE=16`, plus `APP_ANDROID_LATEST_VERSION_CODE` and `APP_ANDROID_APK_URL` (see ENVIRONMENT.md). The old app's update dialog has never been checked on a device.
 
@@ -109,4 +102,4 @@ The schedule itself (which task falls on which date) lives only in the Android a
 - `POST /cleaning-list` (ADMIN) now also takes optional `day` (`yyyy-MM-dd`) and `taskCount` (whole number) and returns `daySubmitted`. Submitting with `day` marks that date released in `schedule_days`; beds may be empty when a day is submitted.
 - Tick window and carry-over: a tick is accepted only for a submitted day from 31 days ago (`ScheduleService.LOOKBACK_DAYS = 31`) up to today, never a future date. Carry-over is computed by the app from `/schedule/days`: every unticked slot of a submitted day (daily tasks included) stays on housekeeping's list on later days until ticked, looking back 31 days; older leftovers drop off. A never-submitted day is not carried over. A leftover ticked today is stored against its original date with today's `doneAt`.
 - Push types: `CLEANING_LIST` to Housekeeping, combined wording `Today's cleaning: N bed(s), M task(s)`; `SCHEDULE_REMINDER` (title `Cleaning schedule`, body `Today's schedule has not been submitted.`) to Admin and Superadmin only. No guest data.
-- Reminder job (`ScheduleReminderTask`): cron `0 */10 9-11 * * *`, zone `Asia/Kolkata` (every 10 minutes, 09:00 to 11:50 IST runs; nothing is sent once a day is submitted). If today is not submitted and no `schedule_reminders` row exists, it inserts one (unique index, so the first run wins, one reminder per day, safe with two instances or restarts) and pushes. It only runs while the Space is awake; `HeartbeatTask` only logs and nothing keeps the Space awake, so an external pinger on the Space's public URL is an owner step (rollout checklist).
+- Reminder job (`ScheduleReminderTask`): cron `0 */10 9-11 * * *`, zone `Asia/Kolkata`. It claims one reminder per date, sends to Admin/SuperAdmin devices, and removes the inserted claim if no device accepted the push so a later run can retry. It only runs while the Space is awake.

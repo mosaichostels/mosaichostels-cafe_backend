@@ -1,6 +1,7 @@
 package com.hostel.ordering.model;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 @Document(collection = "audit_logs")
@@ -15,6 +16,7 @@ public class AuditLog {
 
     private String details;
 
+    @Indexed
     private long timestamp;
 
     public AuditLog() {

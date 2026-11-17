@@ -3,24 +3,27 @@ package com.hostel.ordering.service;
 import com.google.firebase.messaging.*;
 import com.hostel.ordering.model.Order;
 import com.hostel.ordering.model.OrderItem;
+import com.hostel.ordering.model.User;
+import com.hostel.ordering.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class FCMNotificationService {
 
     private static final Logger logger = LoggerFactory.getLogger(FCMNotificationService.class);
-    private static final String ORDERS_TOPIC = "new_orders";
-    static final String ESSENTIALS_TOPIC = "new_essential_orders";
-
     private final FirebaseMessaging firebaseMessaging;
+    private final UserRepository userRepository;
 
-    public FCMNotificationService(FirebaseMessaging firebaseMessaging) {
+    public FCMNotificationService(FirebaseMessaging firebaseMessaging, UserRepository userRepository) {
         this.firebaseMessaging = firebaseMessaging;
+        this.userRepository = userRepository;
     }
 
     @Async
@@ -47,20 +50,20 @@ public class FCMNotificationService {
                             .build())
                     .build();
 
-            Message message = Message.builder()
-                    .setTopic(topicFor(order))
-                    .setAndroidConfig(androidConfig)
-                    .setWebpushConfig(webpushConfig)
-                    .putData("type", "NEW_ORDER")
-                    .putData("orderId", orderId)
-                    .putData("customerName", bookingName)
-                    .putData("totalAmount", String.valueOf(totalAmount))
-                    .putData("title", title)
-                    .putData("body", body)
-                    .build();
-
-            String response = firebaseMessaging.send(message);
-            logger.info("✅ FCM notification sent: {}", response);
+            for (String token : recipientTokens(order)) {
+                Message message = Message.builder()
+                        .setToken(token)
+                        .setAndroidConfig(androidConfig)
+                        .setWebpushConfig(webpushConfig)
+                        .putData("type", "NEW_ORDER")
+                        .putData("orderId", orderId)
+                        .putData("customerName", bookingName)
+                        .putData("totalAmount", String.valueOf(totalAmount))
+                        .putData("title", title)
+                        .putData("body", body)
+                        .build();
+                logger.info("✅ FCM notification sent: {}", firebaseMessaging.send(message));
+            }
 
         } catch (Exception e) {
             logger.error("❌ Failed to send FCM notification", e);
@@ -89,19 +92,19 @@ public class FCMNotificationService {
                             .build())
                     .build();
 
-            Message message = Message.builder()
-                    .setTopic(topicFor(order))
-                    .setAndroidConfig(androidConfig)
-                    .setWebpushConfig(webpushConfig)
-                    .putData("type", "ORDER_CANCELLED")
-                    .putData("orderId", orderId)
-                    .putData("customerName", bookingName)
-                    .putData("title", title)
-                    .putData("body", body)
-                    .build();
-
-            String response = firebaseMessaging.send(message);
-            logger.info("✅ FCM cancellation notification sent: {}", response);
+            for (String token : recipientTokens(order)) {
+                Message message = Message.builder()
+                        .setToken(token)
+                        .setAndroidConfig(androidConfig)
+                        .setWebpushConfig(webpushConfig)
+                        .putData("type", "ORDER_CANCELLED")
+                        .putData("orderId", orderId)
+                        .putData("customerName", bookingName)
+                        .putData("title", title)
+                        .putData("body", body)
+                        .build();
+                logger.info("✅ FCM cancellation notification sent: {}", firebaseMessaging.send(message));
+            }
 
         } catch (Exception e) {
             logger.error("❌ Failed to send FCM cancellation notification", e);
@@ -109,12 +112,22 @@ public class FCMNotificationService {
     }
 
 
-    /** Essentials-only orders skip Kitchen. Null type, unknown type or no items counts as a menu order: notify more people, never fewer. */
-    static String topicFor(Order order) {
+    private Set<String> recipientTokens(Order order) {
         List<OrderItem> items = order.getItems();
         boolean essentialsOnly = items != null && !items.isEmpty()
                 && items.stream().allMatch(i -> "ESSENTIAL".equals(i.getType()));
-        return essentialsOnly ? ESSENTIALS_TOPIC : ORDERS_TOPIC;
+        List<String> roles = essentialsOnly
+                ? List.of("ROLE_SUPERADMIN", "ROLE_ADMIN")
+                : List.of("ROLE_SUPERADMIN", "ROLE_ADMIN", "ROLE_KITCHEN", "ROLE_STAFF");
+        Set<String> tokens = new LinkedHashSet<>();
+        for (String role : roles) {
+            for (User user : userRepository.findByRolesContaining(role)) {
+                if (user.getFcmToken() != null && !user.getFcmToken().isBlank()) {
+                    tokens.add(user.getFcmToken());
+                }
+            }
+        }
+        return tokens;
     }
 
     /** Same short id every client shows: the last 6 characters, which are the part of an ObjectId that differs between orders placed close together. */
@@ -123,37 +136,10 @@ public class FCMNotificationService {
         return "#" + (id.length() > 6 ? id.substring(id.length() - 6) : id).toUpperCase(java.util.Locale.ROOT);
     }
 
-    /** Enough of the token to correlate log lines, without putting the credential in the log. */
-    private static String maskToken(String token) {
-        if (token == null || token.length() < 12) return "<redacted>";
-        return token.substring(0, 6) + "…" + token.substring(token.length() - 4);
-    }
-
-    public void subscribeToTopic(String token) {
-        try {
-            TopicManagementResponse response = firebaseMessaging.subscribeToTopic(
-                    java.util.Collections.singletonList(token), ORDERS_TOPIC);
-            logger.info("✅ Token subscribed to topic: {} -> {} successes", maskToken(token), response.getSuccessCount());
-        } catch (FirebaseMessagingException e) {
-            logger.error("❌ Failed to subscribe token to topic", e);
-        }
-    }
-
-    public void unsubscribeFromTopic(String token) {
-        try {
-            TopicManagementResponse response = firebaseMessaging.unsubscribeFromTopic(
-                    java.util.Collections.singletonList(token), ORDERS_TOPIC);
-            logger.info("✅ Token unsubscribed from topic: {} -> {} successes", maskToken(token), response.getSuccessCount());
-        } catch (FirebaseMessagingException e) {
-            logger.error("❌ Failed to unsubscribe token from topic", e);
-        }
-    }
-
-    @Async
-    public void sendNotificationToToken(String token, String title, String body, java.util.Map<String, String> data) {
+    public boolean sendNotificationToToken(String token, String title, String body, java.util.Map<String, String> data) {
         if (token == null || token.isBlank()) {
             logger.warn("⚠️ FCM token is null or blank, skipping notification");
-            return;
+            return false;
         }
         try {
             Message.Builder messageBuilder = Message.builder()
@@ -178,8 +164,10 @@ public class FCMNotificationService {
 
             String response = firebaseMessaging.send(message);
             logger.info("✅ FCM notification sent to token: {}", response);
+            return true;
         } catch (FirebaseMessagingException e) {
             logger.error("❌ Failed to send FCM notification to token: {}", e.getMessage());
+            return false;
         }
     }
 }

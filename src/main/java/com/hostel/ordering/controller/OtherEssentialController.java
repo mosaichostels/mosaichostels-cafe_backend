@@ -5,6 +5,7 @@ import com.hostel.ordering.service.OtherEssentialService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import java.util.List;
+import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 @RestController
@@ -19,7 +20,7 @@ public class OtherEssentialController {
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<OtherEssential> createOtherEssential(@RequestBody OtherEssential otherEssential) {
+    public ResponseEntity<OtherEssential> createOtherEssential(@Valid @RequestBody OtherEssential otherEssential) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(otherEssentialService.createOtherEssential(otherEssential));
     }

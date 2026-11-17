@@ -13,6 +13,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.hostel.ordering.pms.PmsException;
 
@@ -61,6 +63,11 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(new ErrorResponse(ex.getReason()), ex.getStatusCode());
     }
 
+    @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
+    public ResponseEntity<ErrorResponse> handleNoResourceFound(Exception ex) {
+        return new ResponseEntity<>(new ErrorResponse("Not found"), HttpStatus.NOT_FOUND);
+    }
+
     /**
      * Messages on IllegalArgumentException are deliberate and addressed to the caller - "Username
      * is already taken!", "Cannot delete the last administrator" - so they are passed through.
@@ -72,6 +79,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ChargeUnconfirmedException.class)
     public ResponseEntity<ErrorResponse> handleChargeUnconfirmed(ChargeUnconfirmedException ex) {
+        return new ResponseEntity<>(new ErrorResponse(ex.getMessage()), HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler(StaleOrderException.class)
+    public ResponseEntity<ErrorResponse> handleStaleOrder(StaleOrderException ex) {
         return new ResponseEntity<>(new ErrorResponse(ex.getMessage()), HttpStatus.CONFLICT);
     }
 

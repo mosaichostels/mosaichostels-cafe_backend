@@ -1,5 +1,9 @@
 package com.hostel.ordering.model;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -7,10 +11,18 @@ import org.springframework.data.mongodb.core.mapping.Document;
 public class OtherEssential {
     @Id
     private String id;
+    @NotBlank(message = "Name cannot be blank")
+    @Size(max = 100, message = "Name must be at most 100 characters")
     private String name;
+    @Size(max = 500, message = "Description must be at most 500 characters")
     private String description;
+    @NotNull(message = "Price is required")
+    @Positive(message = "Price must be positive")
     private Double price;
+    @NotBlank(message = "Category cannot be blank")
+    @Size(max = 100, message = "Category must be at most 100 characters")
     private String category;
+    @NotNull(message = "Availability is required")
     private Boolean available;
     private Long createdAt;
     private boolean deleted = false;
